@@ -1,0 +1,10 @@
+node_modules
+.next
+.env
+.env.*
+__pycache__/
+*.pyc
+.DS_Store
+*.csv
+*.xlsx
+

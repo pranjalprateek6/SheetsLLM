@@ -1,0 +1,24 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root{
+  --glass-border:rgba(0,0,0,.12);
+  --glass-fill:rgba(255,255,255,.75);
+  --grid-dot: rgba(0,0,0,.03);
+  --page-bg: #ECECEE;
+}
+.dark{
+  --glass-border:rgba(255,255,255,.12);
+  --glass-fill:rgba(255,255,255,.06);
+  --grid-dot: rgba(255,255,255,.08);
+  --page-bg: #000000;
+}
+.bg-grid{
+  background-color: var(--page-bg);
+  background-image: radial-gradient(var(--grid-dot) 1px, transparent 1px);
+  background-size: 24px 24px; background-position: -1px -1px;
+}
+
+html, body { height: 100%; }
+body { @apply antialiased; }
