@@ -2,21 +2,6 @@
 
 > Transform your spreadsheets using natural language. No formulas, no code, just plain English.
 
-## 📋 Table of Contents
-
-- [Overview](#overview)
-- [Features](#features)
-- [Architecture](#architecture)
-- [Tech Stack](#tech-stack)
-- [How It Works](#how-it-works)
-- [Project Structure](#project-structure)
-- [Setup & Installation](#setup--installation)
-- [API Documentation](#api-documentation)
-- [Design Decisions](#design-decisions)
-- [Future Enhancements](#future-enhancements)
-
----
-
 ## 🎯 Overview
 
 **SheetsLLM** is a full-stack web application that enables users to transform CSV/XLSX files using natural language instructions. Instead of writing complex Excel formulas or Python scripts, users can simply describe what they want in plain English (e.g., "keep rows where HS% > 25 and FK > 40"), and the AI translates it into precise data operations.
