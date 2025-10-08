@@ -635,10 +635,4 @@ This project is built as an MVP demonstration. No formal license applied yet.
 
 For questions, feedback, or issues:
 - Create an issue in this repository
-- Email: [your-email@example.com]
-
----
-
-**Built with ❤️ using AI-assisted development**
-
-*Last updated: 2025-01-07*
+- Email: pranjalprateek9@gmail.com
