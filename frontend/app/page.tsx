@@ -1,5 +1,7 @@
+"use client";
 import Link from "next/link";
-import { ArrowUpRight, Upload, MessageSquare, Eye, Zap, Shield, Users } from "lucide-react";
+import { ArrowRight, Upload, MessageSquare, Eye, Zap, Shield, Users } from "lucide-react";
+import { motion } from "framer-motion";
 
 const topFeatures = [
   {
@@ -10,7 +12,7 @@ const topFeatures = [
   {
     icon: MessageSquare,
     title: "Natural-language transforms",
-    description: "Type commands in plain English. Filter rows, rename columns, calculate fields—no formulas or code required."
+    description: "Type commands in plain English. Filter rows, rename columns, calculate fields - no formulas or code required."
   },
   {
     icon: Eye,
@@ -39,64 +41,79 @@ const benefits = [
 
 export default function Landing(){
   return (
-    <div className="relative space-y-20">
+    <div className="relative space-y-8 pt-0">
       {/* Hero Section */}
-      <section className="text-center py-16 sm:py-20">
-        <h1 className="text-5xl sm:text-7xl font-bold tracking-tight text-zinc-900 dark:text-white">
+      <section className="text-center py-8 sm:py-12">
+        <h1 className="text-5xl sm:text-7xl font-bold tracking-tight text-black dark:text-white">
           LLM-powered spreadsheets.
         </h1>
-        <p className="mt-6 text-xl text-zinc-600 dark:text-white/70 max-w-3xl mx-auto leading-relaxed">
-          Upload a sheet, type what you want, watch it transform—fast and transparent.
+        <p className="mt-3 text-xl text-black/70 dark:text-white/70 max-w-3xl mx-auto leading-relaxed">
+          Upload a sheet, type what you want, watch it transform - fast and transparent.
         </p>
-        <div className="mt-10 flex items-center justify-center gap-4">
-          <Link href="/workspace" className="inline-flex items-center gap-2 rounded-full px-7 py-3.5 bg-black text-white hover:bg-black/90 dark:bg-white dark:text-black dark:hover:bg-white/90 transition font-medium text-lg shadow-lg">
-            Try it yourself <ArrowUpRight className="h-5 w-5"/>
-          </Link>
-          <Link 
-            href="/features"
-            className="rounded-full px-7 py-3.5 border border-zinc-300 dark:border-white/20 hover:bg-zinc-50 dark:hover:bg-white/5 transition font-medium text-lg text-zinc-900 dark:text-white"
+        <motion.div 
+          className="mt-6 flex items-center justify-center gap-4"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3, duration: 0.5 }}
+        >
+          <motion.div
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
           >
-            See all features
-          </Link>
-        </div>
+            <Link href="/workspace" className="inline-flex items-center gap-2 rounded-lg px-7 py-3.5 bg-black dark:bg-white text-white dark:text-black hover:bg-black/80 dark:hover:bg-white/80 transition font-medium text-lg shadow-lg">
+              Try it yourself <ArrowRight className="h-5 w-5"/>
+            </Link>
+          </motion.div>
+          <motion.div
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+          >
+            <Link 
+              href="/features"
+              className="glass-card rounded-lg px-7 py-3.5 hover:bg-black/5 dark:hover:bg-white/5 transition font-medium text-lg text-black dark:text-white"
+            >
+              See all features
+            </Link>
+          </motion.div>
+        </motion.div>
       </section>
 
       {/* What is it */}
       <section className="max-w-4xl mx-auto">
-        <h2 className="text-3xl font-bold text-center text-zinc-900 dark:text-white mb-6">
+        <h2 className="text-3xl font-bold text-center text-black dark:text-white mb-3">
           What is SheetsLLM?
         </h2>
-        <p className="text-lg text-zinc-600 dark:text-white/70 leading-relaxed text-center">
+        <p className="text-lg text-black/70 dark:text-white/70 leading-relaxed text-center">
           SheetsLLM is an AI-powered spreadsheet transformation tool that lets you manipulate data using natural language. 
           No more wrestling with complex formulas or learning programming languages. Just describe what you want in plain English, 
-          and our AI translates it into precise data operations—instantly.
+          and our AI translates it into precise data operations - instantly.
         </p>
       </section>
 
       {/* Why & For Whom */}
-      <section className="max-w-5xl mx-auto grid md:grid-cols-2 gap-12">
+      <section className="max-w-5xl mx-auto grid md:grid-cols-2 gap-6">
         <div className="space-y-4">
-          <h2 className="text-2xl font-bold text-zinc-900 dark:text-white">Why we built it</h2>
-          <p className="text-zinc-600 dark:text-white/70 leading-relaxed">
+          <h2 className="text-2xl font-bold text-black dark:text-white">Why we built it</h2>
+          <p className="text-black/70 dark:text-white/70 leading-relaxed">
             Spreadsheet operations shouldn't require expert knowledge. We built SheetsLLM because data professionals 
             waste hours writing formulas, debugging expressions, and translating business logic into technical syntax. 
-            LLMs understand intent—why not use them to bridge the gap between "what you want" and "how to do it"?
+            LLMs understand intent - why not use them to bridge the gap between "what you want" and "how to do it"?
           </p>
         </div>
         <div className="space-y-4">
-          <h2 className="text-2xl font-bold text-zinc-900 dark:text-white">Who it's for</h2>
-          <ul className="space-y-3 text-zinc-600 dark:text-white/70">
+          <h2 className="text-2xl font-bold text-black dark:text-white">Who it's for</h2>
+          <ul className="space-y-3 text-black/70 dark:text-white/70">
             <li className="flex items-start gap-3">
-              <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 dark:bg-white/40 mt-2 flex-shrink-0"></span>
-              <span><strong className="text-zinc-900 dark:text-white">Analysts & Data Scientists</strong> who want to clean data faster</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-black/40 dark:bg-white/40 mt-2 flex-shrink-0"></span>
+              <span><strong className="text-black dark:text-white">Analysts & Data Scientists</strong> who want to clean data faster</span>
             </li>
             <li className="flex items-start gap-3">
-              <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 dark:bg-white/40 mt-2 flex-shrink-0"></span>
-              <span><strong className="text-zinc-900 dark:text-white">Business Users</strong> who need quick insights without coding</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-black/40 dark:bg-white/40 mt-2 flex-shrink-0"></span>
+              <span><strong className="text-black dark:text-white">Business Users</strong> who need quick insights without coding</span>
             </li>
             <li className="flex items-start gap-3">
-              <span className="w-1.5 h-1.5 rounded-full bg-zinc-400 dark:bg-white/40 mt-2 flex-shrink-0"></span>
-              <span><strong className="text-zinc-900 dark:text-white">Anyone</strong> tired of complex Excel formulas and VBA macros</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-black/40 dark:bg-white/40 mt-2 flex-shrink-0"></span>
+              <span><strong className="text-black dark:text-white">Anyone</strong> tired of complex Excel formulas and VBA macros</span>
             </li>
           </ul>
         </div>
@@ -104,20 +121,38 @@ export default function Landing(){
 
       {/* How it helps */}
       <section className="max-w-4xl mx-auto">
-        <h2 className="text-3xl font-bold text-center text-zinc-900 dark:text-white mb-10">
+        <motion.h2 
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5 }}
+          className="text-3xl font-bold text-center text-black dark:text-white mb-4"
+        >
           How it helps you
-        </h2>
-        <div className="grid sm:grid-cols-3 gap-6">
+        </motion.h2>
+        <div className="grid sm:grid-cols-3 gap-5">
           {benefits.map((benefit, i) => {
             const Icon = benefit.icon;
             return (
-              <div key={i} className="text-center space-y-3">
-                <div className="w-14 h-14 rounded-2xl bg-black/10 dark:bg-white/10 flex items-center justify-center mx-auto">
-                  <Icon className="h-7 w-7 text-zinc-900 dark:text-white" />
-                </div>
-                <h3 className="font-semibold text-zinc-900 dark:text-white">{benefit.title}</h3>
-                <p className="text-sm text-zinc-600 dark:text-white/70">{benefit.description}</p>
-              </div>
+              <motion.div 
+                key={i}
+                initial={{ opacity: 0, scale: 0.8 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.4, delay: i * 0.15 }}
+                whileHover={{ y: -5 }}
+                className="text-center space-y-3"
+              >
+                <motion.div 
+                  className="w-14 h-14 rounded-2xl bg-black/10 dark:bg-white/10 flex items-center justify-center mx-auto"
+                  whileHover={{ scale: 1.1, rotate: 5 }}
+                  transition={{ type: "spring", stiffness: 300 }}
+                >
+                  <Icon className="h-7 w-7 text-black dark:text-white" />
+                </motion.div>
+                <h3 className="font-semibold text-black dark:text-white">{benefit.title}</h3>
+                <p className="text-sm text-black/70 dark:text-white/70">{benefit.description}</p>
+              </motion.div>
             );
           })}
         </div>
@@ -125,46 +160,65 @@ export default function Landing(){
 
       {/* Top Features */}
       <section className="max-w-6xl mx-auto">
-        <h2 className="text-3xl font-bold text-center text-zinc-900 dark:text-white mb-10">
+        <motion.h2 
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5 }}
+          className="text-3xl font-bold text-center text-black dark:text-white mb-4"
+        >
           Top Features
-        </h2>
-        <div className="grid md:grid-cols-3 gap-6">
+        </motion.h2>
+        <div className="grid md:grid-cols-3 gap-5">
           {topFeatures.map((feature, i) => {
             const Icon = feature.icon;
             return (
-              <div key={i} className="rounded-2xl border-2 border-zinc-300 dark:border-white/10 bg-white/90 dark:bg-white/5 backdrop-blur-xl p-6 transition hover:border-zinc-400 dark:hover:border-white/20 shadow-lg hover:shadow-xl">
-                <div className="w-12 h-12 rounded-xl bg-black/10 dark:bg-white/10 flex items-center justify-center mb-4">
-                  <Icon className="h-6 w-6 text-zinc-900 dark:text-white" />
-                </div>
-                <h3 className="font-semibold text-zinc-900 dark:text-white mb-2">{feature.title}</h3>
-                <p className="text-sm text-zinc-600 dark:text-white/70 leading-relaxed">{feature.description}</p>
-              </div>
+              <motion.div 
+                key={i}
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: i * 0.1 }}
+                whileHover={{ scale: 1.02, y: -4 }}
+                whileTap={{ scale: 0.98 }}
+                className="glass-card rounded-3xl p-5 cursor-pointer"
+              >
+                <motion.div 
+                  className="w-12 h-12 rounded-xl bg-black/10 dark:bg-white/10 flex items-center justify-center mb-4"
+                  whileHover={{ rotate: 360 }}
+                  transition={{ duration: 0.6 }}
+                >
+                  <Icon className="h-6 w-6 text-black dark:text-white" />
+                </motion.div>
+                <h3 className="font-semibold text-black dark:text-white mb-2">{feature.title}</h3>
+                <p className="text-sm text-black/70 dark:text-white/70 leading-relaxed">{feature.description}</p>
+              </motion.div>
             );
           })}
         </div>
         <div className="text-center mt-8">
           <Link 
             href="/features" 
-            className="inline-flex items-center gap-2 text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white font-medium"
+            className="inline-flex items-center gap-2 text-black/70 dark:text-white/70 hover:text-black dark:hover:text-white font-medium"
           >
-            View all features <ArrowUpRight className="h-4 w-4" />
+            View all features <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
       </section>
 
       {/* CTA */}
-      <section className="text-center py-16 rounded-3xl border-2 border-zinc-300 dark:border-white/10 bg-gradient-to-br from-white/95 to-zinc-100/95 dark:from-white/5 dark:to-white/[0.02] backdrop-blur-xl shadow-lg">
-        <h2 className="text-3xl font-bold text-zinc-900 dark:text-white mb-4">
+      <section className="text-center py-8 glass-card rounded-3xl">
+        <h2 className="text-3xl font-bold text-black dark:text-white mb-2">
           Ready to transform your spreadsheets?
         </h2>
-        <p className="text-zinc-600 dark:text-white/70 mb-8 text-lg">
+        <p className="text-black/70 dark:text-white/70 mb-5 text-lg">
           No signup required. Start transforming in seconds.
         </p>
         <Link 
           href="/workspace" 
-          className="inline-flex items-center gap-2 rounded-full px-7 py-3.5 bg-black text-white hover:bg-black/90 dark:bg-white dark:text-black dark:hover:bg-white/90 transition font-medium text-lg shadow-lg"
+          className="inline-flex items-center gap-2 rounded-lg px-7 py-3.5 bg-black dark:bg-white text-white dark:text-black hover:bg-black/80 dark:hover:bg-white/80 transition font-medium text-lg"
         >
-          Get Started <ArrowUpRight className="h-5 w-5"/>
+          Get Started <ArrowRight className="h-5 w-5"/>
         </Link>
       </section>
     </div>

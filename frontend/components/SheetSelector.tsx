@@ -1,6 +1,6 @@
 "use client";
 import { motion, AnimatePresence } from "framer-motion";
-import { FileSpreadsheet } from "lucide-react";
+import { FileSpreadsheet, ArrowRight } from "lucide-react";
 
 interface SheetSelectorProps {
   isOpen: boolean;
@@ -34,49 +34,32 @@ export default function SheetSelector({
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white dark:bg-zinc-900 rounded-2xl border-2 border-zinc-300 dark:border-white/10 shadow-2xl max-w-md w-full overflow-hidden pointer-events-auto"
+              className="glass-card rounded-3xl max-w-lg w-full overflow-hidden pointer-events-auto"
             >
-              <div className="p-6 border-b border-zinc-200 dark:border-zinc-700">
-                <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-blue-100 dark:bg-blue-500/20 flex items-center justify-center flex-shrink-0">
-                    <FileSpreadsheet className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-lg font-semibold text-zinc-900 dark:text-white mb-1">
-                      Select Sheet
-                    </h3>
-                    <p className="text-sm text-zinc-600 dark:text-zinc-300">
-                      This file contains multiple sheets. Choose which one to import:
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-4 max-h-96 overflow-y-auto">
-                <div className="space-y-2">
+              <div className="p-8">
+                <h2 className="text-2xl font-semibold text-black dark:text-white mb-2">Select a Sheet</h2>
+                <p className="text-black/70 dark:text-white/70 mb-6">This workbook contains multiple sheets. Choose one to continue:</p>
+                
+                <div className="space-y-3">
                   {sheets.map((sheet, i) => (
                     <button
                       key={i}
                       onClick={() => onSelect(sheet)}
-                      className="w-full text-left px-4 py-3 rounded-lg border-2 border-zinc-200 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-500 bg-white dark:bg-zinc-800/50 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition group"
+                      className="w-full text-left px-6 py-4 rounded-xl glass-card hover:bg-black/5 dark:hover:bg-white/5 transition-all group"
                     >
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-zinc-100 dark:bg-zinc-700 flex items-center justify-center flex-shrink-0 group-hover:bg-zinc-200 dark:group-hover:bg-zinc-600 transition">
-                          <FileSpreadsheet className="h-4 w-4 text-zinc-600 dark:text-zinc-300" />
-                        </div>
-                        <span className="font-medium text-zinc-900 dark:text-white">
-                          {sheet}
-                        </span>
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium text-black dark:text-white">{sheet}</span>
+                        <ArrowRight className="h-5 w-5 text-black/50 dark:text-white/50 group-hover:text-black dark:group-hover:text-white group-hover:translate-x-1 transition-all" />
                       </div>
                     </button>
                   ))}
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-3 p-4 bg-zinc-50 dark:bg-zinc-800/50 border-t border-zinc-200 dark:border-zinc-700">
+              <div className="flex items-center justify-end gap-3 px-8 py-6 bg-black/5 dark:bg-white/5 border-t border-black/10 dark:border-white/10">
                 <button
                   onClick={onCancel}
-                  className="px-4 py-2 rounded-lg text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition"
+                  className="px-6 py-2.5 rounded-lg font-medium text-black/70 dark:text-white/70 hover:bg-black/5 dark:hover:bg-white/5 transition"
                 >
                   Cancel
                 </button>

@@ -7,10 +7,19 @@ export async function GET(req: NextRequest) {
   if (!file_id) return NextResponse.json({ error: "missing file_id" }, { status: 400 });
   const resp = await fetch(`${backendUrl}/download?file_id=${file_id}&format=${format}`);
   const blob = await resp.arrayBuffer();
+  const filename = format === "xlsx" ? "export.xlsx" : "export.csv";
+
+  let contentType: string;
+  if (format === "xlsx") {
+    contentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+  } else {
+    contentType = "text/csv; charset=utf-8";
+  }
+
   return new NextResponse(blob, {
     headers: {
-      "Content-Type": "text/csv",
-      "Content-Disposition": `attachment; filename="result.${format}"`
+      "Content-Type": contentType,
+      "Content-Disposition": `attachment; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(filename)}`
     }
   });
 }

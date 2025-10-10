@@ -1,10 +1,9 @@
 "use client";
 import Link from "next/link";
 import { 
-  Upload, MessageSquare, Eye, Filter, Table, Download, 
-  Sparkles, Undo2, Clock, GitMerge, Users, Shield, 
-  TrendingUp, Zap, CheckCircle2
+  ArrowRight, CheckCircle2, Sparkles, Upload, FileText, Filter, Table, Download, Undo2, Zap, Shield, Database, Users, GitBranch, BarChart3, Eye, History, Columns, MessageSquare, TrendingUp, Clock, GitMerge 
 } from "lucide-react";
+import { motion } from "framer-motion";
 
 interface Feature {
   icon: any;
@@ -65,7 +64,7 @@ const currentFeatures: Feature[] = [
   {
     icon: Download,
     title: "Export Results",
-    description: "Download your transformed spreadsheet in CSV or XLSX format. Keep your original file safe—all changes are non-destructive.",
+    description: "Download your transformed spreadsheet in CSV or XLSX format. Keep your original file safe - all changes are non-destructive.",
     status: "available"
   },
   {
@@ -123,13 +122,13 @@ const upcomingFeatures: Feature[] = [
 
 export default function FeaturesPage() {
   return (
-    <div className="space-y-16">
+    <div className="space-y-8 pt-8">
       {/* Hero Section */}
       <div className="text-center max-w-3xl mx-auto">
-        <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-zinc-900 dark:text-white">
+        <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-black dark:text-white">
           Powerful Features
         </h1>
-        <p className="mt-4 text-lg text-zinc-600 dark:text-white/70">
+        <p className="mt-2 text-lg text-black/70 dark:text-white/70">
           Everything you need to transform spreadsheets with natural language. 
           No coding required.
         </p>
@@ -137,30 +136,40 @@ export default function FeaturesPage() {
 
       {/* Current Features */}
       <div>
-        <div className="flex items-center gap-3 mb-8">
+        <div className="flex items-center gap-3 mb-4">
           <CheckCircle2 className="h-6 w-6 text-green-600 dark:text-green-400" />
-          <h2 className="text-2xl font-semibold text-zinc-900 dark:text-white">
+          <h2 className="text-2xl font-semibold text-black dark:text-white">
             Available Now
           </h2>
         </div>
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
           {currentFeatures.map((feature, i) => {
             const Icon = feature.icon;
             return (
-              <div 
-                key={i} 
-                className="rounded-2xl border-2 border-zinc-300 dark:border-white/10 bg-white/90 dark:bg-white/5 backdrop-blur-xl p-6 hover:border-zinc-400 dark:hover:border-white/20 transition shadow-lg hover:shadow-xl"
+              <motion.div 
+                key={i}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.4, delay: i * 0.08 }}
+                whileHover={{ y: -4, scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                className="glass-card rounded-3xl p-5 cursor-pointer"
               >
-                <div className="w-12 h-12 rounded-xl bg-black/10 dark:bg-white/10 flex items-center justify-center mb-4">
-                  <Icon className="h-6 w-6 text-zinc-900 dark:text-white" />
-                </div>
-                <h3 className="font-semibold text-zinc-900 dark:text-white mb-2">
+                <motion.div 
+                  className="w-12 h-12 rounded-xl bg-black/10 dark:bg-white/10 flex items-center justify-center mb-4"
+                  whileHover={{ rotate: 360, scale: 1.1 }}
+                  transition={{ duration: 0.5 }}
+                >
+                  <Icon className="h-6 w-6 text-black dark:text-white" />
+                </motion.div>
+                <h3 className="font-semibold text-black dark:text-white mb-2">
                   {feature.title}
                 </h3>
-                <p className="text-sm text-zinc-600 dark:text-white/70 leading-relaxed">
+                <p className="text-sm text-black/70 dark:text-white/70 leading-relaxed">
                   {feature.description}
                 </p>
-              </div>
+              </motion.div>
             );
           })}
         </div>
@@ -168,32 +177,32 @@ export default function FeaturesPage() {
 
       {/* Upcoming Features */}
       <div>
-        <div className="flex items-center gap-3 mb-8">
+        <div className="flex items-center gap-3 mb-4">
           <Sparkles className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-          <h2 className="text-2xl font-semibold text-zinc-900 dark:text-white">
+          <h2 className="text-2xl font-semibold text-black dark:text-white">
             Coming Soon
           </h2>
         </div>
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
           {upcomingFeatures.map((feature, i) => {
             const Icon = feature.icon;
             return (
               <div 
                 key={i} 
-                className="rounded-2xl border-2 border-zinc-300/60 dark:border-white/5 bg-zinc-50/80 dark:bg-white/[0.02] backdrop-blur-xl p-6 relative overflow-hidden shadow-md"
+                className="glass-card rounded-3xl p-5 relative overflow-hidden opacity-60"
               >
                 <div className="absolute top-3 right-3">
-                  <span className="text-xs font-medium px-2 py-1 rounded-full bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400">
+                  <span className="text-xs font-medium px-2 py-1 rounded-full bg-black/10 dark:bg-white/10 text-black dark:text-white">
                     Soon
                   </span>
                 </div>
-                <div className="w-12 h-12 rounded-xl bg-zinc-200 dark:bg-white/5 flex items-center justify-center mb-4">
-                  <Icon className="h-6 w-6 text-zinc-500 dark:text-white/50" />
+                <div className="w-12 h-12 rounded-xl bg-black/10 dark:bg-white/10 flex items-center justify-center mb-4">
+                  <Icon className="h-6 w-6 text-black/50 dark:text-white/50" />
                 </div>
-                <h3 className="font-semibold text-zinc-900 dark:text-white mb-2">
+                <h3 className="font-semibold text-black dark:text-white mb-2">
                   {feature.title}
                 </h3>
-                <p className="text-sm text-zinc-600 dark:text-white/60 leading-relaxed">
+                <p className="text-sm text-black/70 dark:text-white/70 leading-relaxed">
                   {feature.description}
                 </p>
               </div>
@@ -203,18 +212,18 @@ export default function FeaturesPage() {
       </div>
 
       {/* CTA */}
-      <div className="text-center py-12 rounded-2xl border-2 border-zinc-300 dark:border-white/10 bg-gradient-to-br from-white/95 to-zinc-100/95 dark:from-white/5 dark:to-white/[0.02] backdrop-blur-xl shadow-lg">
-        <h3 className="text-2xl font-semibold text-zinc-900 dark:text-white mb-3">
+      <div className="text-center py-8 glass-card rounded-3xl">
+        <h3 className="text-2xl font-semibold text-black dark:text-white mb-2">
           Ready to get started?
         </h3>
-        <p className="text-zinc-600 dark:text-white/70 mb-6">
-          Try it now—no signup required. Upload a file and start transforming.
+        <p className="text-black/70 dark:text-white/70 mb-4">
+          Try it now - no signup required. Upload a file and start transforming.
         </p>
         <Link 
           href="/workspace" 
-          className="inline-flex items-center gap-2 rounded-full px-6 py-3 bg-black text-white hover:bg-black/90 dark:bg-white dark:text-black dark:hover:bg-white/90 transition font-medium"
+          className="inline-flex items-center gap-2 rounded-lg px-6 py-3 bg-black dark:bg-white text-white dark:text-black hover:bg-black/80 dark:hover:bg-white/80 transition font-medium"
         >
-          Go to Workspace
+          Go to Workspace <ArrowRight className="h-5 w-5" />
         </Link>
       </div>
     </div>

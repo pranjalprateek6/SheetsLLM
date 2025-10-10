@@ -1,7 +1,8 @@
 "use client";
 import { useRef, useState } from "react";
+import { Loader2 } from "lucide-react";
 
-type PreviewFn = (p:{ columns: string[]; rows: any[] }) => void;
+type PreviewFn = (p:{ columns: string[]; rows: any[]; totalRows?: number; totalColumns?: number }) => void;
 
 async function safeJson(res: Response){
   const ct = res.headers.get("content-type") || "";
@@ -25,7 +26,8 @@ export default function InstructionPanel({
   onUndo,
   onReset,
   onRunning,
-  onDuration
+  onDuration,
+  onSchema
 }: {
   fileId?: string;
   schema?: any;
@@ -33,9 +35,10 @@ export default function InstructionPanel({
   runDurationSec?: number | null;
   onPreview: PreviewFn;
   onUndo: () => void;
-  onReset: () => void;
+  onReset: () => Promise<void> | void;
   onRunning?: (v: boolean) => void;
   onDuration?: (sec: number) => void;
+  onSchema?: (s: any) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [running, setRunning] = useState(false);
@@ -83,8 +86,11 @@ export default function InstructionPanel({
       const execBody = await safeJson(execRes);
       if ((execBody as any).__nonjson) throw new Error("Execute endpoint returned non-JSON content.");
 
-      const { preview, columns } = execBody as any;
-      onPreview({ columns, rows: preview });
+      const { preview, columns, total_rows, total_columns, schema: updatedSchema } = execBody as any;
+      onPreview({ columns, rows: preview, totalRows: total_rows, totalColumns: total_columns });
+      if (updatedSchema && onSchema) {
+        onSchema(updatedSchema);
+      }
       
       const t1 = performance.now();
       onDuration?.((t1 - t0)/1000);
@@ -98,41 +104,42 @@ export default function InstructionPanel({
   };
   return (
     <div>
-      <h3 className="font-medium mb-3 text-zinc-900 dark:text-white">Instruction</h3>
+      <h3 className="font-semibold mb-4 text-black dark:text-white text-lg">Transform Your Data</h3>
       <input
         ref={inputRef}
-        className="w-full rounded-xl bg-zinc-50 dark:bg-white/5 border border-zinc-300 dark:border-white/10 px-3 py-2 outline-none focus:ring-2 focus:ring-zinc-400 dark:focus:ring-white/20 text-zinc-900 dark:text-white placeholder:text-zinc-500 dark:placeholder:text-white/50"
-        placeholder="e.g., keep rows where HS% > 25 and FK > 40; sort by Rating desc; limit 30"
+        className="w-full rounded-lg glass-card px-4 py-3 outline-none focus:ring-2 focus:ring-black dark:focus:ring-white text-black dark:text-white placeholder:text-black/50 dark:placeholder:text-white/50 transition"
+        placeholder="e.g., keep rows where Revenue > 1000; sort by Date desc"
       />
-      <div className="mt-3 flex gap-2">
+      <div className="mt-4 flex gap-3">
         <button
           onClick={run}
           disabled={running}
-          className="rounded-full px-4 py-2 bg-black text-white dark:bg-white dark:text-black hover:bg-black/90 dark:hover:bg-white/90 disabled:opacity-60 transition text-sm font-medium"
+          className="px-6 py-2.5 rounded-lg bg-black dark:bg-white text-white dark:text-black hover:bg-black/80 dark:hover:bg-white/80 disabled:opacity-50 disabled:cursor-not-allowed transition font-medium inline-flex items-center gap-2"
         >
+          {running && <Loader2 className="h-4 w-4 animate-spin" />}
           {running ? "Running…" : "Run"}
         </button>
         <button
           onClick={onUndo}
           disabled={loading}
-          className="rounded-full px-4 py-2 border border-zinc-300 dark:border-white/10 hover:bg-zinc-100 dark:hover:bg-white/5 disabled:opacity-60 text-zinc-900 dark:text-white transition text-sm"
+          className="px-6 py-2.5 rounded-lg glass-card hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-50 disabled:cursor-not-allowed text-black dark:text-white transition font-medium"
         >
           Undo
         </button>
         <button
-          onClick={() => {
+          onClick={async () => {
             if (inputRef.current) {
               inputRef.current.value = "";
             }
-            onReset();
+            await onReset();
           }}
           disabled={loading}
-          className="rounded-full px-4 py-2 border border-transparent hover:bg-zinc-100 dark:hover:bg-white/5 text-zinc-900 dark:text-white transition text-sm"
+          className="px-6 py-2.5 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 text-black/70 dark:text-white/70 transition font-medium"
         >
           Reset
         </button>
       </div>
-      {error && <p className="mt-3 text-sm text-red-400 dark:text-red-300/90">{error}</p>}
+      {error && <p className="mt-4 text-sm text-red-600 dark:text-red-400 glass-card rounded-lg p-3">{error}</p>}
     </div>
   );
 }

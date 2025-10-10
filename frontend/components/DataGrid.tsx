@@ -28,25 +28,34 @@ export default function DataGrid({ columns, rows, loading }: { columns: string[]
       {/* Main table container */}
       <div 
         ref={tableRef}
-        className="overflow-auto border border-white/10 rounded-xl flex-1"
+        className="overflow-auto glass-card no-hover rounded-xl flex-1"
       >
         <table className="min-w-full text-sm">
-          <thead className="bg-white/5 backdrop-blur-lg sticky top-0 z-10">
+          <thead className="bg-black/5 dark:bg-white/5 sticky top-0 z-10">
             <tr>
               {head.map((h) => (
-                <th key={h} className="px-3 py-2 text-left font-semibold border-b border-white/10 whitespace-nowrap">{h}</th>
+                <th key={h} className="px-4 py-3 text-left font-semibold text-black dark:text-white border-b border-black/10 dark:border-white/10 whitespace-nowrap">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td className="px-3 py-2 text-white/70" colSpan={head.length}>Running…</td></tr>
+              <tr>
+                <td className="px-4 py-3 text-black/70 dark:text-white/70" colSpan={head.length}>
+                  <div className="flex items-center gap-2 animate-pulse">
+                    <div className="w-4 h-4 bg-black/20 dark:bg-white/20 rounded-full animate-bounce"></div>
+                    <div className="w-4 h-4 bg-black/20 dark:bg-white/20 rounded-full animate-bounce" style={{animationDelay: '0.1s'}}></div>
+                    <div className="w-4 h-4 bg-black/20 dark:bg-white/20 rounded-full animate-bounce" style={{animationDelay: '0.2s'}}></div>
+                    <span className="ml-2">Running…</span>
+                  </div>
+                </td>
+              </tr>
             ) : rows.length === 0 ? (
-              <tr><td className="px-3 py-2 text-white/70" colSpan={head.length}>No data</td></tr>
+              <tr><td className="px-4 py-3 text-black/70 dark:text-white/70" colSpan={head.length}>No data</td></tr>
             ) : rows.map((r, i) => (
-              <tr key={i} className="border-b border-white/10">
+              <tr key={i} className="border-b border-black/5 dark:border-white/5 hover:bg-black/5 dark:hover:bg-white/5 transition-colors">
                 {head.map((h) => (
-                  <td key={h} className="px-3 py-2 align-top">
+                  <td key={h} className="px-4 py-3 align-top text-black dark:text-white">
                     <div className="truncate max-w-[200px]" title={String(r[h] ?? "")}>{String(r[h] ?? "")}</div>
                   </td>
                 ))}
