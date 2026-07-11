@@ -1,0 +1,146 @@
+name: AI Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: ai-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    # Forked PRs don't receive secrets; skip them explicitly.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Collect PR diff
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          git diff "$BASE_SHA...$HEAD_SHA" \
+            -- . \
+            ':(exclude)package-lock.json' \
+            ':(exclude)*.lock' \
+            ':(exclude)*.min.js' \
+            ':(exclude)*.min.css' \
+            > pr.diff
+          echo "Diff size: $(wc -c < pr.diff) bytes, $(grep -c '^+++' pr.diff || true) files"
+
+      - name: Gemini review
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          python3 - <<'PY'
+          import json, os, sys, urllib.request, urllib.error
+
+          MODELS = ["gemini-3.5-flash", "gemini-2.5-flash-lite", "gemini-flash-latest"]
+          MAX_DIFF_CHARS = 250_000
+
+          diff = open("pr.diff", encoding="utf-8", errors="replace").read()
+          if not diff.strip():
+              open("review.md", "w").write("No reviewable changes in this diff.")
+              sys.exit(0)
+          truncated = len(diff) > MAX_DIFF_CHARS
+          diff = diff[:MAX_DIFF_CHARS]
+
+          system = """You are a rigorous senior code reviewer for a FastAPI + Next.js project
+          (SheetsLLM: natural-language spreadsheet transforms via DuckDB SQL over Parquet,
+          Supabase auth/storage, LLM-generated SELECT-only SQL).
+
+          Review ONLY the diff you are given. Output GitHub-flavored Markdown with EXACTLY these sections:
+
+          ## Summary
+          2-4 sentences on what the change does and overall assessment.
+
+          ## 🚨 Security & malicious code
+          Injection risks, auth bypasses, secrets in code, path traversal, unsafe deserialization,
+          supply-chain red flags, obfuscated/beaconing/exfiltrating code, backdoors. Also flag prompt-injection
+          risks given LLM-generated SQL is executed. If clean, say "No issues found."
+
+          ## 🐛 Correctness
+          Real bugs with a concrete failure scenario (inputs -> wrong behavior). No style nits here.
+
+          ## 🧹 Quality & simplification
+          Duplication, dead code, error-handling gaps, needless complexity. Be selective - top items only.
+
+          ## 🔧 Suggested fixes
+          For each concrete finding above, a short fenced code block with the corrected code,
+          prefixed by the file path. Skip if nothing actionable.
+
+          Rules: cite file paths and line hints from the diff. Be specific, not generic.
+          Do not invent issues to fill sections. Severity-order findings. Keep the whole review under 600 words."""
+
+          user = f"PR title: {os.environ.get('PR_TITLE','')}\n\nPR description:\n{os.environ.get('PR_BODY','') or '(none)'}\n\nDiff{' (truncated)' if truncated else ''}:\n```diff\n{diff}\n```"
+
+          payload = json.dumps({
+              "system_instruction": {"parts": [{"text": system}]},
+              "contents": [{"role": "user", "parts": [{"text": user}]}],
+              "generationConfig": {"temperature": 0.1, "maxOutputTokens": 4096},
+          }).encode()
+
+          key = os.environ["GEMINI_API_KEY"]
+          text, errors = None, []
+          for model in MODELS:
+              req = urllib.request.Request(
+                  f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={key}",
+                  data=payload, headers={"Content-Type": "application/json"})
+              try:
+                  with urllib.request.urlopen(req, timeout=180) as r:
+                      data = json.load(r)
+                  parts = data["candidates"][0]["content"].get("parts", [])
+                  text = "\n".join(p.get("text", "") for p in parts).strip()
+                  if text:
+                      print(f"Reviewed with {model}")
+                      break
+              except urllib.error.HTTPError as e:
+                  errors.append(f"{model}: HTTP {e.code}")
+              except Exception as e:
+                  errors.append(f"{model}: {e}")
+
+          if not text:
+              text = "⚠️ AI review unavailable this run (" + "; ".join(errors) + "). Not blocking."
+
+          note = "\n\n> ⚠️ Diff was truncated for review.\n" if truncated else "\n"
+          open("review.md", "w", encoding="utf-8").write(text + note)
+          PY
+
+      - name: Post / update PR comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          MARKER="<!-- ai-code-review -->"
+          {
+            echo "$MARKER"
+            echo "## 🤖 AI Code Review"
+            echo ""
+            cat review.md
+            echo ""
+            echo "_Automated review of ${{ github.event.pull_request.head.sha }} — advisory, not blocking._"
+          } > comment.md
+
+          # Upsert: update the existing bot comment instead of stacking new ones.
+          COMMENT_ID=$(gh api "repos/${{ github.repository }}/issues/$PR/comments" \
+            --paginate --jq ".[] | select(.body | startswith(\"$MARKER\")) | .id" | head -1)
+          if [ -n "$COMMENT_ID" ]; then
+            gh api "repos/${{ github.repository }}/issues/comments/$COMMENT_ID" \
+              --method PATCH -F body=@comment.md > /dev/null
+            echo "Updated comment $COMMENT_ID"
+          else
+            gh api "repos/${{ github.repository }}/issues/$PR/comments" \
+              --method POST -F body=@comment.md > /dev/null
+            echo "Created new comment"
+          fi
