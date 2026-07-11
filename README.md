@@ -1,623 +1,293 @@
-# SheetsLLM - AI-Powered Spreadsheet Transformation Tool
+# SheetsLLM — AI-Powered Spreadsheet Transformation
 
 > Transform your spreadsheets using natural language. No formulas, no code, just plain English.
 
 ## 🎯 Overview
 
-**SheetsLLM** is a full-stack web application that enables users to transform CSV/XLSX files using natural language instructions. Instead of writing complex Excel formulas or Python scripts, users can simply describe what they want in plain English (e.g., "keep rows where HS% > 25 and FK > 40"), and the AI translates it into precise data operations.
+**SheetsLLM** is a full-stack web application that transforms CSV/XLSX/JSON/Parquet files using natural language. Type an instruction like *"keep rows where age > 28"* or *"create a column landing cost x MRP"* and an LLM translates it into a **DuckDB SQL** query that runs against your data — with a live preview, full step-by-step history, undo/revert, and a conversational assistant (**SAGE**) that can both transform data and answer questions about it.
 
-### Why SheetsLLM?
+### How it's different from the usual "LLM + pandas" demo
 
-- **Accessibility**: No programming or Excel expertise required
-- **Speed**: Most operations complete in under 2 seconds
-- **Privacy**: All data processing happens in-session (no permanent storage)
-- **Transparency**: See exactly what transformations are being applied
-- **Modern UX**: Beautiful dark/light themes with smooth animations
+- **SQL, not generated code** — the LLM emits a single `SELECT` statement, validated against a strict allowlist before execution. No arbitrary code ever runs.
+- **Immutable source data** — uploads are converted once to Parquet and never mutated. Every transformation is stored as a SQL step and **replayed as a CTE chain**, so undo/reset/revert are just "truncate the step list and re-run".
+- **Real persistence & multi-user** — Supabase Postgres for metadata, Supabase Storage for Parquet objects, Supabase Auth (JWT) for users. Files survive restarts and are isolated per user.
+- **Provider-agnostic LLM layer** — switch between OpenAI and Google Gemini with one env var.
 
 ---
 
 ## ✨ Features
 
-### Core Functionality
-
-1. **File Upload & Schema Detection**
-   - Support for CSV and XLSX files
-   - Automatic type inference
-   - Multi-sheet XLSX support with interactive sheet selector
-   - File size limit: 1 million rows
-
-2. **Natural Language Transformations**
-   - Filter rows (e.g., "show only rows where age > 30")
-   - Select/drop columns
-   - Rename columns
-   - Sort data
-   - Calculate new columns (arithmetic operations)
-   - Group by aggregations (sum, mean, count, etc.)
-   - Fill/drop missing values
-   - Deduplicate rows
-   - Limit/take top N rows
-
-3. **Interactive Workflow**
-   - Real-time preview of transformations
-   - Undo functionality (step-by-step)
-   - Reset to original data
-   - Download transformed data as CSV
-   - Persistent state across tab navigation
-
-4. **UI/UX Enhancements**
-   - Dark/Light theme toggle
-   - Glass morphism design
-   - Smooth Framer Motion animations
-   - Custom confirmation dialogs (no browser popups)
-   - Responsive layout
-   - Loading states and progress indicators
+| Area | What you get |
+|---|---|
+| **Upload** | CSV, XLSX/XLS (multi-sheet with selector), TSV, JSON/JSONL, Parquet — converted to ZSTD Parquet. Magic-byte validation, VBA-macro rejection, column sanitization |
+| **Transform** | Natural language → validated DuckDB SQL: filter, sort, select/drop/rename, computed columns, group-by aggregates, dedupe, null handling, pivots… anything expressible as a `SELECT` |
+| **SAGE chat** | Conversational panel with three response modes: **transform** (runs SQL), **insight** (answers questions about the data), **clarification** (asks back when ambiguous, with suggestion buttons) |
+| **Insights** | Auto-generated data quality report on upload: null percentages, duplicate rows, numeric min/max/avg/median, one-click fix suggestions |
+| **Charts** | Built-in bar/line/pie builder (pure SVG, no chart library) with aggregation modes and PNG export |
+| **History** | Every step recorded with its SQL; step-by-step **undo**, full **reset**, and **revert to any step**. Audit log of every action |
+| **Files** | Dashboard with rename, duplicate, delete, download (CSV/TSV/JSON/Parquet), pagination, search & sort |
+| **Async jobs** | Transforms on >100k-row files run as background jobs with progress polling |
+| **UX** | Dark glass-morphism UI, virtualized data grid (sortable/resizable/copy-cell), ⌘K command palette, keyboard shortcuts, onboarding tour |
 
 ---
 
 ## 🏗️ Architecture
 
-SheetsLLM follows a **client-server architecture** with clear separation of concerns:
-
 ```
-┌─────────────────────────────────────────────┐
-│                  Frontend                    │
-│           (Next.js 14 + React)              │
-│                                             │
-│  ┌────────────┐  ┌──────────────────────┐  │
-│  │  UI Pages  │  │   Components         │  │
-│  │  - Home    │  │   - DropZone         │  │
-│  │  - Workspace│  │   - DataGrid        │  │
-│  │  - Features │  │   - InstructionPanel│  │
-│  │  - History  │  │   - Modals          │  │
-│  └────────────┘  └──────────────────────┘  │
-│                                             │
-│  ┌──────────────────────────────────────┐  │
-│  │       Next.js API Routes            │  │
-│  │  /api/upload  /api/plan             │  │
-│  │  /api/execute /api/undo             │  │
-│  │  /api/download                      │  │
-│  └──────────────────────────────────────┘  │
-└──────────────┬──────────────────────────────┘
-               │ HTTP/JSON
-               ▼
-┌─────────────────────────────────────────────┐
-│                Backend                      │
-│          (FastAPI + Python)                │
-│                                             │
-│  ┌──────────────────────────────────────┐  │
-│  │         FastAPI Endpoints           │  │
-│  │  POST /upload                       │  │
-│  │  POST /plan                         │  │
-│  │  POST /execute                      │  │
-│  │  POST /undo                         │  │
-│  │  GET  /download                     │  │
-│  └──────────────────────────────────────┘  │
-│                                             │
-│  ┌──────────────────────────────────────┐  │
-│  │       Core Processing               │  │
-│  │  - Pandas DataFrames                │  │
-│  │  - OpenAI GPT-4o-mini              │  │
-│  │  - In-memory file storage           │  │
-│  │  - History management               │  │
-│  └──────────────────────────────────────┘  │
-└─────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────┐
+│                   Frontend — Next.js 14                    │
+│  Pages: / · /auth · /dashboard · /workspace                │
+│  Components: DataGrid · ChatPanel · ChartPanel ·           │
+│              InsightsCard · HistoryDrawer · CommandPalette │
+│                                                            │
+│  app/api/* route handlers (thin proxies, forward JWT) ─────┼──┐
+│  Supabase JS: email/password auth, session management      │  │
+└────────────────────────────────────────────────────────────┘  │
+                                                    HTTP/JSON   │
+┌───────────────────────────────────────────────────────────────▼┐
+│                     Backend — FastAPI                           │
+│                                                                 │
+│  Middleware: CORS → security headers → per-route timeouts →     │
+│              request-id → Supabase JWT auth                     │
+│                                                                 │
+│  ┌───────────┐  ┌──────────────┐  ┌───────────────────────┐    │
+│  │ LLM layer │  │ SQL validator │  │ DuckDB engine         │    │
+│  │ OpenAI /  │─▶│ SELECT-only,  │─▶│ Parquet views, CTE    │    │
+│  │ Gemini    │  │ EXPLAIN check │  │ replay, schema stats  │    │
+│  └───────────┘  └──────────────┘  └───────────────────────┘    │
+│        ▲                                       │                │
+│   24h SQL cache                     30-min local Parquet cache  │
+└────────────┬──────────────────────────────────┬────────────────┘
+             │                                  │
+   ┌─────────▼──────────┐            ┌──────────▼─────────┐
+   │  Supabase Postgres │            │  Supabase Storage  │
+   │  files             │            │  {user}/{file}/    │
+   │  transformations   │            │  original.parquet  │
+   │  audit_log         │            └────────────────────┘
+   │  chat_messages     │
+   └────────────────────┘
 ```
 
-### Data Flow
+### The transformation model (the interesting part)
 
-1. **Upload**: User uploads CSV/XLSX → Frontend sends to Next.js API → Forwarded to FastAPI → Stored in memory
-2. **Transform**: User types instruction → Sent to `/plan` → OpenAI generates JSON plan → Sent to `/execute` → Pandas applies transformations → Preview returned
-3. **Download**: User clicks download → Frontend requests `/download` → Backend converts DataFrame to CSV → File downloaded
+1. Upload converts the file **once** to Parquet — this object is never modified again.
+2. Each instruction produces one SQL step (`SELECT … FROM data`), stored in the `transformations` table with a step number.
+3. Reads replay the whole stack as a CTE chain:
+
+```sql
+WITH step_1 AS (SELECT * FROM data WHERE age > 28),
+     step_2 AS (SELECT name, age, city FROM step_1 ORDER BY age DESC)
+SELECT * FROM step_2
+```
+
+4. **Undo** deletes the last step. **Reset** deletes all steps. **Revert** deletes everything after step *N*. Then the chain is simply replayed.
+
+### Safety pipeline for LLM-generated SQL
+
+```
+instruction ─▶ LLM (temp 0) ─▶ strip fences/semicolons
+           ─▶ must start with SELECT/WITH
+           ─▶ keyword denylist (DROP/INSERT/COPY/ATTACH/PRAGMA/…)
+           ─▶ no statement chaining
+           ─▶ DuckDB EXPLAIN dry-run
+           ─▶ execute (thread-pool timeout, memory-capped connection)
+           ─▶ on error: one LLM retry with the DuckDB error as context
+```
 
 ---
 
 ## 🛠️ Tech Stack
 
-### Frontend
+**Frontend** — Next.js 14 (App Router) · React 18 · TypeScript · Tailwind CSS · Framer Motion · TanStack Virtual · Supabase JS · Lucide
 
-| Technology | Version | Purpose |
-|-----------|---------|---------|
-| **Next.js** | 14.2.5 | React framework with App Router |
-| **React** | 18.3.1 | UI component library |
-| **TypeScript** | 5.5.4 | Type-safe JavaScript |
-| **Tailwind CSS** | 3.4.10 | Utility-first CSS framework |
-| **Framer Motion** | 11.18.2 | Animation library |
-| **Lucide React** | 0.441.0 | Icon library |
-| **next-themes** | 0.3.0 | Dark/light theme management |
-| **TanStack Table** | 8.20.5 | Data grid rendering |
+**Backend** — FastAPI · Python 3.12 · DuckDB · PyArrow · Supabase (Postgres + Storage + Auth) · httpx · pandas/openpyxl (XLSX ingestion only)
 
-### Backend
-
-| Technology | Version | Purpose |
-|-----------|---------|---------|
-| **FastAPI** | 0.112.0 | Modern Python web framework |
-| **Python** | ≥3.10 | Programming language |
-| **Pandas** | 2.2.2 | Data manipulation |
-| **OpenAI GPT** | 4o-mini | LLM for NL→JSON translation |
-| **Pydantic** | 2.8.2 | Data validation |
-| **openpyxl** | 3.1.5 | Excel file support |
-| **numexpr** | 2.10.1 | Fast numerical expression evaluation |
-| **HTTPX** | 0.27.0 | Async HTTP client |
-| **python-dotenv** | 1.0.1 | Environment variable management |
+**LLM** — OpenAI (`gpt-4o-mini`-class) or Google Gemini (`gemini-3.5-flash`), selected via `LLM_PROVIDER`
 
 ---
 
-## 🔄 How It Works
+## 🚀 Setup
 
-### 1. File Upload & Preprocessing
+### Prerequisites
 
-```
-User uploads file → FastAPI receives raw bytes → Pandas reads CSV/XLSX
-→ Schema inference (column names + dtypes) → Preview (first 500 rows)
-→ Stored in memory with unique file_id
-```
+- **Python 3.12** (easiest via [uv](https://docs.astral.sh/uv/), which can download it for you)
+- **Node.js 18+**
+- A **Supabase project** (free tier works)
+- An **OpenAI or Gemini API key**
 
-**Multi-sheet XLSX handling**:
-- If XLSX has multiple sheets → Return sheet list to frontend
-- User selects sheet via modal → Re-upload with `?sheet_name=` param
-- Selected sheet parsed and processed
+### 1. Supabase
 
-### 2. Natural Language to Plan Translation
+1. Create a project at [supabase.com](https://supabase.com).
+2. Run `backend/migrations/001_create_tables.sql` in the SQL editor (creates `files`, `transformations`, `audit_log`, `chat_messages`).
+3. Create a **private** storage bucket named `sheetsllm-files`.
+4. Grab from Project Settings → API: the **URL**, **anon key**, and **service_role key**.
 
-**User Input**: `"keep rows where HS% > 25 and FK > 40"`
+### 2. Backend
 
-**Step 1: Plan Generation** (`/api/plan`)
-```python
-# Frontend sends to OpenAI via FastAPI
-{
-  "instruction": "keep rows where HS% > 25 and FK > 40",
-  "schema": {
-    "columns": [{"name": "HS%", "dtype": "float64"}, ...],
-    "samples": [[row1], [row2], ...]
-  }
-}
+```bash
+cd backend
 
-# OpenAI responds with structured JSON
-{
-  "version": "1.0",
-  "steps": [
-    {
-      "op": "filter",
-      "where": ["HS% > 25", "FK > 40"]
-    }
-  ],
-  "explain": "Filter rows where HS% > 25 and FK > 40"
-}
+# with uv (recommended)
+uv venv --python 3.12 .venv
+uv pip install -r requirements.txt --python .venv/Scripts/python.exe   # Windows
+# uv pip install -r requirements.txt --python .venv/bin/python        # macOS/Linux
+
+# or classic
+python -m venv .venv && .venv/Scripts/activate && pip install -r requirements.txt
 ```
 
-**Step 2: Plan Validation**
-- Pydantic models validate JSON structure
-- Normalization fixes common model variations (e.g., `by` → `sort`)
-- Unsupported operations rejected
+Create `backend/.env`:
 
-**Step 3: Execution** (`/api/execute`)
-```python
-# Whitelist-based execution (NO arbitrary code)
-for step in plan.steps:
-    if step.op == "filter":
-        df = apply_filter_expressions(df, step.where)
-    elif step.op == "select":
-        df = df[step.columns]
-    elif step.op == "sort":
-        df = df.sort_values(...)
-    # ... 12 total operations
+```bash
+# LLM — pick one provider
+LLM_PROVIDER=gemini                 # "openai" or "gemini"
+OPENAI_API_KEY=sk-...
+OPENAI_MODEL=gpt-4o-mini
+GEMINI_API_KEY=AIza...
+GEMINI_MODEL=gemini-3.5-flash
+
+# Supabase
+SUPABASE_URL=https://<project-ref>.supabase.co
+SUPABASE_SERVICE_KEY=<service_role key>
+SUPABASE_ANON_KEY=<anon key>
+SUPABASE_BUCKET=sheetsllm-files
+
+# Auth — leave unset (or false) in production!
+# true = requests with missing/invalid JWTs proceed as user "anonymous"
+ALLOW_ANONYMOUS=true                # local dev convenience only
+
+# Optional limits (defaults shown)
+MAX_ROWS=1000000
+MAX_PREVIEW_ROWS=500
+MAX_UPLOAD_MB=400
+MAX_INSTRUCTION_LENGTH=2000
+MAX_COLUMNS=500
+DUCKDB_THREADS=2
+DUCKDB_MEMORY_LIMIT=512MB
+DUCKDB_QUERY_TIMEOUT=30
+ALLOWED_ORIGINS=http://localhost:3000
 ```
 
-### 3. Transformation Operations
+Run it:
 
-**Supported Operations**:
-
-| Operation | Example Instruction | Backend Action |
-|-----------|-------------------|----------------|
-| **filter** | "rows where age > 30" | `df[df.query("age > 30")]` |
-| **select** | "keep only name and age" | `df[["name", "age"]]` |
-| **rename** | "rename Score to Points" | `df.rename(columns={...})` |
-| **sort** | "sort by age descending" | `df.sort_values(...)` |
-| **limit** | "top 10 rows" | `df.head(10)` |
-| **add_columns** | "create KD = K - D" | `df["KD"] = df["K"] - df["D"]` |
-| **groupby** | "average score by team" | `df.groupby(...).agg(...)` |
-| **dropna** | "remove missing values" | `df.dropna()` |
-| **fillna** | "fill age with 0" | `df["age"].fillna(0)` |
-| **dedupe** | "remove duplicates" | `df.drop_duplicates()` |
-
-### 4. State Management
-
-**Frontend State** (React + localStorage):
-- File metadata (ID, name)
-- Current DataFrame preview (columns + rows)
-- Original DataFrame (for reset)
-- Schema information
-- Persistent across page navigation
-
-**Backend State** (In-memory dictionaries):
-```python
-DFS: Dict[str, pd.DataFrame] = {}           # Current state per file_id
-HIST: Dict[str, List[pd.DataFrame]] = {}    # Undo history (snapshots)
+```bash
+uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-**Undo Mechanism**:
-- After each transformation, DataFrame snapshot saved to history
-- Undo removes current state, reverts to previous snapshot
-- History cleared on reset/new upload
+### 3. Frontend
+
+```bash
+cd frontend
+npm install
+```
+
+Create `frontend/.env`:
+
+```bash
+BACKEND_URL=http://localhost:8000
+NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon key>
+```
+
+```bash
+npm run dev
+```
+
+Open **http://localhost:3000**, sign up at `/auth`, upload a file, and try *"show the top 10 rows by revenue"*.
+
+### Docker
+
+```bash
+docker compose up --build
+```
+
+Brings up backend (:8000) and frontend (:3000); backend health-gated.
+
+---
+
+## 📡 API Reference (FastAPI, all JSON)
+
+All routes except `/health` require `Authorization: Bearer <supabase-jwt>` (unless `ALLOW_ANONYMOUS=true`).
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/health` | Liveness + active LLM provider/model |
+| `POST` | `/upload` | Raw bytes + `X-Filename` header (+ `?sheet_name=` for multi-sheet XLSX) → file_id, schema, preview, insights |
+| `GET` | `/files` | Paginated file list |
+| `GET` | `/files/{id}` | File metadata + transformation steps |
+| `PATCH` | `/files/{id}` | Rename |
+| `DELETE` | `/files/{id}` | Delete file + storage object + steps |
+| `POST` | `/files/{id}/duplicate` | Copy file (storage + metadata) |
+| `GET` | `/files/{id}/history` | Transformation steps |
+| `POST` | `/files/{id}/revert/{step}` | Revert to step N, replay |
+| `POST` | `/transform` | `{file_id, instruction}` → SQL + preview (or `{job_id}` for large files, or a clarification) |
+| `POST` | `/chat` | `{file_id, message}` → transform / insight / clarification |
+| `GET` | `/chat/{id}` | Chat history |
+| `GET` | `/insights/{id}` | Data-quality insights (reflects applied steps) |
+| `GET` | `/jobs/{id}` | Poll async job status/progress/result |
+| `POST` | `/undo` | Remove last step, replay |
+| `POST` | `/reset` | Remove all steps |
+| `GET` | `/download?file_id=&format=` | Export result — csv, tsv, json, parquet |
+| `GET` | `/audit/{id}` | Paginated audit trail |
+
+The Next.js `app/api/*` routes are thin same-origin proxies that forward the Supabase session token to the backend.
+
+---
+
+## 🔐 Security Model
+
+- **SELECT-only SQL** — denylist of mutating/system keywords, no semicolons, `EXPLAIN` dry-run before execution; DuckDB runs in-memory with thread/memory caps and a query timeout.
+- **Auth** — Supabase JWTs verified server-side on every request. The `ALLOW_ANONYMOUS` dev fallback is **off by default**; without it, unauthenticated requests get a strict 401.
+- **Tenancy** — every DB query filters by `user_id`; storage keys are namespaced `{user_id}/{file_id}/`.
+- **Uploads** — magic-byte checks (rejects executables/mismatched extensions), `.xlsm`/VBA-macro rejection, column-name sanitization, size/column caps.
+- **Abuse** — per-user sliding-window rate limit (30 req/min) on LLM-backed endpoints; security headers (HSTS, nosniff, frame-deny) on all responses.
+
+**Known gaps (tracked for follow-up):** no Postgres RLS policies yet (isolation is application-level); DuckDB file-reading functions (`read_csv`, `read_text`, …) are not yet blocked by the validator; no automated test suite.
 
 ---
 
 ## 📁 Project Structure
 
 ```
-llm-spreadsheet-assistant/
 ├── backend/
 │   ├── app/
-│   │   └── main.py              # FastAPI app with all endpoints
-│   ├── .env                     # Environment variables (OPENAI_API_KEY)
-│   └── pyproject.toml           # Python dependencies
+│   │   ├── main.py            # FastAPI app + middleware stack
+│   │   ├── config.py          # env-driven configuration
+│   │   ├── auth.py            # Supabase JWT verification
+│   │   ├── engine.py          # DuckDB: execution, CTE replay, schema, conversion
+│   │   ├── sql_validator.py   # SELECT-only enforcement
+│   │   ├── db.py              # Supabase Postgres CRUD
+│   │   ├── storage.py         # Supabase Storage (Parquet objects)
+│   │   ├── cache.py           # SQL cache (24h) + local Parquet cache (30m)
+│   │   ├── security.py        # file validation, rate limiting, sanitization
+│   │   ├── insights.py        # data-quality analysis
+│   │   ├── jobs.py            # in-memory async job store
+│   │   ├── llm/               # adapter + OpenAI/Gemini clients + prompts
+│   │   └── routes/            # one module per endpoint group
+│   └── migrations/001_create_tables.sql
 │
 ├── frontend/
-│   ├── app/
-│   │   ├── api/                 # Next.js API routes (proxy to backend)
-│   │   │   ├── upload/route.ts
-│   │   │   ├── plan/route.ts
-│   │   │   ├── execute/route.ts
-│   │   │   ├── undo/route.ts
-│   │   │   └── download/route.ts
-│   │   ├── features/            # Features page
-│   │   ├── history/             # History page (placeholder)
-│   │   ├── workspace/           # Main workspace page
-│   │   │   └── page.tsx
-│   │   ├── layout.tsx           # Root layout with theme provider
-│   │   ├── page.tsx             # Landing page
-│   │   └── globals.css          # Global styles + theme variables
-│   │
-│   ├── components/
-│   │   ├── ConfirmDialog.tsx    # Custom confirmation modal
-│   │   ├── DataGrid.tsx         # Table for previewing data
-│   │   ├── DropZone.tsx         # File upload zone
-│   │   ├── Header.tsx           # Navigation header
-│   │   ├── InstructionPanel.tsx # Instruction input + controls
-│   │   ├── SheetSelector.tsx    # XLSX sheet selection modal
-│   │   └── ThemeToggle.tsx      # Dark/light theme switcher
-│   │
-│   ├── lib/
-│   │   └── animations.ts        # Framer Motion animation configs
-│   │
-│   ├── styles/
-│   │   └── globals.css          # Tailwind + custom CSS
-│   │
-│   └── package.json             # Frontend dependencies
+│   ├── app/                   # pages: /, /auth, /dashboard, /workspace
+│   │   └── api/               # proxy route handlers
+│   ├── components/            # DataGrid, ChatPanel, ChartPanel, …
+│   ├── contexts/AuthContext.tsx
+│   └── lib/                   # supabase client, fetch-with-auth, helpers
 │
-└── README.md                    # This file
+└── docker-compose.yml
 ```
 
 ---
 
-## 🚀 Setup & Installation
+## 🔮 Roadmap
 
-### Prerequisites
-
-- **Python** 3.10 or higher
-- **Node.js** 18 or higher
-- **OpenAI API Key** ([get one here](https://platform.openai.com/api-keys))
-
-### Backend Setup
-
-1. **Navigate to backend directory**
-   ```bash
-   cd backend
-   ```
-
-2. **Create virtual environment**
-   ```bash
-   python -m venv .venv
-   ```
-
-3. **Activate virtual environment**
-   - Windows:
-     ```bash
-     .venv\Scripts\activate
-     ```
-   - macOS/Linux:
-     ```bash
-     source .venv/bin/activate
-     ```
-
-4. **Install dependencies**
-   ```bash
-   pip install -e .
-   ```
-
-5. **Create `.env` file**
-   ```bash
-   # backend/.env
-   OPENAI_API_KEY=your_openai_api_key_here
-   OPENAI_MODEL=gpt-4o-mini
-   MAX_ROWS=1000000
-   ```
-
-6. **Start the backend server**
-   ```bash
-   uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-   ```
-
-   Backend will be available at: **http://localhost:8000**
-
-### Frontend Setup
-
-1. **Navigate to frontend directory**
-   ```bash
-   cd frontend
-   ```
-
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
-
-3. **Start the development server**
-   ```bash
-   npm run dev
-   ```
-
-   Frontend will be available at: **http://localhost:3000**
-
-### Verify Setup
-
-1. Open browser to **http://localhost:3000**
-2. Check backend health: **http://localhost:8000/health**
-3. Upload a test CSV file
-4. Try instruction: `"show first 5 rows"`
+- Postgres RLS policies (defense-in-depth for tenancy)
+- Block DuckDB file-access functions in the SQL validator
+- Automated tests (validator + CTE replay first)
+- Multi-file joins · saved transformation templates · scheduled transforms
+- Rename the vestigial `r2_key` column (storage moved from Cloudflare R2 to Supabase)
 
 ---
 
-## 📡 API Documentation
+## 📞 Contact
 
-### Backend Endpoints (FastAPI)
-
-#### 1. `POST /upload`
-
-Upload and parse CSV/XLSX files.
-
-**Query Parameters**:
-- `sheet_name` (optional): For multi-sheet XLSX files
-
-**Headers**:
-- `X-Filename`: Filename (e.g., "data.csv")
-
-**Request Body**: Raw file bytes (octet-stream)
-
-**Response**:
-```json
-// Single sheet or CSV
-{
-  "file_id": "uuid-string",
-  "schema": {
-    "columns": [{"name": "col1", "dtype": "int64"}],
-    "samples": [[...], [...]]
-  },
-  "preview": {
-    "columns": ["col1", "col2"],
-    "rows": [{...}, {...}]
-  }
-}
-
-// Multi-sheet XLSX (requires selection)
-{
-  "requires_sheet_selection": true,
-  "sheets": ["Sheet1", "Sheet2"],
-  "file_id": "uuid-string"
-}
-```
-
-#### 2. `POST /plan`
-
-Generate transformation plan from natural language.
-
-**Request**:
-```json
-{
-  "file_id": "uuid",
-  "instruction": "keep rows where age > 30",
-  "schema": {...}
-}
-```
-
-**Response**:
-```json
-{
-  "plan_json": {
-    "version": "1.0",
-    "steps": [{
-      "op": "filter",
-      "where": ["age > 30"]
-    }],
-    "explain": "Filter rows where age > 30"
-  }
-}
-```
-
-#### 3. `POST /execute`
-
-Execute transformation plan.
-
-**Request**:
-```json
-{
-  "file_id": "uuid",
-  "plan_json": {...}
-}
-```
-
-**Response**:
-```json
-{
-  "columns": ["col1", "col2"],
-  "preview": [{...}, {...}]
-}
-```
-
-#### 4. `POST /undo`
-
-Revert to previous state.
-
-**Request**:
-```json
-{
-  "file_id": "uuid"
-}
-```
-
-**Response**: Same as execute
-
-#### 5. `GET /download`
-
-Download transformed data.
-
-**Query Parameters**:
-- `file_id`: UUID
-- `format`: "csv" or "xlsx" (default: csv)
-
-**Response**: File download (CSV/XLSX)
-
-### Frontend API Routes (Next.js)
-
-All frontend routes proxy to backend:
-- `/api/upload` → `http://localhost:8000/upload`
-- `/api/plan` → `http://localhost:8000/plan`
-- `/api/execute` → `http://localhost:8000/execute`
-- `/api/undo` → `http://localhost:8000/undo`
-- `/api/download` → `http://localhost:8000/download`
-
-**Purpose**: Handle CORS, add middleware, format FormData
-
----
-
-## 🎨 Design Decisions
-
-### 1. **Why In-Memory Storage?**
-
-**Decision**: Use Python dictionaries instead of database
-
-**Reasoning**:
-- MVP simplicity
-- No persistent storage needed (privacy-first)
-- Fast reads/writes
-- Easy undo/redo with snapshots
-
-**Trade-offs**:
-- ❌ Data lost on server restart
-- ❌ No multi-instance scaling
-- ✅ Simple deployment
-- ✅ Fast performance
-
-### 2. **Why Next.js API Routes as Proxy?**
-
-**Decision**: Add Next.js middleware instead of direct backend calls
-
-**Reasoning**:
-- CORS handling
-- Request/response transformation (FormData ↔ octet-stream)
-- Future: Authentication, rate limiting, caching
-
-### 3. **Why GPT-4o-mini?**
-
-**Decision**: Use smaller, faster model
-
-**Reasoning**:
-- Simple JSON generation task (doesn't need GPT-4 reasoning)
-- 10x cheaper
-- Faster response times (<1s)
-
-### 4. **Why Whitelist-Based Execution?**
-
-**Decision**: Restrict operations to 12 predefined pandas functions
-
-**Reasoning**:
-- **Security**: No arbitrary code execution
-- **Reliability**: Tested, predictable operations
-- **Performance**: Optimized pandas implementations
-
-### 5. **Why Glass Morphism UI?**
-
-**Decision**: Modern frosted-glass aesthetic with backdrop blur
-
-**Reasoning**:
-- Professional appearance
-- Clear visual hierarchy
-- Smooth theme transitions
-- Aligns with modern design trends
-
-### 6. **Why localStorage for State Persistence?**
-
-**Decision**: Save workspace state client-side
-
-**Reasoning**:
-- Persist across tab switches
-- No backend complexity
-- Instant restore on page load
-- User controls data (privacy)
-
----
-
-## 🔮 Future Enhancements
-
-### Short-term
-
-- [ ] **File Join Operations**: Merge multiple spreadsheets
-- [ ] **Export to XLSX**: Support Excel output
-- [ ] **Batch Operations**: Run same transform on multiple files
-- [ ] **Transformation History UI**: Visual timeline of changes
-- [ ] **Saved Templates**: Reusable transformation workflows
-
-### Long-term
-
-- [ ] **Multi-user Collaboration**: Share transformations with teams
-- [ ] **Database Connectors**: Load from PostgreSQL, MySQL, etc.
-- [ ] **Scheduled Transforms**: Cron-like automation
-- [ ] **API Key Management**: User-provided OpenAI keys
-- [ ] **Advanced Visualizations**: Charts, pivot tables
-- [ ] **Custom Functions**: User-defined transformation logic
-
----
-
-## 🤝 Contributing
-
-This is an MVP project. Contributions, issues, and feature requests are welcome!
-
-**To contribute**:
-1. Fork the repository
-2. Create feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit changes (`git commit -m 'Add AmazingFeature'`)
-4. Push to branch (`git push origin feature/AmazingFeature`)
-5. Open Pull Request
-
----
-
-## 📝 License
-
-This project is built as an MVP demonstration. No formal license applied yet.
-
----
-
-## 💡 Lessons Learned
-
-### Technical Insights
-
-1. **LLM JSON Mode**: Using OpenAI's JSON mode with strict Pydantic validation ensures structured, parseable outputs
-2. **Pandas Performance**: Keep transformations stateless; DataFrame copies prevent unintended mutations
-3. **Next.js App Router**: API routes in App Router require different patterns than Pages Router
-4. **Theme Implementation**: CSS variables + Tailwind + next-themes = seamless dark/light switching
-5. **Sheet Selection UX**: Multi-sheet XLSX requires two-step upload flow (detect → select → re-upload)
-
-### Design Insights
-
-1. **Glass Morphism**: Requires careful backdrop-blur + transparency tuning for readability
-2. **Confirmation Dialogs**: Custom modals > browser alerts for modern UX
-3. **Loading States**: Always show spinner + disable buttons during async operations
-4. **Mobile Responsiveness**: Table overflows require horizontal scroll containers
-
----
-
-## 📞 Contact & Support
-
-For questions, feedback, or issues:
-- Create an issue in this repository
-- Email: pranjalprateek9@gmail.com
+Questions or feedback: pranjalprateek9@gmail.com — or open an issue.

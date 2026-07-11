@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { BACKEND_URL, backendHeaders } from "@/lib/api-helpers";
 
 export async function POST(req: NextRequest) {
-  const backendUrl = process.env.BACKEND_URL || "http://localhost:8000";
   const body = await req.json();
-  const resp = await fetch(`${backendUrl}/reset`, {
+  const resp = await fetch(`${BACKEND_URL()}/reset`, {
     method: "POST",
     body: JSON.stringify(body),
-    headers: { "Content-Type": "application/json" }
+    headers: backendHeaders(req, { "Content-Type": "application/json" }),
   });
   const json = await resp.json();
   return NextResponse.json(json, { status: resp.status });

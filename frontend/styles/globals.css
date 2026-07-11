@@ -2,74 +2,55 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --glass-fill: rgba(255, 255, 255, 0.7);
-  --glass-border: rgba(0, 0, 0, 0.1);
+@layer base {
+  :root {
+    --ds-gray-900: hsla(0, 0%, 40%, 1);
+    --ds-gray-alpha-400: hsla(0, 0%, 100%, 0.14);
+    --ds-background-100: hsla(0, 0%, 4%, 1);
+    --ds-background-200: hsla(0, 0%, 0%, 1);
+  }
 }
 
-.dark {
-  --glass-fill: rgba(0, 0, 0, 0.3);
-  --glass-border: rgba(255, 255, 255, 0.2);
-}
-
-html, body { 
-  height: 100%; 
-  scroll-behavior: smooth;
+html, body {
+  height: 100%;
 }
 
 html {
-  background: #FFFFFF;
-}
-
-html.dark {
   background: #0B0B0B;
 }
 
-body { 
-  @apply antialiased text-black dark:text-white;
+body {
+  @apply antialiased text-white;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   background: transparent;
 }
 
-.glass-card {
-  background: var(--glass-fill);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid var(--glass-border);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+/* Respect user motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
-.glass-card:hover {
-  transform: translateY(-2px) scale(1.01);
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2);
+/* Card style */
+.card {
+  @apply bg-neutral-900 border border-white/10 rounded-2xl;
 }
 
-.glass-card:active {
-  transform: translateY(0) scale(0.99);
-  transition: all 0.1s ease;
+/* Dotted background pattern */
+.dotted-bg {
+  background-image: radial-gradient(circle, rgba(255,255,255,0.06) 1px, transparent 1px);
+  background-size: 22px 22px;
 }
 
-.glass-card.no-hover:hover {
-  transform: none;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+/* Cyan accent */
+.btn-accent {
+  @apply bg-cyan-500 text-white font-mono font-medium tracking-wider hover:bg-cyan-400 transition-colors;
 }
 
-.glass-card.no-hover:active {
-  transform: none;
-}
-
-/* Button animations */
-button, a {
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-button:hover, a:hover {
-  transform: translateY(-1px);
-}
-
-button:active, a:active {
-  transform: scale(0.98);
+.btn-accent-outline {
+  @apply border border-white/20 text-white font-mono font-medium tracking-wider hover:bg-white/5 transition-colors;
 }
 
 /* Loading spinner */
@@ -92,35 +73,20 @@ button:active, a:active {
   animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
-/* Fade in animation */
+/* Fade in */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
+  from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
 .animate-fadeIn {
-  animation: fadeIn 0.4s ease-out;
+  animation: fadeIn 0.3s ease-out;
 }
 
-/* Shimmer loading effect */
-@keyframes shimmer {
-  0% { background-position: -1000px 0; }
-  100% { background-position: 1000px 0; }
-}
-
-.animate-shimmer {
-  background: linear-gradient(
-    90deg,
-    rgba(255, 255, 255, 0) 0%,
-    rgba(255, 255, 255, 0.2) 50%,
-    rgba(255, 255, 255, 0) 100%
-  );
-  background-size: 1000px 100%;
-  animation: shimmer 2s infinite;
-}
-
+/* Scrollbar */
 ::-webkit-scrollbar {
-  width: 10px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
@@ -128,18 +94,16 @@ button:active, a:active {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 5px;
-}
-
-.dark ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.3);
+  background: rgba(255, 255, 255, 0.2);
 }
 
-.dark ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.3);
+/* Fix select/option styling */
+select option {
+  background: #262626;
+  color: white;
 }
