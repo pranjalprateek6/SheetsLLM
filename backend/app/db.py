@@ -218,6 +218,67 @@ def increment_usage(
     ).execute()
 
 
+# ── Recipes ──────────────────────────────────────────────────────────
+
+
+def create_recipe(
+    *,
+    user_id: str,
+    name: str,
+    steps: list[dict],
+    required_columns: list[dict],
+    description: str | None = None,
+    source_file_id: str | None = None,
+) -> dict:
+    row = {
+        "user_id": user_id,
+        "name": name,
+        "description": description,
+        "source_file_id": source_file_id,
+        "steps": steps,
+        "required_columns": required_columns,
+    }
+    resp = get_client().table("recipes").insert(row).execute()
+    return resp.data[0]
+
+
+def list_recipes(user_id: str) -> list[dict]:
+    resp = (
+        get_client()
+        .table("recipes")
+        .select("id,name,description,source_file_id,steps,required_columns,created_at")
+        .eq("user_id", user_id)
+        .order("created_at", desc=True)
+        .execute()
+    )
+    return resp.data
+
+
+def get_recipe(recipe_id: str, user_id: str) -> dict | None:
+    resp = (
+        get_client()
+        .table("recipes")
+        .select("*")
+        .eq("id", recipe_id)
+        .eq("user_id", user_id)
+        .limit(1)
+        .execute()
+    )
+    return resp.data[0] if resp.data else None
+
+
+def delete_recipe(recipe_id: str, user_id: str) -> bool:
+    resp = (
+        get_client()
+        .table("recipes")
+        .delete()
+        .eq("id", recipe_id)
+        .eq("user_id", user_id)
+        .execute()
+    )
+    return bool(resp.data)
+
+
 # ── Audit Log ────────────────────────────────────────────────────────
 
 

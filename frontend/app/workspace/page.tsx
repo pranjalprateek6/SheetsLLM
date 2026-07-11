@@ -1,12 +1,13 @@
 "use client";
 import { Suspense, useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
-import { X, Zap, FileSpreadsheet, History, BarChart3, Download, Upload, Lightbulb, Undo2 } from "lucide-react";
+import { X, Zap, FileSpreadsheet, History, BarChart3, BookMarked, Download, Upload, Lightbulb, Undo2 } from "lucide-react";
 import DropZone from "@/components/DropZone";
 import DataGrid from "@/components/DataGrid";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import SheetSelector from "@/components/SheetSelector";
 import HistoryDrawer from "@/components/HistoryDrawer";
+import RecipesDrawer, { type RecipeApplyResult } from "@/components/RecipesDrawer";
 import ChatPanel from "@/components/ChatPanel";
 import ChartPanel from "@/components/ChartPanel";
 import CommandPalette from "@/components/CommandPalette";
@@ -47,6 +48,7 @@ function WorkspaceContent() {
   const [availableSheets, setAvailableSheets] = useState<string[]>([]);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [recipesOpen, setRecipesOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(true);
   const [chartOpen, setChartOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -419,6 +421,9 @@ function WorkspaceContent() {
                   <button onClick={() => setHistoryOpen(true)} className="p-1.5 hover:bg-white/5 text-white/30 hover:text-white transition-colors" title="History">
                     <History className="h-4 w-4" />
                   </button>
+                  <button onClick={() => setRecipesOpen(true)} className="p-1.5 hover:bg-white/5 text-white/30 hover:text-white transition-colors" title="Recipes">
+                    <BookMarked className="h-4 w-4" />
+                  </button>
                   <button onClick={handleDownload} className="p-1.5 hover:bg-white/5 text-white/30 hover:text-white transition-colors" title="Download CSV (Ctrl+S)">
                     <Download className="h-4 w-4" />
                   </button>
@@ -449,6 +454,17 @@ function WorkspaceContent() {
         )}
 
         <HistoryDrawer open={historyOpen} onClose={() => setHistoryOpen(false)} fileId={fileId} onRevert={handleRevert} />
+        <RecipesDrawer
+          open={recipesOpen}
+          onClose={() => setRecipesOpen(false)}
+          fileId={fileId}
+          onApplied={(result: RecipeApplyResult) => {
+            setColumns(result.preview.columns);
+            setRows(result.preview.rows);
+            setRowCount(result.preview.total_rows);
+            setColumnCount(result.preview.total_columns);
+          }}
+        />
         <ConfirmDialog isOpen={showResetDialog} onConfirm={handleFullReset} onCancel={() => setShowResetDialog(false)} title="Are you sure you want to reset?" message="This will clear your current work and return to the upload screen." confirmText="Reset" cancelText="Cancel" items={["Clear your current file and all transformations", "Return to the upload screen"]} />
         <SheetSelector isOpen={showSheetSelector} sheets={availableSheets} onSelect={handleSheetSelect} onCancel={() => { setShowSheetSelector(false); setPendingFile(null); setLoading(false); }} />
         <ChartPanel columns={columns} rows={rows} open={chartOpen} onClose={() => setChartOpen(false)} />
