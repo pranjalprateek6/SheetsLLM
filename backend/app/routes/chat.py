@@ -141,7 +141,9 @@ async def chat(request: Request):
     conversation_context = _build_conversation_context(recent_messages)
 
     # Generate response with conversational context
-    user_message = build_user_message(message, schema)
+    user_message = build_user_message(
+        message, schema, privacy_mode=db.get_privacy_mode(user_id)
+    )
     if conversation_context:
         user_message = f"Previous conversation:\n{conversation_context}\n\nNew request:\n{user_message}"
 

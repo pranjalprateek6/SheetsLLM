@@ -49,8 +49,15 @@ Original instruction: {instruction}
 Fix the SQL to avoid this error. Return ONLY the corrected SELECT statement."""
 
 
-def build_user_message(instruction: str, schema: dict) -> str:
-    """Build the user message with enriched schema context for the LLM."""
+def build_user_message(
+    instruction: str, schema: dict, *, privacy_mode: bool = False
+) -> str:
+    """Build the user message with enriched schema context for the LLM.
+
+    With privacy_mode=True, NO data values are included: sample values and
+    sample rows are omitted. Column names, types, and aggregate statistics
+    (null %, distinct counts) remain — they describe shape, not content.
+    """
     lines: list[str] = []
     for col in schema.get("columns", []):
         info = f"  - {col['name']} ({col['dtype']})"
@@ -58,11 +65,19 @@ def build_user_message(instruction: str, schema: dict) -> str:
             info += f" — {col['null_pct']}% nulls"
         if col.get("unique_count") is not None:
             info += f", {col['unique_count']} unique values"
-        if col.get("sample_values"):
+        if not privacy_mode and col.get("sample_values"):
             samples = ", ".join(str(v) for v in col["sample_values"][:5])
             info += f", e.g.: {samples}"
         lines.append(info)
     schema_text = "\n".join(lines)
+
+    if privacy_mode:
+        return f"""Table: data
+Columns:
+{schema_text}
+
+(No sample data available — rely on column names, types, and the instruction.)
+Instruction: {instruction}"""
 
     sample_text = ""
     if schema.get("samples"):

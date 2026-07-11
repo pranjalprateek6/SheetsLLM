@@ -4,9 +4,10 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState, useRef, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
-import { User, LogOut, ChevronDown, ArrowRight, Menu, X } from "lucide-react";
+import { User, LogOut, ChevronDown, ArrowRight, Menu, X, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import Image from "next/image";
+import { fetchWithAuth } from "@/lib/fetch-with-auth";
 
 export default function Header() {
   const pathname = usePathname();
@@ -17,7 +18,35 @@ export default function Header() {
   if (pathname === "/auth") return null;
   const [menuOpen, setMenuOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [privacyMode, setPrivacyMode] = useState<boolean | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  // Load the privacy setting when the dropdown first opens
+  useEffect(() => {
+    if (menuOpen && privacyMode === null && user) {
+      fetchWithAuth("/api/settings")
+        .then((r) => r.json())
+        .then((d) => setPrivacyMode(!!d.privacy_mode))
+        .catch(() => setPrivacyMode(false));
+    }
+  }, [menuOpen, privacyMode, user]);
+
+  const togglePrivacy = async () => {
+    const next = !privacyMode;
+    setPrivacyMode(next); // optimistic
+    try {
+      const r = await fetchWithAuth("/api/settings", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ privacy_mode: next }),
+      });
+      // On failure, reset to unknown so the next dropdown open refetches
+      // the authoritative value instead of showing a possibly stale state.
+      if (!r.ok) setPrivacyMode(null);
+    } catch {
+      setPrivacyMode(null);
+    }
+  };
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -122,8 +151,32 @@ export default function Header() {
                     </p>
                   </div>
                   <button
+                    onClick={togglePrivacy}
+                    className="w-full flex items-center gap-2 px-4 py-2.5 text-xs font-mono text-white/80 hover:bg-white/5 transition-colors"
+                    title="When on, prompts sent to the AI contain column names and types only — never sample values or rows from your data."
+                  >
+                    <ShieldCheck className={cn("h-4 w-4", privacyMode ? "text-cyan-400" : "text-white/40")} />
+                    <span className="flex-1 text-left">PRIVACY MODE</span>
+                    <span
+                      className={cn(
+                        "relative inline-flex h-4 w-7 items-center rounded-full transition-colors",
+                        privacyMode ? "bg-cyan-500" : "bg-white/15"
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "inline-block h-3 w-3 rounded-full bg-white transition-transform",
+                          privacyMode ? "translate-x-3.5" : "translate-x-0.5"
+                        )}
+                      />
+                    </span>
+                  </button>
+                  <p className="px-4 pb-2 text-[10px] font-mono leading-relaxed text-white/35">
+                    Schema-only prompts: the AI never sees sample values or rows.
+                  </p>
+                  <button
                     onClick={handleSignOut}
-                    className="w-full flex items-center gap-2 px-4 py-2.5 text-xs font-mono text-red-400 hover:bg-red-500/10 transition-colors"
+                    className="w-full flex items-center gap-2 px-4 py-2.5 text-xs font-mono text-red-400 hover:bg-red-500/10 transition-colors border-t border-white/5"
                   >
                     <LogOut className="h-4 w-4" />
                     SIGN OUT

@@ -218,6 +218,46 @@ def increment_usage(
     ).execute()
 
 
+# ── User settings ────────────────────────────────────────────────────
+
+
+def get_user_settings(user_id: str) -> dict | None:
+    resp = (
+        get_client()
+        .table("user_settings")
+        .select("*")
+        .eq("user_id", user_id)
+        .limit(1)
+        .execute()
+    )
+    return resp.data[0] if resp.data else None
+
+
+def upsert_user_settings(user_id: str, **settings) -> dict:
+    row = {"user_id": user_id, **settings}
+    resp = (
+        get_client()
+        .table("user_settings")
+        .upsert(row, on_conflict="user_id")
+        .execute()
+    )
+    return resp.data[0]
+
+
+def get_privacy_mode(user_id: str) -> bool:
+    """Whether the user opted into schema-only LLM prompts.
+
+    Fails to False (the default behavior) on any lookup error so a settings
+    hiccup never blocks the data path.
+    """
+    try:
+        row = get_user_settings(user_id)
+        return bool(row and row.get("privacy_mode"))
+    except Exception:
+        logger.warning("privacy_mode lookup failed for %s; defaulting to off", user_id)
+        return False
+
+
 # ── Recipes ──────────────────────────────────────────────────────────
 
 
