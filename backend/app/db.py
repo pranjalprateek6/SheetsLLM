@@ -273,12 +273,12 @@ def get_subscription(user_id: str) -> dict | None:
     return resp.data[0] if resp.data else None
 
 
-def get_subscription_by_customer(stripe_customer_id: str) -> dict | None:
+def get_subscription_by_provider_id(provider_subscription_id: str) -> dict | None:
     resp = (
         get_client()
         .table("subscriptions")
         .select("*")
-        .eq("stripe_customer_id", stripe_customer_id)
+        .eq("provider_subscription_id", provider_subscription_id)
         .limit(1)
         .execute()
     )

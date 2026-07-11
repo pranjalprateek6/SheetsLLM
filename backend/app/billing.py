@@ -1,22 +1,28 @@
-"""Stripe billing — checkout, customer portal, webhook handling.
+"""Razorpay billing — subscription checkout, cancel, webhook handling.
 
 Tier is stored in the subscriptions table and read by usage enforcement; the
-webhook is the single source that keeps it in sync with Stripe. All Stripe SDK
+webhook is the single source that keeps it in sync with Razorpay. All SDK
 calls are wrapped so a missing/invalid config surfaces as BillingError rather
 than a 500 with a stack trace.
+
+Razorpay differs from card-processor flows:
+- Subscriptions are created server-side; the customer authorizes payment on a
+  Razorpay-hosted `short_url` (returned by create). No return-URL round trip.
+- There is no hosted customer portal; cancellation is an API call.
+- Webhooks are authenticated with an HMAC-SHA256 signature over the raw body.
 """
 
 from __future__ import annotations
 
+import datetime as _dt
 import logging
 
 from app.config import (
-    BILLING_CANCEL_URL,
-    BILLING_PORTAL_RETURN_URL,
-    BILLING_SUCCESS_URL,
-    STRIPE_PRICE_ID,
-    STRIPE_SECRET_KEY,
-    STRIPE_WEBHOOK_SECRET,
+    RAZORPAY_KEY_ID,
+    RAZORPAY_KEY_SECRET,
+    RAZORPAY_PLAN_ID,
+    RAZORPAY_TOTAL_COUNT,
+    RAZORPAY_WEBHOOK_SECRET,
 )
 from app import db
 
@@ -27,139 +33,121 @@ class BillingError(Exception):
     """Raised for any billing operation that cannot proceed."""
 
 
-def _stripe():
-    if not STRIPE_SECRET_KEY:
+def _client():
+    if not (RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET):
         raise BillingError("Billing is not configured")
-    import stripe
+    import razorpay
 
-    stripe.api_key = STRIPE_SECRET_KEY
-    return stripe
+    return razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
 
 
 def is_configured() -> bool:
-    return bool(STRIPE_SECRET_KEY and STRIPE_PRICE_ID)
+    return bool(RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET and RAZORPAY_PLAN_ID)
 
 
-def _ensure_customer(stripe, user_id: str, email: str | None) -> str:
-    """Return the Stripe customer id for a user, creating and persisting it once."""
-    sub = db.get_subscription(user_id)
-    if sub and sub.get("stripe_customer_id"):
-        return sub["stripe_customer_id"]
+# Razorpay subscription statuses that grant the paid tier.
+_ACTIVE_STATUSES = {"active", "authenticated", "charged", "resumed"}
 
-    customer = stripe.Customer.create(
-        email=email or None,
-        metadata={"user_id": user_id},
-    )
-    db.upsert_subscription(user_id, stripe_customer_id=customer.id)
-    return customer.id
+
+def _period_end_iso(ts) -> str | None:
+    if not ts:
+        return None
+    return _dt.datetime.fromtimestamp(int(ts), _dt.timezone.utc).isoformat()
 
 
 def create_checkout_session(user_id: str, email: str | None) -> str:
-    """Create a Stripe Checkout session for the Pro plan; return its URL."""
+    """Create a Razorpay subscription; return the hosted auth/payment URL."""
     if not is_configured():
         raise BillingError("Billing is not configured")
-    stripe = _stripe()
-    customer_id = _ensure_customer(stripe, user_id, email)
+    client = _client()
 
-    session = stripe.checkout.Session.create(
-        mode="subscription",
-        customer=customer_id,
-        line_items=[{"price": STRIPE_PRICE_ID, "quantity": 1}],
-        success_url=BILLING_SUCCESS_URL,
-        cancel_url=BILLING_CANCEL_URL,
-        client_reference_id=user_id,
-        metadata={"user_id": user_id},
-        allow_promotion_codes=True,
+    sub = client.subscription.create(
+        {
+            "plan_id": RAZORPAY_PLAN_ID,
+            "total_count": RAZORPAY_TOTAL_COUNT,
+            "customer_notify": 1,
+            "notes": {"user_id": user_id, "email": email or ""},
+        }
     )
-    return session.url
-
-
-def create_portal_session(user_id: str) -> str:
-    """Create a Stripe Billing Portal session; return its URL."""
-    stripe = _stripe()
-    sub = db.get_subscription(user_id)
-    if not sub or not sub.get("stripe_customer_id"):
-        raise BillingError("No billing account for this user")
-
-    session = stripe.billing_portal.Session.create(
-        customer=sub["stripe_customer_id"],
-        return_url=BILLING_PORTAL_RETURN_URL,
-    )
-    return session.url
-
-
-def verify_webhook(payload: bytes, signature: str):
-    """Verify and parse a Stripe webhook event."""
-    if not STRIPE_WEBHOOK_SECRET:
-        raise BillingError("Webhook secret not configured")
-    stripe = _stripe()
-    try:
-        return stripe.Webhook.construct_event(
-            payload, signature, STRIPE_WEBHOOK_SECRET
-        )
-    except Exception as exc:  # SignatureVerificationError, ValueError
-        raise BillingError(f"Invalid webhook signature: {exc}") from exc
-
-
-# Stripe subscription statuses that grant the paid tier.
-_ACTIVE_STATUSES = {"active", "trialing", "past_due"}
-
-
-def _sync_from_subscription(stripe, subscription_id: str, customer_id: str) -> None:
-    """Fetch a subscription from Stripe and write the derived tier locally."""
-    sub = stripe.Subscription.retrieve(subscription_id)
-    status = sub.get("status")
-    tier = "pro" if status in _ACTIVE_STATUSES else "free"
-    period_end = sub.get("current_period_end")
-
-    row = db.get_subscription_by_customer(customer_id)
-    user_id = row.get("user_id") if row else None
-    if not user_id:
-        logger.warning("webhook: no local user for customer %s", customer_id)
-        return
-
-    import datetime as _dt
-
+    # Persist the pending subscription so the webhook can map it back to the
+    # user even if the notes are absent.
     db.upsert_subscription(
         user_id,
-        stripe_subscription_id=subscription_id,
+        provider_subscription_id=sub["id"],
+        status=sub.get("status"),
+    )
+    short_url = sub.get("short_url")
+    if not short_url:
+        raise BillingError("Razorpay did not return a checkout URL")
+    return short_url
+
+
+def cancel_subscription(user_id: str) -> dict:
+    """Cancel at the end of the current cycle (user keeps Pro until then)."""
+    client = _client()
+    sub = db.get_subscription(user_id)
+    sub_id = sub.get("provider_subscription_id") if sub else None
+    if not sub_id:
+        raise BillingError("No active subscription for this user")
+
+    result = client.subscription.cancel(sub_id, {"cancel_at_cycle_end": 1})
+    db.upsert_subscription(user_id, status=result.get("status"))
+    return {"status": result.get("status"), "ends_at": _period_end_iso(result.get("current_end"))}
+
+
+def verify_webhook(payload: bytes, signature: str) -> dict:
+    """Verify a Razorpay webhook signature and return the parsed event."""
+    if not RAZORPAY_WEBHOOK_SECRET:
+        raise BillingError("Webhook secret not configured")
+    client = _client()
+    body = payload.decode("utf-8")
+    try:
+        client.utility.verify_webhook_signature(body, signature, RAZORPAY_WEBHOOK_SECRET)
+    except Exception as exc:  # SignatureVerificationError
+        raise BillingError(f"Invalid webhook signature: {exc}") from exc
+
+    import json
+
+    return json.loads(body)
+
+
+def _entity(event: dict) -> dict | None:
+    payload = event.get("payload") or {}
+    sub = payload.get("subscription") or {}
+    return sub.get("entity")
+
+
+def handle_event(event: dict) -> None:
+    """Apply a verified Razorpay event to local subscription state."""
+    etype = event.get("event", "")
+    if not etype.startswith("subscription."):
+        logger.debug("billing: ignoring event %s", etype)
+        return
+
+    entity = _entity(event)
+    if not entity:
+        logger.warning("billing: %s had no subscription entity", etype)
+        return
+
+    sub_id = entity.get("id")
+    status = entity.get("status")
+    notes = entity.get("notes") or {}
+
+    # Map subscription to a local user: notes first, then the stored id.
+    user_id = notes.get("user_id")
+    if not user_id and sub_id:
+        row = db.get_subscription_by_provider_id(sub_id)
+        user_id = row.get("user_id") if row else None
+    if not user_id:
+        logger.warning("billing: no local user for subscription %s", sub_id)
+        return
+
+    tier = "pro" if status in _ACTIVE_STATUSES else "free"
+    db.upsert_subscription(
+        user_id,
+        provider_subscription_id=sub_id,
         tier=tier,
         status=status,
-        current_period_end=(
-            _dt.datetime.fromtimestamp(period_end, _dt.timezone.utc).isoformat()
-            if period_end else None
-        ),
+        current_period_end=_period_end_iso(entity.get("current_end")),
     )
-    logger.info("billing: user %s -> tier=%s status=%s", user_id, tier, status)
-
-
-def handle_event(event) -> None:
-    """Apply a verified Stripe event to local subscription state."""
-    stripe = _stripe()
-    etype = event["type"]
-    obj = event["data"]["object"]
-
-    if etype == "checkout.session.completed":
-        customer_id = obj.get("customer")
-        subscription_id = obj.get("subscription")
-        # Bind customer -> user if this is the first time we see them
-        user_id = obj.get("client_reference_id") or (obj.get("metadata") or {}).get("user_id")
-        if user_id and customer_id:
-            db.upsert_subscription(user_id, stripe_customer_id=customer_id)
-        if subscription_id and customer_id:
-            _sync_from_subscription(stripe, subscription_id, customer_id)
-
-    elif etype in ("customer.subscription.updated", "customer.subscription.created"):
-        _sync_from_subscription(stripe, obj["id"], obj["customer"])
-
-    elif etype == "customer.subscription.deleted":
-        row = db.get_subscription_by_customer(obj["customer"])
-        if row:
-            db.upsert_subscription(
-                row["user_id"], tier="free", status="canceled",
-                stripe_subscription_id=None,
-            )
-            logger.info("billing: user %s downgraded to free", row["user_id"])
-
-    else:
-        logger.debug("billing: ignoring event type %s", etype)
+    logger.info("billing: user %s -> tier=%s status=%s (%s)", user_id, tier, status, etype)

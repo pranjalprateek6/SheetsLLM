@@ -28,6 +28,14 @@ def _json_response(status: int, code: str, message: str, **extra) -> Response:
     )
 
 
+def _require_real_user(request: Request) -> str | None:
+    """Billing must never operate on the shared 'anonymous' pseudo-user.
+    In production ALLOW_ANONYMOUS is off so unauthenticated requests already
+    401; this is defense in depth for dev/misconfiguration."""
+    user_id = getattr(request.state, "user_id", "anonymous")
+    return None if user_id == "anonymous" else user_id
+
+
 @router.get("/billing/status")
 async def billing_status(request: Request):
     user_id = getattr(request.state, "user_id", "anonymous")
@@ -39,7 +47,9 @@ async def billing_status(request: Request):
 
 @router.post("/billing/checkout")
 async def checkout(request: Request):
-    user_id = getattr(request.state, "user_id", "anonymous")
+    user_id = _require_real_user(request)
+    if not user_id:
+        return _json_response(401, "UNAUTHORIZED", "Sign in to subscribe")
     email = getattr(request.state, "email", "") or None
     try:
         url = billing.create_checkout_session(user_id, email)
@@ -47,27 +57,29 @@ async def checkout(request: Request):
         return _json_response(400, "BILLING_ERROR", str(exc))
     except Exception as exc:
         logger.error("checkout failed: %s", exc)
-        return _json_response(502, "STRIPE_ERROR", "Could not start checkout")
+        return _json_response(502, "PROVIDER_ERROR", "Could not start checkout")
     return {"url": url}
 
 
-@router.post("/billing/portal")
-async def portal(request: Request):
-    user_id = getattr(request.state, "user_id", "anonymous")
+@router.post("/billing/cancel")
+async def cancel(request: Request):
+    user_id = _require_real_user(request)
+    if not user_id:
+        return _json_response(401, "UNAUTHORIZED", "Sign in to manage billing")
     try:
-        url = billing.create_portal_session(user_id)
+        result = billing.cancel_subscription(user_id)
     except BillingError as exc:
         return _json_response(400, "BILLING_ERROR", str(exc))
     except Exception as exc:
-        logger.error("portal failed: %s", exc)
-        return _json_response(502, "STRIPE_ERROR", "Could not open billing portal")
-    return {"url": url}
+        logger.error("cancel failed: %s", exc)
+        return _json_response(502, "PROVIDER_ERROR", "Could not cancel subscription")
+    return result
 
 
 @router.post("/billing/webhook")
 async def webhook(request: Request):
     payload = await request.body()
-    signature = request.headers.get("stripe-signature", "")
+    signature = request.headers.get("x-razorpay-signature", "")
     try:
         event = billing.verify_webhook(payload, signature)
     except BillingError as exc:

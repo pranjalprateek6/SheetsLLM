@@ -55,14 +55,26 @@ function PricingContent() {
     }
   };
 
-  const manage = async () => {
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const cancel = async () => {
+    if (!confirm("Cancel your Pro subscription? You'll keep Pro access until the end of the current billing period.")) return;
     setBusy(true);
     setError(null);
     try {
-      const r = await fetchWithAuth("/api/billing/portal", { method: "POST" });
+      const r = await fetchWithAuth("/api/billing/cancel", { method: "POST" });
       const d = await r.json();
-      if (r.ok && d.url) window.location.href = d.url;
-      else setError(d.message || "Could not open billing portal.");
+      if (r.ok) {
+        setNotice(
+          d.ends_at
+            ? `Subscription will end on ${new Date(d.ends_at).toLocaleDateString()}. You keep Pro until then.`
+            : "Subscription cancellation scheduled."
+        );
+      } else {
+        setError(d.message || "Could not cancel subscription.");
+      }
+    } catch {
+      setError("Could not cancel subscription.");
     } finally {
       setBusy(false);
     }
@@ -87,6 +99,11 @@ function PricingContent() {
       {error && (
         <div className="mb-6 text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-center">
           {error}
+        </div>
+      )}
+      {notice && (
+        <div className="mb-6 text-sm text-cyan-300 bg-cyan-500/10 border border-cyan-500/30 rounded-lg p-3 text-center">
+          {notice}
         </div>
       )}
 
@@ -117,7 +134,7 @@ function PricingContent() {
           </div>
           <h2 className="text-lg font-semibold text-white">Pro</h2>
           <p className="mt-1 text-3xl font-bold text-white">
-            $12<span className="text-sm font-normal text-white/40">/mo</span>
+            ₹999<span className="text-sm font-normal text-white/40">/mo</span>
           </p>
           <ul className="mt-6 space-y-2.5 flex-1">
             {PRO_FEATURES.map((f) => (
@@ -129,11 +146,11 @@ function PricingContent() {
           </ul>
           {isPro ? (
             <button
-              onClick={manage}
+              onClick={cancel}
               disabled={busy}
               className="mt-6 w-full py-2.5 rounded-lg bg-white/10 text-white text-sm font-medium hover:bg-white/15 transition disabled:opacity-50"
             >
-              {busy ? "Opening..." : "Manage subscription"}
+              {busy ? "Working..." : "Cancel subscription"}
             </button>
           ) : (
             <button
