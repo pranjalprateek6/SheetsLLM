@@ -9,7 +9,7 @@ from time import perf_counter
 
 from fastapi import APIRouter, Header, HTTPException, Query, Request, Response
 
-from app.config import MAX_COLUMNS, MAX_ROWS, MAX_UPLOAD_MB, UPLOAD_MAX_BYTES
+from app.config import MAX_COLUMNS, MAX_UPLOAD_MB, UPLOAD_MAX_BYTES
 from app import db, storage
 from app.engine import convert_to_parquet, detect_sheets, get_schema_from_local
 from app.insights import generate_insights
@@ -106,10 +106,8 @@ async def upload(
             f"File has {col_count} columns (max {MAX_COLUMNS})",
         )
 
-    if row_count > MAX_ROWS:
-        row_count = MAX_ROWS
-        # Re-convert with truncation would be expensive;
-        # for now we just note it. DuckDB handles LIMIT at query time.
+    # Row cap is enforced inside convert_to_parquet (table is truncated),
+    # so row_count here always reflects the stored data.
 
     # ── Upload to Storage ────────────────────────────────────────────
     r2_key = storage.r2_key_for_file(user_id, file_id)
