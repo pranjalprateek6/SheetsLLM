@@ -1,7 +1,12 @@
 "use client";
 import * as React from "react";
 
-export type Toast = { id: number; title?: string; description?: string };
+export type Toast = {
+  id: number;
+  title?: string;
+  description?: string;
+  variant?: "default" | "destructive";
+};
 
 const ToastCtx = React.createContext<{
   toasts: Toast[];
@@ -29,9 +34,20 @@ export default function ToastProvider({ children }: { children: React.ReactNode 
       {children}
       <div className="fixed bottom-6 right-6 z-50 space-y-2">
         {toasts.map((t) => (
-          <div key={t.id} className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow p-3 text-sm">
+          <div
+            key={t.id}
+            className={
+              t.variant === "destructive"
+                ? "rounded-xl border border-destructive/30 bg-destructive/5 text-destructive shadow-md p-3 text-sm"
+                : "rounded-xl border bg-card text-foreground shadow-md p-3 text-sm"
+            }
+          >
             {t.title && <div className="font-medium mb-0.5">{t.title}</div>}
-            {t.description && <div className="opacity-80">{t.description}</div>}
+            {t.description && (
+              <div className={t.variant === "destructive" ? "text-destructive/80" : "text-muted-foreground"}>
+                {t.description}
+              </div>
+            )}
           </div>
         ))}
       </div>

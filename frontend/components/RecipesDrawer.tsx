@@ -1,8 +1,20 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { BookMarked, Play, Trash2, Plus, X } from "lucide-react";
+import Link from "next/link";
+import { BookMarked, Play, Trash2, Plus } from "lucide-react";
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
-import { TextShimmer } from "@/components/ui/text-shimmer";
+import { markOnboardingStep } from "@/components/GettingStarted";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
 
 export type Recipe = {
   id: string;
@@ -42,6 +54,7 @@ export default function RecipesDrawer({
   const [applying, setApplying] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [upgradeWall, setUpgradeWall] = useState<string | null>(null);
   const [showSave, setShowSave] = useState(false);
   const [name, setName] = useState("");
 
@@ -75,6 +88,7 @@ export default function RecipesDrawer({
     if (open) {
       setError(null);
       setNotice(null);
+      setUpgradeWall(null);
       fetchRecipes();
       fetchStepCount();
     }
@@ -92,11 +106,20 @@ export default function RecipesDrawer({
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.message || "Failed to save recipe.");
+        if (res.status === 402) {
+          setUpgradeWall(
+            data.message ||
+              "You've reached the saved recipe limit on the free plan."
+          );
+          setShowSave(false);
+        } else {
+          setError(data.message || "Failed to save recipe.");
+        }
       } else {
         setName("");
         setShowSave(false);
         setNotice(`Saved "${data.name}" (${data.steps} steps).`);
+        markOnboardingStep("recipe");
         fetchRecipes();
       }
     } catch (e) {
@@ -149,105 +172,107 @@ export default function RecipesDrawer({
   };
 
   return (
-    <div className={`fixed inset-0 z-50 ${open ? "" : "pointer-events-none"}`}>
-      <div
-        className={`absolute inset-0 bg-black/30 transition-opacity ${
-          open ? "opacity-100" : "opacity-0"
-        }`}
-        onClick={onClose}
-      />
-      <aside
-        className={`absolute right-0 top-0 bottom-0 w-[400px] max-w-[85vw] bg-white dark:bg-zinc-900 border-l border-black/10 dark:border-white/10 shadow-xl transform transition-transform ${
-          open ? "translate-x-0" : "translate-x-full"
-        }`}
-      >
-        {/* Header */}
-        <div className="p-4 border-b border-black/10 dark:border-white/10 flex items-center gap-2">
-          <BookMarked className="h-4 w-4 text-black dark:text-white" />
-          <h3 className="text-sm font-semibold text-black dark:text-white flex-1">
+    <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
+      <SheetContent side="right" className="flex w-full flex-col gap-0 p-0 sm:max-w-md">
+        <SheetHeader className="border-b px-6 py-4 text-left">
+          <SheetTitle className="flex items-center gap-2 text-base">
+            <BookMarked className="h-4 w-4 text-muted-foreground" />
             Recipes
-          </h3>
-          <span className="text-xs text-black/50 dark:text-white/50">
-            {recipes.length}
-          </span>
-          <button
-            onClick={onClose}
-            className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/10 transition"
-          >
-            <X className="h-4 w-4 text-black/60 dark:text-white/60" />
-          </button>
-        </div>
+            <Badge variant="secondary" className="tabular-nums">
+              {recipes.length}
+            </Badge>
+          </SheetTitle>
+          <SheetDescription>
+            Save a transformation chain once, re-apply it to future uploads.
+          </SheetDescription>
+        </SheetHeader>
 
-        <div className="overflow-y-auto h-[calc(100%-57px)] p-3 space-y-2">
+        <div className="flex-1 space-y-3 overflow-y-auto px-6 py-4">
           {/* Save current chain */}
           {fileId && (
-            <div className="rounded-xl border border-black/10 dark:border-white/10 p-3">
+            <div className="rounded-lg border p-3">
               {!showSave ? (
-                <button
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
                   onClick={() => setShowSave(true)}
                   disabled={stepCount === 0}
-                  className="w-full text-xs inline-flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-black/5 dark:bg-white/10 text-black dark:text-white hover:bg-black/10 dark:hover:bg-white/15 transition disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  <Plus className="h-3.5 w-3.5" />
+                  <Plus className="h-4 w-4" />
                   {stepCount === 0
                     ? "Apply transformations first to save a recipe"
                     : `Save current ${stepCount}-step chain as recipe`}
-                </button>
+                </Button>
               ) : (
                 <div className="space-y-2">
-                  <input
+                  <Input
                     autoFocus
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && saveRecipe()}
                     placeholder="Recipe name, e.g. Monthly orders cleanup"
                     maxLength={120}
-                    className="w-full text-sm px-2.5 py-1.5 rounded-lg bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 text-black dark:text-white placeholder:text-black/40 dark:placeholder:text-white/40 outline-none focus:border-black/30 dark:focus:border-white/30"
+                    className="h-9"
                   />
                   <div className="flex gap-2">
-                    <button
+                    <Button
+                      size="sm"
+                      className="flex-1"
                       onClick={saveRecipe}
                       disabled={saving || !name.trim()}
-                      className="flex-1 text-xs py-1.5 rounded-lg bg-black dark:bg-white text-white dark:text-black hover:opacity-80 transition disabled:opacity-40"
                     >
                       {saving ? "Saving..." : "Save recipe"}
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       onClick={() => {
                         setShowSave(false);
                         setName("");
                       }}
-                      className="text-xs px-3 py-1.5 rounded-lg bg-black/5 dark:bg-white/10 text-black/70 dark:text-white/70 hover:bg-black/10 dark:hover:bg-white/15 transition"
                     >
                       Cancel
-                    </button>
+                    </Button>
                   </div>
                 </div>
               )}
             </div>
           )}
 
+          {/* Upgrade wall (402) */}
+          {upgradeWall && (
+            <div className="rounded-lg border bg-muted/50 p-3">
+              <p className="text-sm font-medium text-foreground">
+                Recipe limit reached
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">{upgradeWall}</p>
+              <Button asChild size="sm" className="mt-2">
+                <Link href="/pricing">Upgrade to Pro</Link>
+              </Button>
+            </div>
+          )}
+
           {notice && (
-            <div className="text-xs rounded-lg border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 text-black/70 dark:text-white/70 p-2.5">
+            <div className="rounded-md border bg-muted/50 p-2.5 text-xs text-muted-foreground">
               {notice}
             </div>
           )}
           {error && (
-            <div className="text-xs rounded-lg border border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400 p-2.5">
+            <div className="rounded-md border border-destructive/30 bg-destructive/10 p-2.5 text-xs text-destructive">
               {error}
             </div>
           )}
 
           {loading && (
-            <div className="p-4 text-center">
-              <TextShimmer className="font-mono text-xs" duration={1.2}>
-                Loading recipes...
-              </TextShimmer>
+            <div className="space-y-3">
+              <Skeleton className="h-16 w-full" />
+              <Skeleton className="h-16 w-full" />
             </div>
           )}
 
           {!loading && recipes.length === 0 && (
-            <div className="text-xs text-black/50 dark:text-white/50 p-4 text-center">
+            <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
               No recipes yet. Transform a file, then save the chain here to
               re-apply it to future uploads.
             </div>
@@ -256,44 +281,47 @@ export default function RecipesDrawer({
           {recipes.map((recipe) => (
             <div
               key={recipe.id}
-              className="rounded-xl border border-black/10 dark:border-white/10 p-3 hover:bg-black/5 dark:hover:bg-white/5 transition"
+              className="rounded-lg border p-3 transition-colors hover:bg-accent/50"
             >
-              <div className="flex items-start gap-2">
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-black dark:text-white break-words font-medium">
-                    {recipe.name}
-                  </p>
-                  <p className="text-xs text-black/50 dark:text-white/50 mt-0.5">
-                    {recipe.steps} step{recipe.steps !== 1 ? "s" : ""}
-                    {recipe.created_at && (
-                      <> · {new Date(recipe.created_at).toLocaleDateString()}</>
-                    )}
-                  </p>
-                </div>
+              <div className="flex items-start justify-between gap-2">
+                <p className="min-w-0 flex-1 break-words text-sm font-medium text-foreground">
+                  {recipe.name}
+                </p>
+                <Badge variant="secondary" className="shrink-0 tabular-nums">
+                  {recipe.steps} step{recipe.steps !== 1 ? "s" : ""}
+                </Badge>
               </div>
-              <div className="flex items-center gap-2 mt-2">
+              {recipe.created_at && (
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Saved {new Date(recipe.created_at).toLocaleDateString()}
+                </p>
+              )}
+              <div className="mt-2 flex items-center gap-2">
                 {fileId && (
-                  <button
+                  <Button
+                    size="sm"
+                    className="h-7 px-2.5 text-xs"
                     onClick={() => applyRecipe(recipe)}
                     disabled={applying !== null}
-                    className="text-xs inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-black dark:bg-white text-white dark:text-black hover:opacity-80 transition disabled:opacity-40"
                   >
-                    <Play className="h-3 w-3" />
+                    <Play className="h-3.5 w-3.5" />
                     {applying === recipe.id ? "Applying..." : "Apply to this file"}
-                  </button>
+                  </Button>
                 )}
-                <button
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="ml-auto h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
                   onClick={() => deleteRecipe(recipe)}
-                  className="text-xs inline-flex items-center gap-1 text-black/50 dark:text-white/50 hover:text-red-500 transition ml-auto"
                 >
-                  <Trash2 className="h-3 w-3" />
+                  <Trash2 className="h-3.5 w-3.5" />
                   Delete
-                </button>
+                </Button>
               </div>
             </div>
           ))}
         </div>
-      </aside>
-    </div>
+      </SheetContent>
+    </Sheet>
   );
 }

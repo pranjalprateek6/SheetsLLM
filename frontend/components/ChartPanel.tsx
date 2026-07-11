@@ -199,43 +199,43 @@ export default function ChartPanel({
     );
   };
 
-  const selectClass = "rounded-lg border border-black/10 dark:border-white/10 bg-white dark:bg-neutral-800 px-2.5 py-1.5 text-sm text-black dark:text-white outline-none appearance-none cursor-pointer";
+  const selectClass = "rounded-lg border bg-background px-2.5 py-1.5 text-sm shadow-xs outline-none appearance-none cursor-pointer";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-white dark:bg-neutral-900 rounded-2xl shadow-2xl w-[880px] max-w-[95vw] max-h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/20 backdrop-blur-sm" onClick={onClose}>
+      <div className="flex max-h-[90vh] w-[880px] max-w-[95vw] flex-col overflow-hidden rounded-2xl border bg-card shadow-lg" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-black/10 dark:border-white/10">
-          <h3 className="font-semibold text-black dark:text-white text-lg">Quick Chart</h3>
+        <div className="flex items-center justify-between border-b px-5 py-4">
+          <h3 className="text-lg font-semibold tracking-tight">Quick chart</h3>
           <div className="flex items-center gap-2">
-            <button onClick={exportPng} className="px-3 py-1.5 rounded-lg bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/20 transition text-sm font-medium text-black dark:text-white inline-flex items-center gap-1.5">
+            <button onClick={exportPng} className="inline-flex items-center gap-1.5 rounded-lg border bg-background px-3 py-1.5 text-sm font-medium shadow-xs transition-colors hover:bg-accent">
               <Download className="h-3.5 w-3.5" /> PNG
             </button>
-            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-black/10 dark:hover:bg-white/10 transition">
-              <X className="h-5 w-5 text-black/70 dark:text-white/70" />
+            <button onClick={onClose} className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground" aria-label="Close">
+              <X className="h-5 w-5" />
             </button>
           </div>
         </div>
 
         {/* Controls */}
-        <div className="flex flex-wrap items-center gap-3 px-5 py-3 border-b border-black/5 dark:border-white/5">
-          <div className="flex gap-1 bg-black/5 dark:bg-white/5 rounded-lg p-0.5">
+        <div className="flex flex-wrap items-center gap-3 border-b px-5 py-3">
+          <div className="flex gap-1 rounded-lg bg-muted p-0.5">
             {([["bar", BarChart3], ["line", LineChart], ["pie", PieChart]] as const).map(([type, Icon]) => (
-              <button key={type} onClick={() => setChartType(type)} className={`p-2 rounded-md transition ${chartType === type ? "bg-black dark:bg-white text-white dark:text-black shadow-sm" : "hover:bg-black/5 dark:hover:bg-white/10 text-black/60 dark:text-white/60"}`}>
+              <button key={type} onClick={() => setChartType(type)} className={`rounded-md p-2 transition-colors ${chartType === type ? "bg-background text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"}`}>
                 <Icon className="h-4 w-4" />
               </button>
             ))}
           </div>
 
           <div className="flex items-center gap-1.5 text-sm">
-            <label className="text-black/50 dark:text-white/50 text-xs font-medium">X</label>
+            <label className="text-xs font-medium text-muted-foreground">X</label>
             <select value={xCol} onChange={(e) => setXCol(e.target.value)} className={selectClass}>
               {columns.map((c) => (<option key={c} value={c}>{c}</option>))}
             </select>
           </div>
 
           <div className="flex items-center gap-1.5 text-sm">
-            <label className="text-black/50 dark:text-white/50 text-xs font-medium">Y</label>
+            <label className="text-xs font-medium text-muted-foreground">Y</label>
             <select value={yCol} onChange={(e) => setYCol(e.target.value)} className={selectClass}>
               {numericCols.length > 0 ? (
                 numericCols.map((c) => (<option key={c} value={c}>{c}</option>))
@@ -246,7 +246,7 @@ export default function ChartPanel({
           </div>
 
           <div className="flex items-center gap-1.5 text-sm">
-            <label className="text-black/50 dark:text-white/50 text-xs font-medium">Agg</label>
+            <label className="text-xs font-medium text-muted-foreground">Agg</label>
             <select value={aggMode} onChange={(e) => setAggMode(e.target.value as AggMode)} className={selectClass}>
               <option value="sum">Sum</option>
               <option value="avg">Average</option>
@@ -260,9 +260,9 @@ export default function ChartPanel({
         {/* Chart */}
         <div className="flex-1 p-5 flex items-center justify-center overflow-auto min-h-[420px]">
           {chartData.length === 0 ? (
-            <p className="text-black/40 dark:text-white/40 text-sm">Select columns to visualize</p>
+            <p className="text-sm text-muted-foreground">Select columns to visualize</p>
           ) : (
-            <svg ref={svgRef} width={W} height={H} viewBox={`0 0 ${W} ${H}`} className="text-black dark:text-white">
+            <svg ref={svgRef} width={W} height={H} viewBox={`0 0 ${W} ${H}`} className="text-foreground">
               {/* Axes for bar/line */}
               {chartType !== "pie" && (
                 <g>

@@ -28,7 +28,7 @@ export function TextShimmer({
     <MotionComponent
       className={cn(
         'relative inline-block bg-[length:250%_100%,auto] bg-clip-text',
-        'text-transparent [--base-color:#71717a] [--base-gradient-color:#ffffff]',
+        'text-transparent [--base-color:hsl(var(--muted-foreground))] [--base-gradient-color:hsl(var(--foreground))]',
         '[--bg:linear-gradient(90deg,#0000_calc(50%-var(--spread)),var(--base-gradient-color),#0000_calc(50%+var(--spread)))] [background-repeat:no-repeat,padding-box]',
         className
       )}
