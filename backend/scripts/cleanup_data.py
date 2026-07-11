@@ -78,12 +78,19 @@ def main() -> int:
     anon_audit = (
         client.table("audit_log").select("id").eq("user_id", "anonymous").execute().data
     )
+    try:
+        anon_recipes = (
+            client.table("recipes").select("id,name").eq("user_id", "anonymous").execute().data
+        )
+    except Exception:
+        anon_recipes = []  # table may predate migration 004
 
     print(f"anonymous files          : {len(anon_files)}")
     for f in anon_files:
         print(f"  - {f['name']}  ({f['size_bytes']} bytes)  {f['r2_key']}")
     print(f"  cascading transformations: {n_steps}, chat messages: {n_chat}")
     print(f"anonymous audit_log rows : {len(anon_audit)}")
+    print(f"anonymous recipes        : {len(anon_recipes)}")
 
     # ── 2. Orphaned storage objects ──────────────────────────────────
     all_keys = set(list_all_storage_keys(client))
@@ -112,6 +119,9 @@ def main() -> int:
     if anon_audit:
         client.table("audit_log").delete().eq("user_id", "anonymous").execute()
         print(f"deleted {len(anon_audit)} audit_log rows")
+    if anon_recipes:
+        client.table("recipes").delete().eq("user_id", "anonymous").execute()
+        print(f"deleted {len(anon_recipes)} recipes")
     if to_remove:
         client.storage.from_(SUPABASE_BUCKET).remove(to_remove)
         print(f"removed {len(to_remove)} storage objects")
