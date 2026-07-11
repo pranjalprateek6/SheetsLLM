@@ -36,12 +36,24 @@ DUCKDB_THREADS: int = int(os.getenv("DUCKDB_THREADS", "2"))
 DUCKDB_MEMORY_LIMIT: str = os.getenv("DUCKDB_MEMORY_LIMIT", "512MB")
 DUCKDB_QUERY_TIMEOUT: int = int(os.getenv("DUCKDB_QUERY_TIMEOUT", "30"))
 
-# ── Usage limits (free tier; 0 = unlimited) ─────────────────────────
-# Pre-billing these mainly act as a circuit breaker so one user cannot
-# exhaust the shared LLM quota. Tighten when subscription tiers land.
+# ── Usage limits (0 = unlimited) ────────────────────────────────────
+# Free-tier caps act as a circuit breaker so one user cannot exhaust the
+# shared LLM quota. Pro caps are generous headroom, not a real ceiling.
 FREE_MAX_UPLOADS_PER_MONTH: int = int(os.getenv("FREE_MAX_UPLOADS_PER_MONTH", "50"))
 FREE_MAX_TRANSFORMS_PER_MONTH: int = int(os.getenv("FREE_MAX_TRANSFORMS_PER_MONTH", "200"))
 FREE_MAX_CHAT_PER_MONTH: int = int(os.getenv("FREE_MAX_CHAT_PER_MONTH", "200"))
+PRO_MAX_UPLOADS_PER_MONTH: int = int(os.getenv("PRO_MAX_UPLOADS_PER_MONTH", "1000"))
+PRO_MAX_TRANSFORMS_PER_MONTH: int = int(os.getenv("PRO_MAX_TRANSFORMS_PER_MONTH", "5000"))
+PRO_MAX_CHAT_PER_MONTH: int = int(os.getenv("PRO_MAX_CHAT_PER_MONTH", "5000"))
+
+# ── Stripe billing ──────────────────────────────────────────────────
+STRIPE_SECRET_KEY: str = os.getenv("STRIPE_SECRET_KEY", "")
+STRIPE_WEBHOOK_SECRET: str = os.getenv("STRIPE_WEBHOOK_SECRET", "")
+STRIPE_PRICE_ID: str = os.getenv("STRIPE_PRICE_ID", "")   # the Pro monthly price
+# Where Stripe Checkout/Portal returns the user (frontend origin).
+BILLING_SUCCESS_URL: str = os.getenv("BILLING_SUCCESS_URL", "http://localhost:3000/dashboard?upgraded=1")
+BILLING_CANCEL_URL: str = os.getenv("BILLING_CANCEL_URL", "http://localhost:3000/pricing")
+BILLING_PORTAL_RETURN_URL: str = os.getenv("BILLING_PORTAL_RETURN_URL", "http://localhost:3000/dashboard")
 
 # ── Auth ─────────────────────────────────────────────────────────────
 # When true, requests that fail JWT verification proceed as user "anonymous"

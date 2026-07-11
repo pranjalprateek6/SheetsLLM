@@ -126,6 +126,7 @@ export default function Header() {
             {navLink("/", "HOME")}
             {navLink("/dashboard", "FILES")}
             {navLink("/workspace", "WORKSPACE")}
+            {navLink("/pricing", "PRICING")}
           </nav>
 
           {/* Right side */}
@@ -202,6 +203,7 @@ export default function Header() {
               {navLink("/", "HOME")}
               {navLink("/dashboard", "FILES")}
               {navLink("/workspace", "WORKSPACE")}
+              {navLink("/pricing", "PRICING")}
             </nav>
           </div>
         )}
