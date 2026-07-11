@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import AuthGuard from "@/components/AuthGuard";
+import UsageCard from "@/components/UsageCard";
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
 import {
   FileSpreadsheet, Search, Grid3X3, List, Upload, Copy, Trash2, Pencil, Download, ArrowUpDown,
@@ -121,6 +122,8 @@ export default function DashboardPage() {
           <Upload className="h-4 w-4" /> UPLOAD NEW
         </button>
       </div>
+
+      <UsageCard />
 
       <div className="flex items-center gap-3 mb-6">
         <div className="flex-1 relative">
