@@ -1,0 +1,95 @@
+name: Deploy
+
+# Manual, on-demand deploys. Open Actions → "Deploy" → "Run workflow",
+# pick the branch from the dropdown, choose what to ship, and Run.
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "What to deploy"
+        type: choice
+        default: both
+        options:
+          - both
+          - frontend   # Vercel
+          - backend    # Render
+      vercel_env:
+        description: "Vercel environment (frontend only)"
+        type: choice
+        default: production
+        options:
+          - production
+          - preview
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend → Render
+    if: ${{ inputs.target == 'both' || inputs.target == 'backend' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Render deploy
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+          REF: ${{ github.ref_name }}
+        run: |
+          if [ -z "$HOOK" ]; then
+            echo "::error::RENDER_DEPLOY_HOOK_URL secret is not set (Render → service → Settings → Deploy Hook)"; exit 1
+          fi
+          echo "Triggering Render deploy of ref '$REF'…"
+          # URL-encode query-unsafe chars a branch name may contain (& # ? = space + %),
+          # keeping '/' literal since Render's ?ref= expects unencoded slashes.
+          ref_enc=$(printf '%s' "$REF" | sed -e 's/%/%25/g' -e 's/&/%26/g' -e 's/#/%23/g' \
+                                             -e 's/?/%3F/g' -e 's/=/%3D/g' -e 's/ /%20/g' -e 's/+/%2B/g')
+          # The hook URL already contains '?key=…', so append ref with '&'.
+          resp=$(curl -fsS -X POST "${HOOK}&ref=${ref_enc}") || { echo "::error::Render deploy hook call failed"; exit 1; }
+          echo "$resp"
+          {
+            echo "### Backend → Render"
+            echo "Triggered deploy of \`$REF\`. Track it in the Render dashboard → your service → Events."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  frontend:
+    name: Frontend → Vercel
+    if: ${{ inputs.target == 'both' || inputs.target == 'frontend' }}
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Deploy to Vercel
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ENV: ${{ inputs.vercel_env }}
+          REF: ${{ github.ref_name }}
+        run: |
+          if [ -z "$VERCEL_TOKEN" ] || [ -z "$VERCEL_ORG_ID" ] || [ -z "$VERCEL_PROJECT_ID" ]; then
+            echo "::error::Set VERCEL_TOKEN, VERCEL_ORG_ID and VERCEL_PROJECT_ID secrets"; exit 1
+          fi
+          if [ "$VERCEL_ENV" = "production" ]; then PROD="--prod"; else PROD=""; fi
+
+          # Non-prebuilt deploy: Vercel builds remotely using the project's own
+          # settings (Root Directory = frontend) and env vars — identical to a
+          # git push, so no local-build directory ambiguity. Project is linked
+          # via the VERCEL_ORG_ID / VERCEL_PROJECT_ID env vars.
+          url=$(vercel deploy --yes $PROD --token="$VERCEL_TOKEN")
+          echo "Deployed $REF → $url"
+          {
+            echo "### Frontend → Vercel ($VERCEL_ENV)"
+            echo "Deployed \`$REF\`: $url"
+          } >> "$GITHUB_STEP_SUMMARY"
