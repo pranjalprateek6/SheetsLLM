@@ -1,0 +1,3 @@
+# Test/dev-only dependencies (installed on top of requirements.txt in CI).
+-r requirements.txt
+pytest>=8.0
