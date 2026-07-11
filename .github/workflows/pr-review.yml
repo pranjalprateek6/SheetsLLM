@@ -88,7 +88,7 @@ jobs:
           payload = json.dumps({
               "system_instruction": {"parts": [{"text": system}]},
               "contents": [{"role": "user", "parts": [{"text": user}]}],
-              "generationConfig": {"temperature": 0.1, "maxOutputTokens": 4096},
+              "generationConfig": {"temperature": 0.1, "maxOutputTokens": 16384},
           }).encode()
 
           key = os.environ["GEMINI_API_KEY"]
@@ -100,8 +100,14 @@ jobs:
               try:
                   with urllib.request.urlopen(req, timeout=180) as r:
                       data = json.load(r)
-                  parts = data["candidates"][0]["content"].get("parts", [])
-                  text = "\n".join(p.get("text", "") for p in parts).strip()
+                  cand = data["candidates"][0]
+                  parts = cand["content"].get("parts", [])
+                  # Thinking models emit internal "thought" parts - keep only the answer.
+                  text = "\n".join(
+                      p.get("text", "") for p in parts if not p.get("thought")
+                  ).strip()
+                  if cand.get("finishReason") == "MAX_TOKENS":
+                      text += "\n\n> ⚠️ Review was cut off by the output token limit."
                   if text:
                       print(f"Reviewed with {model}")
                       break
