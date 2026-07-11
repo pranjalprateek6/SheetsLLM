@@ -82,6 +82,15 @@ async def create_recipe(request: Request):
     except RecipeError as exc:
         return _json_response(400, "EMPTY_RECIPE", str(exc))
 
+    # Recipe count is the Pro gate: free tier is capped, Pro is unlimited.
+    limit = usage.recipe_limit(user_id)
+    if limit and len(db.list_recipes(user_id)) >= limit:
+        return _json_response(
+            402, "RECIPE_LIMIT_REACHED",
+            f"The free plan includes {limit} saved recipe"
+            f"{'s' if limit != 1 else ''}. Upgrade to Pro for unlimited recipes.",
+        )
+
     recipe = db.create_recipe(
         user_id=user_id,
         name=name,

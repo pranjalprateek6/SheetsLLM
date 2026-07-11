@@ -8,18 +8,19 @@ import { TextShimmer } from "@/components/ui/text-shimmer";
 
 const FREE_FEATURES = [
   "50 uploads / month",
-  "200 transforms / month",
-  "1M rows per file",
-  "Chat, insights, charts",
-  "Full transformation history",
+  "200 AI transforms / month",
+  "Up to 1M rows per file",
+  "Chat, insights & charts",
+  "Full history, undo & revert",
   "Strict privacy mode",
+  "1 saved recipe",
 ];
 
 const PRO_FEATURES = [
+  "Unlimited saved recipes — automate every recurring export",
   "1,000 uploads / month",
-  "5,000 transforms / month",
-  "Saved recipes — reusable pipelines",
-  "Priority model access",
+  "5,000 AI transforms / month",
+  "Priority email support",
   "Everything in Free",
 ];
 
@@ -134,7 +135,7 @@ function PricingContent() {
           </div>
           <h2 className="text-lg font-semibold text-white">Pro</h2>
           <p className="mt-1 text-3xl font-bold text-white">
-            ₹999<span className="text-sm font-normal text-white/40">/mo</span>
+            ₹499<span className="text-sm font-normal text-white/40">/mo</span>
           </p>
           <ul className="mt-6 space-y-2.5 flex-1">
             {PRO_FEATURES.map((f) => (
