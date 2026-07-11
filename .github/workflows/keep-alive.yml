@@ -1,0 +1,59 @@
+name: Keep Alive
+
+# Keeps the free-tier infrastructure awake (roadmap Milestone 0, zero cost):
+#
+# - Render free instances spin down after ~15 minutes idle and cold-start in
+#   ~50 s. Pinging /health every 10 minutes keeps the backend warm. Render's
+#   free 750 instance-hours/month cover one always-on service.
+# - Supabase free projects auto-pause after ~7 days without API activity.
+#   One daily request that reaches Supabase Auth (a bearer-token check)
+#   counts as activity and prevents the pause. The expected response is 401.
+#
+# Side effect: a failed run emails the repo owner, acting as a basic
+# uptime alert.
+#
+# Notes: GitHub disables scheduled workflows after 60 days of repository
+# inactivity, and schedule ticks can be delayed by several minutes.
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"   # warm the Render backend
+    - cron: "23 3 * * *"     # daily Supabase activity (03:23 UTC)
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: keep-alive
+  cancel-in-progress: true
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Warm backend (Render)
+        run: |
+          code=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 90 \
+            --retry 2 --retry-delay 5 --retry-all-errors \
+            https://sheetsllm.onrender.com/health)
+          echo "GET /health -> HTTP $code"
+          if [ "$code" != "200" ]; then
+            echo "::error::Backend health check returned HTTP $code"
+            exit 1
+          fi
+
+      - name: Touch Supabase (daily)
+        if: github.event_name == 'workflow_dispatch' || github.event.schedule == '23 3 * * *'
+        run: |
+          # A request with a bearer token forces the backend through
+          # verify_token -> Supabase Auth, which registers project activity.
+          # 401 is the expected, correct response for a dummy token.
+          code=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 90 \
+            --retry 2 --retry-delay 5 --retry-all-errors \
+            -H "Authorization: Bearer keep-alive-ping" \
+            https://sheetsllm.onrender.com/files)
+          echo "GET /files (dummy token) -> HTTP $code"
+          if [ "$code" != "401" ]; then
+            echo "::error::Expected HTTP 401 from the auth check, got $code"
+            exit 1
+          fi
