@@ -46,14 +46,14 @@ PRO_MAX_UPLOADS_PER_MONTH: int = int(os.getenv("PRO_MAX_UPLOADS_PER_MONTH", "100
 PRO_MAX_TRANSFORMS_PER_MONTH: int = int(os.getenv("PRO_MAX_TRANSFORMS_PER_MONTH", "5000"))
 PRO_MAX_CHAT_PER_MONTH: int = int(os.getenv("PRO_MAX_CHAT_PER_MONTH", "5000"))
 
-# ── Stripe billing ──────────────────────────────────────────────────
-STRIPE_SECRET_KEY: str = os.getenv("STRIPE_SECRET_KEY", "")
-STRIPE_WEBHOOK_SECRET: str = os.getenv("STRIPE_WEBHOOK_SECRET", "")
-STRIPE_PRICE_ID: str = os.getenv("STRIPE_PRICE_ID", "")   # the Pro monthly price
-# Where Stripe Checkout/Portal returns the user (frontend origin).
-BILLING_SUCCESS_URL: str = os.getenv("BILLING_SUCCESS_URL", "http://localhost:3000/dashboard?upgraded=1")
-BILLING_CANCEL_URL: str = os.getenv("BILLING_CANCEL_URL", "http://localhost:3000/pricing")
-BILLING_PORTAL_RETURN_URL: str = os.getenv("BILLING_PORTAL_RETURN_URL", "http://localhost:3000/dashboard")
+# ── Razorpay billing ────────────────────────────────────────────────
+RAZORPAY_KEY_ID: str = os.getenv("RAZORPAY_KEY_ID", "")
+RAZORPAY_KEY_SECRET: str = os.getenv("RAZORPAY_KEY_SECRET", "")
+RAZORPAY_WEBHOOK_SECRET: str = os.getenv("RAZORPAY_WEBHOOK_SECRET", "")
+RAZORPAY_PLAN_ID: str = os.getenv("RAZORPAY_PLAN_ID", "")   # the Pro monthly plan
+# Monthly-billed subscription total cycle count (Razorpay requires a bound;
+# ~10 years, the customer can cancel any time).
+RAZORPAY_TOTAL_COUNT: int = int(os.getenv("RAZORPAY_TOTAL_COUNT", "120"))
 
 # ── Auth ─────────────────────────────────────────────────────────────
 # When true, requests that fail JWT verification proceed as user "anonymous"
