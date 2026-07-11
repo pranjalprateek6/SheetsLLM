@@ -23,6 +23,11 @@ CREATE TABLE IF NOT EXISTS public.usage (
 CREATE INDEX IF NOT EXISTS idx_usage_user_month ON public.usage (user_id, month);
 
 -- Atomic upsert-increment. All counters optional; defaults add nothing.
+-- SECURITY INVOKER (default): runs with the caller's privileges, so RLS
+-- applies to anyone who is not the service role. Combined with the REVOKEs
+-- below, only the backend can call this — public-schema functions are
+-- otherwise exposed via PostgREST /rpc and executable by PUBLIC by default,
+-- which would let the anon key inflate any user's counters (lockout DoS).
 CREATE OR REPLACE FUNCTION public.increment_usage(
   p_user_id        TEXT,
   p_uploads        INTEGER DEFAULT 0,
@@ -31,7 +36,6 @@ CREATE OR REPLACE FUNCTION public.increment_usage(
   p_rows_processed BIGINT  DEFAULT 0
 ) RETURNS void
 LANGUAGE sql
-SECURITY DEFINER
 SET search_path = public
 AS $$
   INSERT INTO public.usage (user_id, month, uploads, transforms, chat_requests, rows_processed)
@@ -47,6 +51,12 @@ AS $$
     rows_processed = usage.rows_processed + EXCLUDED.rows_processed,
     updated_at     = now();
 $$;
+
+-- Lock the RPC down to the backend only.
+REVOKE EXECUTE ON FUNCTION public.increment_usage(TEXT, INTEGER, INTEGER, INTEGER, BIGINT)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.increment_usage(TEXT, INTEGER, INTEGER, INTEGER, BIGINT)
+  TO service_role;
 
 -- RLS: backend service role bypasses; authenticated users may read their own row.
 ALTER TABLE public.usage ENABLE ROW LEVEL SECURITY;
