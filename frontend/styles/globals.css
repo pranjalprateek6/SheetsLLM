@@ -19,10 +19,10 @@
     --popover-foreground: 224 25% 12%;
     --border: 220 16% 91%;
     --input: 220 16% 87%;
-    --ring: 243 75% 59%;
+    --ring: 254 75% 64%;
 
-    /* brand */
-    --primary: 243 75% 59%;
+    /* brand — violet, matches the logo mark (#7C5CE8) */
+    --primary: 254 75% 64%;
     --primary-foreground: 0 0% 100%;
     --secondary: 220 20% 96%;
     --secondary-foreground: 224 25% 12%;
@@ -37,10 +37,10 @@
     --warning: 38 92% 50%;
     --warning-foreground: 24 40% 15%;
 
-    /* marketing gradient family: emerald → cyan → indigo */
+    /* marketing gradient family: emerald → cyan → violet */
     --gradient-from: 160 84% 39%;
     --gradient-via: 189 94% 43%;
-    --gradient-to: 243 75% 59%;
+    --gradient-to: 254 75% 64%;
 
     --radius: 0.625rem;
 
@@ -62,8 +62,8 @@
     --popover-foreground: 220 20% 96%;
     --border: 224 18% 18%;
     --input: 224 18% 22%;
-    --ring: 243 80% 66%;
-    --primary: 243 80% 66%;
+    --ring: 253 85% 69%;
+    --primary: 253 85% 69%;
     --primary-foreground: 0 0% 100%;
     --secondary: 224 20% 13%;
     --secondary-foreground: 220 20% 96%;

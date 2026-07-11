@@ -1,6 +1,5 @@
 "use client";
 import Link from "next/link";
-import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
@@ -83,7 +82,8 @@ export default function Header() {
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:px-6">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2">
-          <Image src="/logo.png" alt="" width={26} height={26} className="h-[26px] w-[26px] rounded-md" />
+          {/* eslint-disable-next-line @next/next/no-img-element -- static SVG, no optimizer needed */}
+          <img src="/logo.svg" alt="" width={26} height={26} className="h-[26px] w-[26px]" />
           <span className="text-[15px] font-semibold tracking-tight">SheetsLLM</span>
         </Link>
 

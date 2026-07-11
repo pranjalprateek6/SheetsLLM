@@ -1,6 +1,5 @@
 "use client";
 import Link from "next/link";
-import Image from "next/image";
 import { motion } from "framer-motion";
 import {
   ArrowRight, BookMarked, FileSpreadsheet, History, Lock, MessageSquare, RefreshCw, ShieldCheck, Upload,
@@ -294,7 +293,8 @@ export default function LandingPage() {
       <footer className="border-t">
         <div className="mx-auto flex max-w-5xl flex-col items-center justify-between gap-4 px-4 py-10 sm:flex-row sm:px-6">
           <div className="flex items-center gap-2">
-            <Image src="/logo.png" alt="" width={22} height={22} className="h-[22px] w-[22px] rounded" />
+            {/* eslint-disable-next-line @next/next/no-img-element -- static SVG, no optimizer needed */}
+            <img src="/logo.svg" alt="" width={22} height={22} className="h-[22px] w-[22px]" />
             <span className="text-sm font-medium">SheetsLLM</span>
           </div>
           <nav className="flex items-center gap-6 text-sm text-muted-foreground">
