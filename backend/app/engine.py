@@ -182,6 +182,21 @@ def execute_full_result_local(
 # ── Schema Inference ─────────────────────────────────────────────────
 
 
+def _stringify_samples(sample_df) -> list[list]:
+    """Sample rows as JSON-safe strings, mapping missing values to None.
+
+    pandas 2.x ``astype(str)`` keeps NaN/NaT as floats, which later fails
+    JSON serialization ("Out of range float values are not JSON compliant")
+    and broke uploads of any file with NULLs in the first sample rows.
+    """
+    import pandas as pd
+
+    return [
+        [None if pd.isna(v) else str(v) for v in row]
+        for row in sample_df.values.tolist()
+    ]
+
+
 def _enrich_columns(con: "duckdb.DuckDBPyConnection", source: str) -> list[dict]:
     """
     Build enriched column metadata: name, dtype, null_pct, unique_count, sample_values.
@@ -235,7 +250,7 @@ def get_schema_from_local(local_path: str | Path) -> dict[str, Any]:
     columns = _enrich_columns(con, source)
 
     sample_df = con.execute(f"SELECT * FROM {source} LIMIT 5").fetchdf()
-    samples = sample_df.astype(str).values.tolist()
+    samples = _stringify_samples(sample_df)
 
     return {"columns": columns, "samples": samples}
 
@@ -274,7 +289,7 @@ def get_schema_after_steps(
         sample_df = con.execute(
             f"SELECT * FROM ({replay}) LIMIT {int(sample_rows)}"
         ).fetchdf()
-        samples = sample_df.astype(str).values.tolist()
+        samples = _stringify_samples(sample_df)
 
         return {"columns": columns, "samples": samples}
 

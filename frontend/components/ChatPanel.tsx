@@ -23,7 +23,7 @@ type PreviewFn = (p: {
 }) => void;
 
 export default function ChatPanel({
-  fileId, onPreview, open, fileName, onUndo, onReset,
+  fileId, onPreview, open, fileName, onUndo, onReset, starterSuggestions,
 }: {
   fileId?: string;
   onPreview: PreviewFn;
@@ -31,6 +31,8 @@ export default function ChatPanel({
   fileName?: string;
   onUndo?: () => void;
   onReset?: () => void;
+  /** Curated suggestions shown instantly instead of fetching LLM insights. */
+  starterSuggestions?: string[] | null;
 }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -59,6 +61,10 @@ export default function ChatPanel({
 
   useEffect(() => {
     if (!fileId || !open) return;
+    if (starterSuggestions && starterSuggestions.length > 0) {
+      setSuggestions(starterSuggestions.slice(0, 6));
+      return;
+    }
     setLoadingSuggestions(true);
     fetchWithAuth(`/api/insights/${fileId}`)
       .then((r) => r.json())
@@ -68,7 +74,7 @@ export default function ChatPanel({
       })
       .catch(() => setSuggestions([]))
       .finally(() => setLoadingSuggestions(false));
-  }, [fileId, open]);
+  }, [fileId, open, starterSuggestions]);
 
   const sendMessage = useCallback(
     async (text?: string) => {

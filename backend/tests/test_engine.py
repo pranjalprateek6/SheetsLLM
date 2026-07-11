@@ -85,6 +85,27 @@ def test_convert_and_schema(local_parquet):
     assert names == ["name", "age", "city"]
 
 
+def test_schema_samples_json_safe_with_nulls():
+    # Regression: NULL cells in the sample rows survived pandas astype(str)
+    # as float NaN (pandas 2.x), which is not JSON-compliant and made the
+    # metadata insert - and therefore the whole upload - fail with a 500.
+    import json
+
+    csv = b"name,region,score\nAlice,,30\nBob,East,\nCharlie,West,35\n"
+    parquet_bytes, rows, cols = convert_to_parquet(csv, "nulls.csv")
+    assert (rows, cols) == (3, 3)
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".parquet")
+    tmp.write(parquet_bytes)
+    tmp.close()
+    try:
+        schema = get_schema_from_local(tmp.name)
+        json.dumps(schema, allow_nan=False)  # raises on NaN/Infinity
+        flat = [v for row in schema["samples"] for v in row]
+        assert None in flat  # NULLs preserved as None, not "nan" strings
+    finally:
+        Path(tmp.name).unlink(missing_ok=True)
+
+
 def test_execute_filter(local_parquet):
     result = execute_sql_from_local(local_parquet, "SELECT * FROM data WHERE age > 28")
     assert result["total_rows"] == 2
