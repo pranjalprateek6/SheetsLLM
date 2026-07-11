@@ -16,6 +16,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata = {
+  metadataBase: new URL("https://sheets-llm.vercel.app"),
   title: "SheetsLLM — Clean the same spreadsheet once, never again",
   description:
     "Describe your data cleanup in plain English, save it as a recipe, and re-run it on every new export. Your data never goes to the AI.",

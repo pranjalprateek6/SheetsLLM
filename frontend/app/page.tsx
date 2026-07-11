@@ -299,6 +299,7 @@ export default function LandingPage() {
           </div>
           <nav className="flex items-center gap-6 text-sm text-muted-foreground">
             <Link href="/pricing" className="hover:text-foreground">Pricing</Link>
+            <Link href="/tools" className="hover:text-foreground">Free tools</Link>
             <Link href="/#privacy" className="hover:text-foreground">Privacy</Link>
             <Link href="/auth" className="hover:text-foreground">Sign in</Link>
           </nav>
