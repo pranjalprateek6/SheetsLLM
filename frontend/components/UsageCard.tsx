@@ -44,7 +44,7 @@ function barColor(pct: number) {
   return "bg-primary";
 }
 
-export default function UsageCard() {
+export default function UsageCard({ embedded = false }: { embedded?: boolean }) {
   const router = useRouter();
   const [usage, setUsage] = useState<UsageSummary | null>(null);
 
@@ -70,7 +70,7 @@ export default function UsageCard() {
   const capped = meters.some((m) => m.limit > 0 && m.used >= m.limit);
 
   return (
-    <div className="mb-6 rounded-xl border bg-card p-5 shadow-xs">
+    <div className={cn(!embedded && "mb-6 rounded-xl border bg-card p-5 shadow-xs")}>
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Gauge className="h-4 w-4 text-muted-foreground" />
