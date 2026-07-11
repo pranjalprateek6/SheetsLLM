@@ -16,3 +16,7 @@ backend/SheetsLLM/
 backend/audits/
 *.parquet
 .vercel/
+*.tsbuildinfo
+
+# local test datasets (never commit data files)
+datasets/
