@@ -8,25 +8,28 @@
 
 @layer base {
   :root {
-    /* neutrals — slate-tinted, never pure black/white for text surfaces */
-    --background: 0 0% 100%;
+    /* neutrals — two-level light system (GitHub/Stripe pattern):
+       tinted cool-gray canvas + pure white raised surfaces.
+       Never white-on-white; separation comes from surface contrast
+       first, borders second. */
+    --background: 220 27% 97%;
     --foreground: 224 25% 12%;
-    --muted: 220 20% 96%;
-    --muted-foreground: 220 10% 42%;
+    --muted: 220 20% 94%;
+    --muted-foreground: 220 10% 40%;
     --card: 0 0% 100%;
     --card-foreground: 224 25% 12%;
     --popover: 0 0% 100%;
     --popover-foreground: 224 25% 12%;
-    --border: 220 16% 91%;
-    --input: 220 16% 87%;
+    --border: 220 16% 88%;
+    --input: 220 16% 84%;
     --ring: 254 75% 64%;
 
     /* brand — violet, matches the logo mark (#7C5CE8) */
     --primary: 254 75% 64%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 220 20% 96%;
+    --secondary: 220 20% 94%;
     --secondary-foreground: 224 25% 12%;
-    --accent: 220 20% 94%;
+    --accent: 220 18% 93%;
     --accent-foreground: 224 25% 12%;
 
     /* semantic */

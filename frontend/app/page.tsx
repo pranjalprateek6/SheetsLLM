@@ -125,7 +125,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── Pillars ──────────────────────────────────────────────── */}
-      <section id="product" className="border-t bg-muted/30">
+      <section id="product" className="border-t bg-card">
         <div className="mx-auto grid max-w-5xl gap-8 px-4 py-16 sm:grid-cols-3 sm:px-6 sm:py-20">
           {PILLARS.map((p, i) => (
             <motion.div key={p.title} {...fadeUp} transition={{ ...fadeUp.transition, delay: 0.06 * i }}>
@@ -169,7 +169,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── Privacy ──────────────────────────────────────────────── */}
-      <section id="privacy" className="border-t bg-muted/30">
+      <section id="privacy" className="border-t bg-card">
         <div className="mx-auto grid max-w-5xl items-center gap-10 px-4 py-20 sm:px-6 sm:py-24 md:grid-cols-2">
           <motion.div {...fadeUp}>
             <div className="mb-3 inline-flex items-center gap-1.5 rounded-full border bg-background px-3 py-1 text-xs font-medium text-success shadow-xs">
