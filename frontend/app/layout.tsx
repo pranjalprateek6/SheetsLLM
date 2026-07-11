@@ -1,27 +1,21 @@
 import "@/styles/globals.css";
-import type { ReactNode } from "react";
-import { ThemeProvider } from "next-themes";
+import { AuthProvider } from "@/contexts/AuthContext";
 import Header from "@/components/Header";
-import ScrollToTop from "@/components/ScrollToTop";
-import BackgroundAnimation from "@/components/BackgroundAnimation";
 
-export const metadata = { 
-  title: "SheetsLLM - AI-Powered Spreadsheet Transformation", 
-  description: "Transform your spreadsheets using natural language. No formulas, no code, just plain English." 
+export const metadata = {
+  title: "SheetsLLM - AI-Powered Spreadsheet Transformation",
+  description: "Transform your spreadsheets using natural language. No formulas, no code, just plain English."
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className="min-h-screen antialiased">
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
-          <BackgroundAnimation />
-          <ScrollToTop />
+    <html lang="en" className="dark">
+      <body className="min-h-screen antialiased bg-[#0B0B0B]">
+        <AuthProvider>
           <Header />
-          <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pb-10">{children}</main>
-        </ThemeProvider>
+          <main>{children}</main>
+        </AuthProvider>
       </body>
     </html>
   );
 }
-

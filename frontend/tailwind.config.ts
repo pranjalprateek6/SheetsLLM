@@ -6,6 +6,10 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        "gray-900": "var(--ds-gray-900)",
+        "gray-alpha-400": "var(--ds-gray-alpha-400)",
+        "background-100": "var(--ds-background-100)",
+        "background-200": "var(--ds-background-200)",
         glass: {
           light: "rgba(255, 255, 255, 0.7)",
           dark: "rgba(0, 0, 0, 0.3)",
@@ -31,4 +35,3 @@ const config: Config = {
   plugins: []
 };
 export default config;
-
