@@ -28,10 +28,13 @@ Tailwind + shadcn conventions (`hsl(var(--...))`). Light is the default `:root`;
 
 ### Color
 
-- **Neutrals**: slate-tinted grays (Stripe-like coolness, never pure #000/#fff).
-  `--background` near-white `0 0% 100%`, `--foreground` deep slate `224 25% 12%`,
-  `--muted`, `--muted-foreground`, `--border` (~92% lightness hairlines),
-  `--card`, `--input`, `--ring`.
+- **Neutrals — two-level surface system** (GitHub `#F6F8FA`/Stripe `#F6F9FC`
+  pattern, both verified from production CSS): the canvas is a tinted cool
+  gray (`--background: 220 27% 97%`) and raised surfaces are pure white
+  (`--card: 0 0% 100%`). Separation comes from surface contrast first,
+  borders second — never white-on-white. `--muted` (220 20% 94%) is the
+  third level for insets *inside* white cards (table headers, wells, code
+  blocks); `--border` sits at 88% lightness so hairlines actually read.
 - **Primary (brand)**: indigo `243 75% 59%` (#635BFF-adjacent "trust blurple") for
   actions, links, focus rings.
 - **Gradient family (marketing accents only)**: emerald → cyan → indigo
