@@ -14,6 +14,7 @@ from .insights import router as insights_router
 from .upload import router as upload_router
 from .chat import router as chat_router
 from .usage import router as usage_router
+from .recipes import router as recipes_router
 
 
 def register_routes(app: FastAPI) -> None:
@@ -29,3 +30,4 @@ def register_routes(app: FastAPI) -> None:
     app.include_router(jobs_router)
     app.include_router(chat_router)
     app.include_router(usage_router)
+    app.include_router(recipes_router)
