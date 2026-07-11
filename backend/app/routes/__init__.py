@@ -16,6 +16,7 @@ from .chat import router as chat_router
 from .usage import router as usage_router
 from .recipes import router as recipes_router
 from .settings import router as settings_router
+from .billing import router as billing_router
 
 
 def register_routes(app: FastAPI) -> None:
@@ -33,3 +34,4 @@ def register_routes(app: FastAPI) -> None:
     app.include_router(usage_router)
     app.include_router(recipes_router)
     app.include_router(settings_router)
+    app.include_router(billing_router)

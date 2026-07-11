@@ -258,6 +258,44 @@ def get_privacy_mode(user_id: str) -> bool:
         return False
 
 
+# ── Subscriptions ────────────────────────────────────────────────────
+
+
+def get_subscription(user_id: str) -> dict | None:
+    resp = (
+        get_client()
+        .table("subscriptions")
+        .select("*")
+        .eq("user_id", user_id)
+        .limit(1)
+        .execute()
+    )
+    return resp.data[0] if resp.data else None
+
+
+def get_subscription_by_customer(stripe_customer_id: str) -> dict | None:
+    resp = (
+        get_client()
+        .table("subscriptions")
+        .select("*")
+        .eq("stripe_customer_id", stripe_customer_id)
+        .limit(1)
+        .execute()
+    )
+    return resp.data[0] if resp.data else None
+
+
+def upsert_subscription(user_id: str, **fields) -> dict:
+    row = {"user_id": user_id, **fields}
+    resp = (
+        get_client()
+        .table("subscriptions")
+        .upsert(row, on_conflict="user_id")
+        .execute()
+    )
+    return resp.data[0]
+
+
 # ── Recipes ──────────────────────────────────────────────────────────
 
 

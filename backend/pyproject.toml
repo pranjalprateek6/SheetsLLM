@@ -23,6 +23,8 @@ dependencies = [
   # XLSX support (pandas fallback for multi-sheet)
   "pandas>=2.2.0",
   "openpyxl==3.1.5",
+  # Billing
+  "stripe>=10.0.0",
 ]
 
 [tool.uvicorn]

@@ -59,5 +59,8 @@ async def verify_token(request: Request) -> dict:
         ) from exc
 
 
-# Public routes that skip auth
-PUBLIC_PATHS = frozenset({"/health", "/auth/callback", "/docs", "/openapi.json"})
+# Public routes that skip auth. The Stripe webhook authenticates via its own
+# signature header, not a JWT.
+PUBLIC_PATHS = frozenset(
+    {"/health", "/auth/callback", "/docs", "/openapi.json", "/billing/webhook"}
+)

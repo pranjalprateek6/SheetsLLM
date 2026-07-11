@@ -27,6 +27,9 @@ from app.config import (
     FREE_MAX_CHAT_PER_MONTH,
     FREE_MAX_TRANSFORMS_PER_MONTH,
     FREE_MAX_UPLOADS_PER_MONTH,
+    PRO_MAX_CHAT_PER_MONTH,
+    PRO_MAX_TRANSFORMS_PER_MONTH,
+    PRO_MAX_UPLOADS_PER_MONTH,
 )
 from app import db
 
@@ -39,6 +42,11 @@ TIER_LIMITS: dict[str, dict[str, int]] = {
         "uploads": FREE_MAX_UPLOADS_PER_MONTH,
         "transforms": FREE_MAX_TRANSFORMS_PER_MONTH,
         "chat_requests": FREE_MAX_CHAT_PER_MONTH,
+    },
+    "pro": {
+        "uploads": PRO_MAX_UPLOADS_PER_MONTH,
+        "transforms": PRO_MAX_TRANSFORMS_PER_MONTH,
+        "chat_requests": PRO_MAX_CHAT_PER_MONTH,
     },
 }
 
@@ -63,8 +71,18 @@ def month_key(now: _dt.datetime | None = None) -> str:
 
 
 def get_user_tier(user_id: str) -> str:
-    """Tier resolution. Everyone is 'free' until billing lands (Stripe)."""
-    return "free"
+    """Resolve the user's tier from their subscription row.
+
+    Fails to 'free' on any lookup error so billing issues never over-restrict
+    a paying user's request path (worst case a Pro user is briefly capped at
+    the generous free limits, not blocked)."""
+    try:
+        row = db.get_subscription(user_id)
+        tier = (row or {}).get("tier") or "free"
+        return tier if tier in TIER_LIMITS else "free"
+    except Exception as exc:
+        logger.warning("tier lookup failed for %s: %s", user_id, exc)
+        return "free"
 
 
 def check_limit(usage_row: dict | None, tier: str, action: str) -> None:
