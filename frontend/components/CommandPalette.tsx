@@ -121,11 +121,11 @@ export default function CommandPalette({
             <span>Go to Workspace</span>
           </CommandItem>
           <CommandItem
-            keywords={["features", "list"]}
-            onSelect={() => runCommand(() => router.push("/features"))}
+            keywords={["account", "billing", "settings", "privacy"]}
+            onSelect={() => runCommand(() => router.push("/account"))}
           >
             <Sparkles />
-            <span>View features</span>
+            <span>Account &amp; billing</span>
           </CommandItem>
         </CommandGroup>
       </CommandList>

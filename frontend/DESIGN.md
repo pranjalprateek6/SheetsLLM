@@ -111,3 +111,33 @@ hand-rolled `components/ui/*`:
 WCAG AA contrast on all text (slate-600 minimum on white for secondary text),
 visible focus rings (`--ring`), full keyboard paths through dialogs/menus
 (Radix gives this), `aria-label` on icon-only buttons, reduced-motion fallbacks.
+
+## Research notes (verified 2026-07, adversarially fact-checked)
+
+Findings this system deliberately follows:
+
+- **Token architecture**: semantic background/foreground CSS-variable pairs are
+  shadcn's documented convention — adopted wholesale. (The OKLCH + `@theme
+  inline` format applies to Tailwind v4 only; this repo is on v3.4, where
+  `hsl(var(--token))` is the correct form.)
+- **Cool-tinted neutrals**: verified against Stripe's production CSS (#fff
+  cards, #F6F9FC subsurfaces, all grays blue-tinted). Our 220-hue slate ramp
+  matches that finding.
+- **Product-as-hero**: Linear's marketing pages anchor every section on real
+  product UI, not illustration — hence the DOM-built HeroDemo and mockup cards.
+- **Motion**: `whileInView` uses a pooled IntersectionObserver; keep scroll
+  animation to transform/opacity. "Compositor-safe motion can't hurt Core Web
+  Vitals" was REFUTED — measure before adding more.
+- **Onboarding**: sample data + inline contextual guidance beat front-loaded
+  modal tours for multi-path products; checklists work best with 3-5
+  activation-milestone items and pre-filled progress (endowed progress
+  effect, Nunes & Dreze 2006). Hence GettingStarted replaces the modal tour.
+
+Claims checked and REFUTED — do not reintroduce:
+- Stripe's text color being #0A2540; Linear's exact letter-spacing scale;
+  "Linear uses a single accent color"; "interactive onboarding lifts
+  activation ~50%".
+
+Visual reference library for surfaces without verified patterns (pricing,
+settings, tables): saasui.design /pattern/{onboarding,settings,empty-state,
+table,dashboard,pricing,billing}.
