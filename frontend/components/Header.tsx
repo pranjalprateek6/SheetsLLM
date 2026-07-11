@@ -55,6 +55,7 @@ export default function Header() {
   if (pathname === "/auth") return null;
 
   const togglePrivacy = async () => {
+    if (privacyMode === null) return; // still loading the authoritative value
     const next = !privacyMode;
     setPrivacyMode(next); // optimistic
     try {
@@ -121,17 +122,13 @@ export default function Header() {
                   <p className="mt-0.5 truncate text-sm font-medium">{user.email}</p>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <div
-                  className="flex cursor-pointer items-start gap-2.5 px-2 py-2"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    togglePrivacy();
-                  }}
-                  role="switch"
+                <DropdownMenuItem
+                  className="items-start gap-2.5"
+                  role="menuitemcheckbox"
                   aria-checked={!!privacyMode}
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") togglePrivacy();
+                  onSelect={(e) => {
+                    e.preventDefault(); // keep the menu open while toggling
+                    togglePrivacy();
                   }}
                 >
                   <ShieldCheck
@@ -144,7 +141,7 @@ export default function Header() {
                     </p>
                   </div>
                   <Switch checked={!!privacyMode} className="pointer-events-none mt-0.5" />
-                </div>
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
                   <Link href="/account">Account &amp; billing</Link>
