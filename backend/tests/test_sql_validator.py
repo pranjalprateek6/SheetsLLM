@@ -55,6 +55,8 @@ def test_blocked_keywords_rejected(sql):
 BLOCKED_FUNCTIONS = [
     "SELECT * FROM read_csv('/etc/passwd')",
     "SELECT * FROM read_parquet('other/file.parquet')",
+    "SELECT * FROM parquet_scan('other/file.parquet')",   # read_parquet alias
+    "SELECT * FROM csv_scan('/etc/passwd')",               # read_csv alias
     "SELECT * FROM read_json('x.json')",
     "SELECT * FROM read_text('/etc/hosts')",
     "SELECT * FROM read_blob('x')",

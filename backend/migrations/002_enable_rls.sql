@@ -13,6 +13,11 @@
 -- users read-only access to their OWN rows, should direct reads ever be needed.
 --
 -- Idempotent: safe to run more than once.
+--
+-- Note on the cast: user_id is a TEXT column (see 001_create_tables.sql — it
+-- also holds legacy "anonymous" values), while auth.uid() returns UUID, so the
+-- policies compare user_id = auth.uid()::text. Do NOT drop the ::text cast;
+-- text = uuid would be a type error.
 
 -- ── files ─────────────────────────────────────────────────────────────
 ALTER TABLE public.files ENABLE ROW LEVEL SECURITY;
