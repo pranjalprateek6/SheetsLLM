@@ -5,6 +5,7 @@ from __future__ import annotations
 import concurrent.futures
 import io
 import logging
+import re
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -17,10 +18,18 @@ from app.config import (
     DUCKDB_QUERY_TIMEOUT,
     DUCKDB_THREADS,
     MAX_PREVIEW_ROWS,
+    MAX_ROWS,
 )
 from app.security import sanitize_column_names
 
 logger = logging.getLogger("sheetsllm.engine")
+
+
+def _sql_path(path: str | Path) -> str:
+    """Normalize a filesystem path for safe interpolation into DuckDB SQL:
+    forward slashes for DuckDB, single quotes doubled to prevent breaking
+    out of the string literal."""
+    return str(path).replace("\\", "/").replace("'", "''")
 
 
 # ── Connection ───────────────────────────────────────────────────────
@@ -65,7 +74,7 @@ def execute_sql_from_local(
 
     def _inner():
         con = get_connection()
-        lp = str(local_path).replace("\\", "/")
+        lp = _sql_path(local_path)
         con.execute(f"CREATE VIEW data AS SELECT * FROM read_parquet('{lp}')")
 
         # EXPLAIN dry run — catch errors before full execution
@@ -108,6 +117,25 @@ def replay_transformations_local(
     return execute_sql_from_local(local_path, sql, preview_limit=preview_limit)
 
 
+_FROM_DATA_RE = re.compile(r"\bFROM\s+data\b", re.IGNORECASE)
+# Single-quoted SQL string literals ('' is an escaped quote inside one)
+_STRING_LITERAL_RE = re.compile(r"('(?:[^']|'')*')")
+
+
+def _retarget_from_data(sql: str, replacement: str) -> str:
+    """
+    Rewrite references to the 'data' view to point at ``replacement``,
+    case-insensitively and tolerant of extra whitespace, while leaving
+    string literals untouched (e.g. WHERE note = 'FROM data').
+    """
+    segments = _STRING_LITERAL_RE.split(sql)
+    return "".join(
+        seg if seg.startswith("'")
+        else _FROM_DATA_RE.sub(f"FROM {replacement}", seg)
+        for seg in segments
+    )
+
+
 def build_replay_sql(
     steps: list[dict], *, up_to: int | None = None
 ) -> str:
@@ -129,9 +157,8 @@ def build_replay_sql(
             # First step reads from 'data' (the original Parquet)
             ctes.append(f"step_{i + 1} AS ({sql})")
         else:
-            # Subsequent steps: replace FROM data with previous step
-            modified_sql = sql.replace("FROM data", f"FROM step_{i}")
-            ctes.append(f"step_{i + 1} AS ({modified_sql})")
+            # Subsequent steps: retarget FROM data to the previous step
+            ctes.append(f"step_{i + 1} AS ({_retarget_from_data(sql, f'step_{i}')})")
 
     last_step = len(target_steps)
     return f"WITH {', '.join(ctes)} SELECT * FROM step_{last_step}"
@@ -147,7 +174,7 @@ def execute_full_result_local(
     """Replay all steps from a local Parquet file. Returns DuckDB result."""
     sql = build_replay_sql(steps)
     con = get_connection()
-    lp = str(local_path).replace("\\", "/")
+    lp = _sql_path(local_path)
     con.execute(f"CREATE VIEW data AS SELECT * FROM read_parquet('{lp}')")
     return con.execute(sql)
 
@@ -202,7 +229,7 @@ def _enrich_columns(con: "duckdb.DuckDBPyConnection", source: str) -> list[dict]
 def get_schema_from_local(local_path: str | Path) -> dict[str, Any]:
     """Get enriched column metadata and sample rows from a local Parquet file."""
     con = get_connection()
-    lp = str(local_path).replace("\\", "/")
+    lp = _sql_path(local_path)
     source = f"read_parquet('{lp}')"
 
     columns = _enrich_columns(con, source)
@@ -232,15 +259,21 @@ def convert_to_parquet(
     tmp.write(file_bytes)
     tmp.flush()
     tmp.close()
-    tmp_path = tmp.name.replace("\\", "/")  # DuckDB needs forward slashes
+    tmp_path = _sql_path(tmp.name)  # forward slashes + quote-escaped for DuckDB
 
     try:
         if lower.endswith(".parquet") or lower.endswith(".pq"):
-            # Already parquet — just get counts
+            # Already parquet — enforce the row cap, else pass through
             arrow_table = pq.read_table(tmp.name)
-            row_count = arrow_table.num_rows
-            col_count = arrow_table.num_columns
-            return file_bytes, row_count, col_count
+            if arrow_table.num_rows > MAX_ROWS:
+                arrow_table = arrow_table.slice(0, MAX_ROWS)
+                buf = io.BytesIO()
+                pq.write_table(arrow_table, buf, compression="zstd")
+                logger.warning(
+                    "Parquet upload truncated to MAX_ROWS=%d", MAX_ROWS
+                )
+                return buf.getvalue(), arrow_table.num_rows, arrow_table.num_columns
+            return file_bytes, arrow_table.num_rows, arrow_table.num_columns
 
         if lower.endswith(".xlsx") or lower.endswith(".xls"):
             import pandas as pd
@@ -273,6 +306,11 @@ def convert_to_parquet(
     clean_names = sanitize_column_names(original_names)
     if clean_names != original_names:
         arrow_table = arrow_table.rename_columns(clean_names)
+
+    # Enforce the row cap for real — metadata and stored data must agree
+    if arrow_table.num_rows > MAX_ROWS:
+        arrow_table = arrow_table.slice(0, MAX_ROWS)
+        logger.warning("Upload truncated to MAX_ROWS=%d", MAX_ROWS)
 
     row_count = arrow_table.num_rows
     col_count = arrow_table.num_columns
@@ -315,7 +353,7 @@ def suggest_column(
         return None
 
     con = get_connection()
-    lp = str(local_path).replace("\\", "/")
+    lp = _sql_path(local_path)
     source = f"read_parquet('{lp}')"
 
     schema_df = con.execute(f"DESCRIBE SELECT * FROM {source}").fetchdf()
@@ -324,9 +362,16 @@ def suggest_column(
     if not col_names:
         return None
 
-    # Build a query that scores each column name
+    # Build a query that scores each column name (escape quotes — ``typo``
+    # and column names are untrusted input interpolated into SQL)
+    def _lit(s: str) -> str:
+        return s.replace("'", "''")
+
+    def _ident(s: str) -> str:
+        return s.replace('"', '""')
+
     cases = ", ".join(
-        f"jaro_winkler_similarity('{typo}', '{name}') AS \"{name}\""
+        f"jaro_winkler_similarity('{_lit(typo)}', '{_lit(name)}') AS \"{_ident(name)}\""
         for name in col_names
     )
     row = con.execute(f"SELECT {cases}").fetchone()

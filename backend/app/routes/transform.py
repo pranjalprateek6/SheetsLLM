@@ -134,7 +134,9 @@ def _execute_with_retry(
         return result, fixed_sql
     except Exception as retry_error:
         logger.error("Retry also failed: %s", retry_error)
-        raise first_error  # raise the original error
+        # Surface the most recent error (the corrected SQL's failure) —
+        # chaining keeps the original as __cause__ for logs/debugging.
+        raise retry_error from first_error
 
 
 def _save_transform(

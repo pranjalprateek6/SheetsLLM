@@ -35,6 +35,18 @@ _BLOCKED_PATTERNS = [
     re.compile(rf"\b{kw}\b", re.IGNORECASE) for kw in _BLOCKED_KEYWORDS
 ]
 
+# DuckDB table functions that read local files or external systems.
+# LLM-generated SQL must only ever read the "data" view — these would allow
+# local file disclosure or SSRF-style access (read_csv('/etc/passwd'), etc.).
+# Matched in call form (name followed by "(") to avoid false positives on
+# column names like "read_time".
+_BLOCKED_FUNCTION_PATTERNS = [
+    re.compile(r"\bread_\w+\s*\(", re.IGNORECASE),  # read_csv, read_parquet, read_text, read_blob, ...
+    re.compile(r"\b\w+_scan\s*\(", re.IGNORECASE),  # postgres_scan, sqlite_scan, delta_scan, ...
+    re.compile(r"\bglob\s*\(", re.IGNORECASE),      # glob('**') lists the filesystem
+    re.compile(r"\bsniff_csv\s*\(", re.IGNORECASE),
+]
+
 
 def _strip_string_literals(sql: str) -> str:
     """
@@ -94,6 +106,16 @@ def validate_sql(sql: str) -> str:
             raise SQLValidationError(
                 f"Blocked SQL keyword: {keyword}",
                 blocked_keyword=keyword,
+            )
+
+    # Block file-reading / external-scan table functions (SSRF, local file read)
+    for pattern in _BLOCKED_FUNCTION_PATTERNS:
+        match = pattern.search(stripped)
+        if match:
+            func = match.group(0).rstrip("( \t").upper()
+            raise SQLValidationError(
+                f"Blocked SQL function: {func} — queries may only read the uploaded data",
+                blocked_keyword=func,
             )
 
     # Must not contain semicolons (prevent statement chaining)
