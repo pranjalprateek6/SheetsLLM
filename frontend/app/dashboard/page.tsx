@@ -5,9 +5,22 @@ import AuthGuard from "@/components/AuthGuard";
 import UsageCard from "@/components/UsageCard";
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
 import {
-  FileSpreadsheet, Search, Grid3X3, List, Upload, Copy, Trash2, Pencil, Download, ArrowUpDown,
+  ArrowUpDown, Copy, Download, FileSpreadsheet, Grid3X3, List, MoreHorizontal, Pencil, Search, Trash2, Upload,
 } from "lucide-react";
-import { TextShimmer } from "@/components/ui/text-shimmer";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from "@/components/ui/table";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 type FileItem = {
   id: string;
@@ -27,7 +40,7 @@ function formatBytes(bytes: number) {
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString(undefined, {
-    month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit",
+    month: "short", day: "numeric", year: "numeric",
   });
 }
 
@@ -37,11 +50,12 @@ export default function DashboardPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [view, setView] = useState<"grid" | "list">("grid");
+  const [view, setView] = useState<"grid" | "list">("list");
   const [sortBy, setSortBy] = useState<"created_at" | "name" | "row_count">("created_at");
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<FileItem | null>(null);
 
   const fetchFiles = useCallback(async () => {
     setLoading(true);
@@ -76,11 +90,16 @@ export default function DashboardPage() {
     finally { setActionLoading(null); }
   };
 
-  const handleDelete = async (fileId: string, name: string) => {
-    if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    const fileId = deleteTarget.id;
+    setDeleteTarget(null);
     setActionLoading(fileId);
-    try { await fetchWithAuth(`/api/files/${fileId}`, { method: "DELETE" }); setFiles((prev) => prev.filter((f) => f.id !== fileId)); }
-    catch (e) { console.error("Delete failed:", e); }
+    try {
+      await fetchWithAuth(`/api/files/${fileId}`, { method: "DELETE" });
+      setFiles((prev) => prev.filter((f) => f.id !== fileId));
+      setTotal((t) => Math.max(0, t - 1));
+    } catch (e) { console.error("Delete failed:", e); }
     finally { setActionLoading(null); }
   };
 
@@ -110,109 +129,219 @@ export default function DashboardPage() {
     } catch (e) { console.error("Download failed:", e); }
   };
 
+  const rowActions = (file: FileItem) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 text-muted-foreground"
+          disabled={actionLoading === file.id}
+          onClick={(e) => e.stopPropagation()}
+          aria-label="File actions"
+        >
+          <MoreHorizontal className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+        <DropdownMenuItem onClick={() => { setRenamingId(file.id); setRenameValue(file.name); }}>
+          <Pencil className="mr-2 h-4 w-4" /> Rename
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => handleDuplicate(file.id)}>
+          <Copy className="mr-2 h-4 w-4" /> Duplicate
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => handleDownload(file.id, file.name)}>
+          <Download className="mr-2 h-4 w-4" /> Download CSV
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          className="text-destructive focus:text-destructive"
+          onClick={() => setDeleteTarget(file)}
+        >
+          <Trash2 className="mr-2 h-4 w-4" /> Delete
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
+  const nameCell = (file: FileItem) =>
+    renamingId === file.id ? (
+      <Input
+        autoFocus
+        value={renameValue}
+        onChange={(e) => setRenameValue(e.target.value)}
+        onBlur={() => handleRename(file.id)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") handleRename(file.id);
+          if (e.key === "Escape") setRenamingId(null);
+        }}
+        onClick={(e) => e.stopPropagation()}
+        className="h-8 max-w-xs"
+      />
+    ) : (
+      <span className="font-medium">{file.name}</span>
+    );
+
   return (
     <AuthGuard>
-    <div className="max-w-6xl mx-auto pt-8 px-4 pb-10">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-mono font-bold text-white tracking-wider">YOUR FILES</h1>
-          <p className="text-sm font-mono text-white/40 mt-1">{total} file{total !== 1 ? "s" : ""}</p>
+      <div className="mx-auto max-w-6xl px-4 pb-16 pt-8 sm:px-6">
+        <div className="mb-6 flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-semibold tracking-tight">Files</h1>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              {total} file{total !== 1 ? "s" : ""}
+            </p>
+          </div>
+          <Button onClick={() => router.push("/workspace")}>
+            <Upload className="mr-2 h-4 w-4" /> Upload
+          </Button>
         </div>
-        <button onClick={() => router.push("/workspace")} className="px-5 py-2.5 btn-accent inline-flex items-center gap-2 text-sm">
-          <Upload className="h-4 w-4" /> UPLOAD NEW
-        </button>
+
+        <UsageCard />
+
+        <div className="mb-4 flex items-center gap-2">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9"
+              placeholder="Search files…"
+            />
+          </div>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => setSortBy(sortBy === "created_at" ? "name" : sortBy === "name" ? "row_count" : "created_at")}
+            title={`Sorted by ${sortBy === "created_at" ? "date" : sortBy === "name" ? "name" : "rows"}`}
+          >
+            <ArrowUpDown className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => setView(view === "grid" ? "list" : "grid")}
+            title={view === "grid" ? "List view" : "Grid view"}
+          >
+            {view === "grid" ? <List className="h-4 w-4" /> : <Grid3X3 className="h-4 w-4" />}
+          </Button>
+        </div>
+
+        {loading && (
+          <div className="space-y-2">
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
+          </div>
+        )}
+
+        {!loading && filtered.length === 0 && (
+          <div className="rounded-xl border border-dashed py-16 text-center">
+            <FileSpreadsheet className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
+            <p className="font-medium">{search ? "No files match your search" : "No files yet"}</p>
+            <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
+              {search
+                ? "Try a different search term."
+                : "Upload a spreadsheet — or start from a sample dataset — and describe your cleanup in plain English."}
+            </p>
+            {!search && (
+              <Button className="mt-4" onClick={() => router.push("/workspace")}>
+                <Upload className="mr-2 h-4 w-4" /> Upload your first file
+              </Button>
+            )}
+          </div>
+        )}
+
+        {!loading && filtered.length > 0 && view === "list" && (
+          <div className="overflow-hidden rounded-xl border bg-card shadow-xs">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead className="w-24 text-right">Size</TableHead>
+                  <TableHead className="w-28 text-right">Rows</TableHead>
+                  <TableHead className="w-32">Created</TableHead>
+                  <TableHead className="w-12" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filtered.map((file) => (
+                  <TableRow
+                    key={file.id}
+                    className="cursor-pointer"
+                    onClick={() => handleOpen(file.id)}
+                  >
+                    <TableCell className="flex items-center gap-2.5">
+                      <FileSpreadsheet className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                      {nameCell(file)}
+                      <Badge variant="outline" className="uppercase text-[10px]">
+                        {file.original_format}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-muted-foreground">
+                      {formatBytes(file.size_bytes)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-muted-foreground">
+                      {file.row_count.toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{formatDate(file.created_at)}</TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>{rowActions(file)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+
+        {!loading && filtered.length > 0 && view === "grid" && (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {filtered.map((file) => (
+              <div
+                key={file.id}
+                className="group cursor-pointer rounded-xl border bg-card p-5 shadow-xs transition-shadow hover:shadow-md"
+                onClick={() => handleOpen(file.id)}
+              >
+                <div className="mb-3 flex items-start justify-between">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
+                    <FileSpreadsheet className="h-5 w-5 text-muted-foreground" />
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Badge variant="outline" className="uppercase text-[10px]">
+                      {file.original_format}
+                    </Badge>
+                    {rowActions(file)}
+                  </div>
+                </div>
+                <div className="mb-1 truncate text-sm font-medium">{nameCell(file)}</div>
+                <p className="text-xs tabular-nums text-muted-foreground">
+                  {file.row_count.toLocaleString()} rows · {file.column_count.toLocaleString()} cols · {formatBytes(file.size_bytes)}
+                </p>
+                <p className="mt-0.5 text-xs text-muted-foreground">{formatDate(file.created_at)}</p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <AlertDialog open={!!deleteTarget} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete “{deleteTarget?.name}”?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This permanently deletes the file and its full transformation history. This cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={confirmDelete}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
-
-      <UsageCard />
-
-      <div className="flex items-center gap-3 mb-6">
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/20" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} className="w-full pl-10 pr-4 py-2.5 bg-white/[0.03] border border-white/10 outline-none focus:ring-1 focus:ring-cyan-500/40 text-white placeholder:text-white/20 transition-shadow font-mono text-sm" placeholder="Search files..." />
-        </div>
-        <button onClick={() => setSortBy(sortBy === "created_at" ? "name" : sortBy === "name" ? "row_count" : "created_at")} className="p-2.5 border border-white/10 hover:bg-white/5 transition-colors" title={`Sort by: ${sortBy === "created_at" ? "Date" : sortBy === "name" ? "Name" : "Rows"}`}>
-          <ArrowUpDown className="h-4 w-4 text-white" />
-        </button>
-        <button onClick={() => setView(view === "grid" ? "list" : "grid")} className="p-2.5 border border-white/10 hover:bg-white/5 transition-colors">
-          {view === "grid" ? <List className="h-4 w-4 text-white" /> : <Grid3X3 className="h-4 w-4 text-white" />}
-        </button>
-      </div>
-
-      {loading && (
-        <div className="flex justify-center py-12">
-          <TextShimmer className="font-mono text-sm" duration={1.2}>Loading files...</TextShimmer>
-        </div>
-      )}
-
-      {!loading && filtered.length === 0 && (
-        <div className="text-center py-16">
-          <FileSpreadsheet className="h-12 w-12 mx-auto mb-4 text-white/10" />
-          <p className="text-white/40 font-mono">{search ? "No files match your search" : "No files yet. Upload one to get started!"}</p>
-        </div>
-      )}
-
-      {!loading && view === "grid" && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filtered.map((file) => (
-            <div key={file.id} className="bg-neutral-900 border border-white/10 p-5 cursor-pointer group hover:border-white/20 transition-colors" onClick={() => handleOpen(file.id)}>
-              <div className="flex items-start justify-between mb-3">
-                <FileSpreadsheet className="h-5 w-5 text-white/40" />
-                <span className="text-xs px-2 py-0.5 bg-white/5 text-white/40 uppercase font-mono">{file.original_format}</span>
-              </div>
-              {renamingId === file.id ? (
-                <input autoFocus value={renameValue} onChange={(e) => setRenameValue(e.target.value)} onBlur={() => handleRename(file.id)} onKeyDown={(e) => { if (e.key === "Enter") handleRename(file.id); if (e.key === "Escape") setRenamingId(null); }} onClick={(e) => e.stopPropagation()} className="w-full text-sm font-mono font-medium text-white bg-transparent border-b border-white/20 outline-none mb-2" />
-              ) : (
-                <h3 className="font-mono font-medium text-white text-sm truncate mb-2">{file.name}</h3>
-              )}
-              <div className="text-xs font-mono text-white/30 space-y-1">
-                <p>{file.row_count.toLocaleString()} rows x {file.column_count.toLocaleString()} cols</p>
-                <p>{formatBytes(file.size_bytes)}</p>
-                <p>{formatDate(file.created_at)}</p>
-              </div>
-              <div className="flex gap-1 mt-3 pt-3 border-t border-white/5 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
-                <button onClick={() => { setRenamingId(file.id); setRenameValue(file.name); }} className="p-1.5 hover:bg-white/5 transition-colors" title="Rename"><Pencil className="h-3.5 w-3.5 text-white/40" /></button>
-                <button onClick={() => handleDuplicate(file.id)} className="p-1.5 hover:bg-white/5 transition-colors" title="Duplicate" disabled={actionLoading === file.id}><Copy className="h-3.5 w-3.5 text-white/40" /></button>
-                <button onClick={() => handleDownload(file.id, file.name)} className="p-1.5 hover:bg-white/5 transition-colors" title="Download"><Download className="h-3.5 w-3.5 text-white/40" /></button>
-                <button onClick={() => handleDelete(file.id, file.name)} className="p-1.5 hover:bg-red-900/20 transition-colors ml-auto" title="Delete" disabled={actionLoading === file.id}><Trash2 className="h-3.5 w-3.5 text-red-500" /></button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {!loading && view === "list" && (
-        <div className="bg-neutral-900 border border-white/10 overflow-hidden">
-          <table className="w-full text-sm font-mono">
-            <thead className="bg-white/[0.02]">
-              <tr>
-                <th className="px-4 py-3 text-left font-semibold text-white text-xs tracking-wider">NAME</th>
-                <th className="px-4 py-3 text-left font-semibold text-white text-xs tracking-wider">SIZE</th>
-                <th className="px-4 py-3 text-left font-semibold text-white text-xs tracking-wider">ROWS</th>
-                <th className="px-4 py-3 text-left font-semibold text-white text-xs tracking-wider">CREATED</th>
-                <th className="px-4 py-3 text-right font-semibold text-white text-xs tracking-wider">ACTIONS</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((file) => (
-                <tr key={file.id} className="border-t border-white/5 hover:bg-white/[0.02] cursor-pointer transition-colors" onClick={() => handleOpen(file.id)}>
-                  <td className="px-4 py-3 text-white font-medium">{file.name}</td>
-                  <td className="px-4 py-3 text-white/40">{formatBytes(file.size_bytes)}</td>
-                  <td className="px-4 py-3 text-white/40">{file.row_count.toLocaleString()}</td>
-                  <td className="px-4 py-3 text-white/40">{formatDate(file.created_at)}</td>
-                  <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                    <div className="flex justify-end gap-1">
-                      <button onClick={() => handleDuplicate(file.id)} className="p-1.5 hover:bg-white/5 transition-colors" title="Duplicate"><Copy className="h-3.5 w-3.5" /></button>
-                      <button onClick={() => handleDownload(file.id, file.name)} className="p-1.5 hover:bg-white/5 transition-colors" title="Download"><Download className="h-3.5 w-3.5" /></button>
-                      <button onClick={() => handleDelete(file.id, file.name)} className="p-1.5 hover:bg-red-900/20 transition-colors" title="Delete"><Trash2 className="h-3.5 w-3.5 text-red-500" /></button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
     </AuthGuard>
   );
 }
