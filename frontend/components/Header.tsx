@@ -40,9 +40,11 @@ export default function Header() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ privacy_mode: next }),
       });
-      if (!r.ok) setPrivacyMode(!next); // revert on failure
+      // On failure, reset to unknown so the next dropdown open refetches
+      // the authoritative value instead of showing a possibly stale state.
+      if (!r.ok) setPrivacyMode(null);
     } catch {
-      setPrivacyMode(!next);
+      setPrivacyMode(null);
     }
   };
 
