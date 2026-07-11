@@ -43,8 +43,12 @@ jobs:
             echo "::error::RENDER_DEPLOY_HOOK_URL secret is not set (Render → service → Settings → Deploy Hook)"; exit 1
           fi
           echo "Triggering Render deploy of ref '$REF'…"
+          # URL-encode query-unsafe chars a branch name may contain (& # ? = space + %),
+          # keeping '/' literal since Render's ?ref= expects unencoded slashes.
+          ref_enc=$(printf '%s' "$REF" | sed -e 's/%/%25/g' -e 's/&/%26/g' -e 's/#/%23/g' \
+                                             -e 's/?/%3F/g' -e 's/=/%3D/g' -e 's/ /%20/g' -e 's/+/%2B/g')
           # The hook URL already contains '?key=…', so append ref with '&'.
-          resp=$(curl -fsS -X POST "${HOOK}&ref=${REF}") || { echo "::error::Render deploy hook call failed"; exit 1; }
+          resp=$(curl -fsS -X POST "${HOOK}&ref=${ref_enc}") || { echo "::error::Render deploy hook call failed"; exit 1; }
           echo "$resp"
           {
             echo "### Backend → Render"
