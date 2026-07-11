@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useReducer } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { BookMarked, Check, Sparkles } from "lucide-react";
+import { BookMarked, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /* A staged, looping demo of the actual product moment: messy export in,
@@ -152,7 +152,6 @@ export default function HeroDemo() {
         {/* instruction bar */}
         <div className="border-t bg-muted/40 px-4 py-3">
           <div className="flex items-center gap-2 rounded-lg border bg-background px-3 py-2 shadow-xs">
-            <Sparkles className="h-3.5 w-3.5 flex-shrink-0 text-primary" />
             <span className="min-h-[1rem] flex-1 text-xs text-foreground/80">
               {shown === "messy" ? (
                 <span className="text-muted-foreground">Describe your cleanup…</span>
