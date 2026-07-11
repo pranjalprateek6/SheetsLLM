@@ -18,6 +18,8 @@ from app.security import (
     validate_file_magic,
     validate_no_macros,
 )
+from app import usage
+from app.usage import UsageLimitExceeded
 
 logger = logging.getLogger("sheetsllm.routes.upload")
 
@@ -42,6 +44,12 @@ async def upload(
     file_id = str(uuid.uuid4())
     filename = (x_filename or "upload.csv").strip()
     start_time = perf_counter()
+
+    # ── Monthly usage cap ────────────────────────────────────────────
+    try:
+        usage.enforce(user_id, "uploads")
+    except UsageLimitExceeded as exc:
+        return _json_response(429, "USAGE_LIMIT_EXCEEDED", str(exc))
 
     # ── Stream upload with size check ────────────────────────────────
     content_length = request.headers.get("content-length")
@@ -183,6 +191,8 @@ async def upload(
         )
     except Exception:
         pass  # Non-critical
+
+    usage.record(user_id, uploads=1, rows_processed=row_count)
 
     elapsed_ms = round((perf_counter() - start_time) * 1000, 2)
     logger.info(

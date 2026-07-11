@@ -33,6 +33,8 @@ from app.llm.factory import get_llm
 from app.llm.prompts import SYSTEM_PROMPT, build_retry_message, build_user_message
 from app.security import RateLimitExceeded, check_rate_limit
 from app.sql_validator import SQLValidationError, validate_sql
+from app import usage
+from app.usage import UsageLimitExceeded
 
 logger = logging.getLogger("sheetsllm.routes.transform")
 
@@ -207,6 +209,7 @@ def _run_transform_job(
                 "total_columns": result["total_columns"],
             },
         })
+        usage.record(user_id, transforms=1, rows_processed=result["total_rows"])
     except Exception as exc:
         logger.error("Background transform failed: %s", exc)
         jobs.fail_job(job_id, str(exc))
@@ -225,6 +228,12 @@ async def transform(request: Request, background_tasks: BackgroundTasks):
             429, "RATE_LIMITED",
             f"Too many requests. Retry after {exc.retry_after:.0f}s",
         )
+
+    # ── Monthly usage cap ──────────────────────────────────────────────
+    try:
+        usage.enforce(user_id, "transforms")
+    except UsageLimitExceeded as exc:
+        return _json_response(429, "USAGE_LIMIT_EXCEEDED", str(exc))
 
     # ── Parse body ─────────────────────────────────────────────────────
     try:
@@ -315,6 +324,8 @@ async def transform(request: Request, background_tasks: BackgroundTasks):
     except Exception as exc:
         logger.error("Failed to save transformation: %s", exc)
         return _json_response(500, "DB_FAILED", "Failed to save transformation")
+
+    usage.record(user_id, transforms=1, rows_processed=result["total_rows"])
 
     elapsed_ms = round((perf_counter() - start_time) * 1000, 2)
     logger.info(
