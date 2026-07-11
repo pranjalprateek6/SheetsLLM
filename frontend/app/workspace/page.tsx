@@ -16,6 +16,7 @@ import KeyboardShortcuts from "@/components/KeyboardShortcuts";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import AuthGuard from "@/components/AuthGuard";
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
+import { SAMPLE_DATASETS } from "@/lib/samples";
 import { TextShimmer } from "@/components/ui/text-shimmer";
 
 export default function Workspace() {
@@ -52,6 +53,7 @@ function WorkspaceContent() {
   const [chatOpen, setChatOpen] = useState(true);
   const [chartOpen, setChartOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [sampleSuggestions, setSampleSuggestions] = useState<string[] | null>(null);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -102,8 +104,9 @@ function WorkspaceContent() {
     }
   };
 
-  const onUpload = async (file: File, sheetName?: string) => {
+  const onUpload = async (file: File, sheetName?: string, suggestions?: string[]) => {
     setLoading(true);
+    setSampleSuggestions(suggestions ?? null);
     try {
       const url = sheetName ? `/api/upload?sheet_name=${encodeURIComponent(sheetName)}` : "/api/upload";
       const form = new FormData();
@@ -115,7 +118,7 @@ function WorkspaceContent() {
         setAvailableSheets(data.sheets);
         setPendingFile(file);
         setShowSheetSelector(true);
-        return;
+        return false;
       }
 
       if (data.preview && data.file_id) {
@@ -128,18 +131,39 @@ function WorkspaceContent() {
         setSchema(data.schema);
         setFileReady(true);
         setShowUpload(false);
+        return true;
       }
     } catch (error) {
       console.error("Upload error:", error);
     } finally {
       setLoading(false);
     }
+    return false;
   };
 
   const handleSheetSelect = (sheetName: string) => {
     if (pendingFile) {
       setShowSheetSelector(false);
       onUpload(pendingFile, sheetName);
+    }
+  };
+
+  const loadSample = async (sampleId: string) => {
+    const sample = SAMPLE_DATASETS.find((s) => s.id === sampleId);
+    if (!sample || loading) return;
+    setLoading(true);
+    try {
+      const res = await fetch(sample.file);
+      if (!res.ok) return;
+      const blob = await res.blob();
+      const file = new File([blob], sample.uploadName, { type: "text/csv" });
+      const ok = await onUpload(file, undefined, sample.suggestions);
+      // skip the intermediate preview screen: sample users go straight to Sage
+      if (ok) setShowTransform(true);
+    } catch (e) {
+      console.error("Failed to load sample dataset:", e);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -217,6 +241,7 @@ function WorkspaceContent() {
     setFileId(undefined);
     setFileName("");
     setSchema(undefined);
+    setSampleSuggestions(null);
     setShowUpload(true);
     setShowResetDialog(false);
   };
@@ -287,6 +312,24 @@ function WorkspaceContent() {
                   <p className="text-xs text-white/30 mt-3 font-medium">
                     CSV, XLSX, JSON, TSV, Parquet
                   </p>
+                  <div className="mt-5 pt-4 border-t border-white/5">
+                    <p className="text-xs font-medium text-white/30 uppercase tracking-wider mb-2">
+                      No file handy? Try a sample
+                    </p>
+                    <div className="space-y-1.5">
+                      {SAMPLE_DATASETS.map((sample) => (
+                        <button
+                          key={sample.id}
+                          onClick={() => loadSample(sample.id)}
+                          disabled={loading}
+                          className="w-full text-left px-3 py-2 rounded-lg bg-white/[0.03] border border-white/5 hover:border-cyan-800/40 hover:bg-cyan-900/10 transition-colors disabled:opacity-50"
+                        >
+                          <span className="text-sm text-white">{sample.name}</span>
+                          <span className="block text-xs text-white/30 mt-0.5">{sample.description}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
                 <div className="space-y-3">
                   <div className="card p-5">
@@ -448,6 +491,7 @@ function WorkspaceContent() {
                 fileName={fileName}
                 onUndo={handleUndo}
                 onReset={handleReset}
+                starterSuggestions={sampleSuggestions}
               />
             </div>
           </div>
@@ -469,7 +513,7 @@ function WorkspaceContent() {
         <SheetSelector isOpen={showSheetSelector} sheets={availableSheets} onSelect={handleSheetSelect} onCancel={() => { setShowSheetSelector(false); setPendingFile(null); setLoading(false); }} />
         <ChartPanel columns={columns} rows={rows} open={chartOpen} onClose={() => setChartOpen(false)} />
         <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} onUpload={handleFullReset} onUndo={handleUndo} onDownload={handleDownload} onReset={handleResetClick} onChat={() => setChatOpen(true)} onHistory={() => setHistoryOpen(true)} fileId={fileId} />
-        {showUpload && !fileReady && <OnboardingOverlay onClose={() => {}} />}
+        {showUpload && !fileReady && <OnboardingOverlay onClose={() => {}} onTrySample={loadSample} />}
       </div>
     </ErrorBoundary>
   );

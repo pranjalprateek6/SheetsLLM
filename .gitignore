@@ -7,6 +7,8 @@ __pycache__/
 .DS_Store
 *.csv
 *.xlsx
+# bundled sample datasets are shipped assets, not user data
+!frontend/public/samples/*.csv
 
 
 # local tooling / environments

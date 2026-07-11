@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { Upload, MessageSquare, Download, ArrowRight, X, Sparkles } from "lucide-react";
+import { SAMPLE_DATASETS } from "@/lib/samples";
 
 const STEPS = [
   {
@@ -20,30 +21,12 @@ const STEPS = [
   },
 ];
 
-const SAMPLE_DATASETS = [
-  {
-    name: "Sales Data",
-    description: "1,000 rows of product sales with revenue, dates, and regions",
-    suggestion: "Show total revenue by region",
-  },
-  {
-    name: "Employee Data",
-    description: "500 employees with departments, salaries, and hire dates",
-    suggestion: "Average salary by department",
-  },
-  {
-    name: "Survey Results",
-    description: "200 survey responses with ratings and demographics",
-    suggestion: "Show average rating by age group",
-  },
-];
-
 export default function OnboardingOverlay({
   onClose,
   onTrySample,
 }: {
   onClose: () => void;
-  onTrySample?: (name: string) => void;
+  onTrySample?: (sampleId: string) => void;
 }) {
   const [step, setStep] = useState(0);
   const [dismissed, setDismissed] = useState(false);
@@ -142,10 +125,10 @@ export default function OnboardingOverlay({
             <div className="space-y-2">
               {SAMPLE_DATASETS.map((sample) => (
                 <button
-                  key={sample.name}
+                  key={sample.id}
                   onClick={() => {
                     handleDismiss();
-                    onTrySample(sample.name);
+                    onTrySample(sample.id);
                   }}
                   className="w-full text-left px-4 py-3 rounded-xl bg-black/5 dark:bg-white/5 hover:bg-black/10 dark:hover:bg-white/10 transition"
                 >

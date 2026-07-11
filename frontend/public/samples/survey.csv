@@ -1,0 +1,201 @@
+response_id,age_group,gender,rating,would_recommend,submitted_at
+RSP-0001,18-24,Female,4,yes,2025-06-04
+RSP-0002,45-54,Non-binary,4,yes,2025-06-01
+RSP-0003,35-44,Non-binary,3,no,2025-07-01
+RSP-0004,18-24,Male,5,yes,2025-06-17
+RSP-0005,18-24,Prefer not to say,5,yes,2025-06-20
+RSP-0006,18-24,Female,4,yes,2025-06-19
+RSP-0007,18-24,Female,5,yes,2025-06-30
+RSP-0008,45-54,Male,3,no,2025-06-03
+RSP-0009,18-24,Female,5,yes,2025-06-15
+RSP-0010,35-44,Female,4,yes,2025-06-14
+RSP-0011,18-24,Female,4,yes,2025-06-18
+RSP-0012,35-44,Female,5,yes,2025-06-13
+RSP-0013,55+,Female,5,yes,2025-06-08
+RSP-0014,45-54,Prefer not to say,4,yes,2025-06-26
+RSP-0015,55+,Female,4,yes,2025-06-11
+RSP-0016,45-54,Male,4,yes,2025-06-19
+RSP-0017,18-24,Male,2,no,2025-06-03
+RSP-0018,55+,Prefer not to say,2,no,2025-06-12
+RSP-0019,45-54,Male,5,yes,2025-06-15
+RSP-0020,25-34,Non-binary,2,yes,2025-06-05
+RSP-0021,55+,Non-binary,4,yes,2025-07-01
+RSP-0022,35-44,Male,4,yes,2025-06-18
+RSP-0023,25-34,Non-binary,4,yes,2025-06-20
+RSP-0024,35-44,Male,4,yes,2025-06-01
+RSP-0025,18-24,Female,3,no,2025-06-18
+RSP-0026,45-54,Male,3,no,2025-06-21
+RSP-0027,18-24,Prefer not to say,3,no,2025-06-23
+RSP-0028,55+,Non-binary,4,yes,2025-06-28
+RSP-0029,55+,Prefer not to say,3,no,2025-06-04
+RSP-0030,18-24,Female,4,yes,2025-06-30
+RSP-0031,25-34,Male,4,yes,2025-06-15
+RSP-0032,25-34,Non-binary,4,yes,2025-06-25
+RSP-0033,45-54,Non-binary,3,yes,2025-06-01
+RSP-0034,18-24,Male,2,yes,2025-06-04
+RSP-0035,35-44,Non-binary,4,yes,2025-06-21
+RSP-0036,18-24,Male,5,yes,2025-06-07
+RSP-0037,35-44,Male,3,no,2025-06-24
+RSP-0038,35-44,Male,5,yes,2025-06-08
+RSP-0039,25-34,Female,1,no,2025-06-30
+RSP-0040,18-24,Prefer not to say,5,yes,2025-06-05
+RSP-0041,18-24,Male,3,no,2025-06-15
+RSP-0042,35-44,Male,5,yes,2025-06-22
+RSP-0043,55+,Prefer not to say,5,yes,2025-06-20
+RSP-0044,18-24,Male,2,no,2025-06-05
+RSP-0045,25-34,Non-binary,4,yes,2025-06-23
+RSP-0046,35-44,Male,4,yes,2025-06-21
+RSP-0047,18-24,Male,5,yes,2025-06-19
+RSP-0048,55+,Female,3,yes,2025-06-08
+RSP-0049,35-44,Prefer not to say,5,yes,2025-06-28
+RSP-0050,25-34,Prefer not to say,5,yes,2025-06-26
+RSP-0051,55+,Non-binary,2,no,2025-06-25
+RSP-0052,45-54,Non-binary,4,yes,2025-06-06
+RSP-0053,35-44,Prefer not to say,4,yes,2025-06-16
+RSP-0054,45-54,Female,3,no,2025-06-30
+RSP-0055,25-34,Male,3,no,2025-06-28
+RSP-0056,45-54,Male,3,no,2025-06-13
+RSP-0057,35-44,Female,3,yes,2025-06-25
+RSP-0058,35-44,Male,4,yes,2025-06-12
+RSP-0059,55+,Prefer not to say,1,no,2025-06-11
+RSP-0060,45-54,Non-binary,4,yes,2025-06-14
+RSP-0061,45-54,Prefer not to say,3,no,2025-06-06
+RSP-0062,25-34,Female,3,yes,2025-06-29
+RSP-0063,35-44,Female,5,yes,2025-06-17
+RSP-0064,35-44,Female,5,yes,2025-06-04
+RSP-0065,18-24,Male,4,yes,2025-06-18
+RSP-0066,35-44,Non-binary,3,no,2025-06-10
+RSP-0067,25-34,Non-binary,5,yes,2025-06-05
+RSP-0068,18-24,Non-binary,5,yes,2025-06-10
+RSP-0069,45-54,Female,5,yes,2025-06-27
+RSP-0070,45-54,Male,4,yes,2025-06-25
+RSP-0071,45-54,Prefer not to say,3,no,2025-06-07
+RSP-0072,25-34,Prefer not to say,4,yes,2025-06-26
+RSP-0073,45-54,Male,3,yes,2025-06-28
+RSP-0074,45-54,Prefer not to say,5,yes,2025-06-23
+RSP-0075,25-34,Female,4,yes,2025-06-28
+RSP-0076,35-44,Female,2,no,2025-06-10
+RSP-0077,45-54,Non-binary,5,yes,2025-06-27
+RSP-0078,35-44,Prefer not to say,3,no,2025-06-25
+RSP-0079,55+,Female,3,no,2025-06-19
+RSP-0080,25-34,Prefer not to say,3,no,2025-06-11
+RSP-0081,45-54,Prefer not to say,3,no,2025-06-18
+RSP-0082,25-34,Prefer not to say,4,yes,2025-06-11
+RSP-0083,35-44,Male,2,yes,2025-06-18
+RSP-0084,18-24,Prefer not to say,5,yes,2025-06-20
+RSP-0085,18-24,Prefer not to say,3,yes,2025-07-01
+RSP-0086,35-44,Female,3,no,2025-06-17
+RSP-0087,45-54,Non-binary,2,no,2025-06-06
+RSP-0088,45-54,Male,4,yes,2025-06-04
+RSP-0089,55+,Female,4,yes,2025-06-24
+RSP-0090,45-54,Male,5,yes,2025-06-28
+RSP-0091,25-34,Prefer not to say,5,yes,2025-06-10
+RSP-0092,45-54,Male,3,no,2025-06-10
+RSP-0093,55+,Non-binary,5,yes,2025-06-15
+RSP-0094,25-34,Prefer not to say,1,yes,2025-06-03
+RSP-0095,55+,Non-binary,5,yes,2025-06-17
+RSP-0096,55+,Prefer not to say,5,yes,2025-06-15
+RSP-0097,55+,Prefer not to say,1,yes,2025-06-21
+RSP-0098,35-44,Non-binary,5,yes,2025-06-23
+RSP-0099,45-54,Male,4,yes,2025-06-26
+RSP-0100,45-54,Prefer not to say,3,no,2025-06-24
+RSP-0101,45-54,Male,4,yes,2025-06-22
+RSP-0102,55+,Male,2,no,2025-06-02
+RSP-0103,25-34,Female,3,no,2025-06-10
+RSP-0104,25-34,Female,5,yes,2025-06-14
+RSP-0105,35-44,Non-binary,2,yes,2025-06-25
+RSP-0106,45-54,Male,4,yes,2025-06-09
+RSP-0107,55+,Prefer not to say,1,yes,2025-06-21
+RSP-0108,45-54,Prefer not to say,3,no,2025-06-07
+RSP-0109,18-24,Male,1,yes,2025-06-30
+RSP-0110,35-44,Prefer not to say,4,yes,2025-06-15
+RSP-0111,45-54,Prefer not to say,2,no,2025-06-08
+RSP-0112,25-34,Male,4,yes,2025-06-09
+RSP-0113,25-34,Female,5,yes,2025-06-20
+RSP-0114,25-34,Male,3,no,2025-06-13
+RSP-0115,18-24,Non-binary,4,yes,2025-06-01
+RSP-0116,25-34,Male,4,yes,2025-06-06
+RSP-0117,18-24,Male,5,yes,2025-06-18
+RSP-0118,45-54,Female,4,yes,2025-06-27
+RSP-0119,45-54,Female,4,yes,2025-06-15
+RSP-0120,55+,Male,1,no,2025-06-25
+RSP-0121,25-34,Male,4,yes,2025-06-08
+RSP-0122,18-24,Non-binary,1,yes,2025-06-01
+RSP-0123,25-34,Male,4,yes,2025-06-03
+RSP-0124,18-24,Male,5,yes,2025-06-27
+RSP-0125,25-34,Non-binary,1,no,2025-06-27
+RSP-0126,35-44,Male,4,yes,2025-06-07
+RSP-0127,55+,Female,4,yes,2025-06-14
+RSP-0128,25-34,Female,3,no,2025-06-06
+RSP-0129,45-54,Prefer not to say,4,yes,2025-06-01
+RSP-0130,25-34,Non-binary,4,yes,2025-06-03
+RSP-0131,55+,Male,4,yes,2025-06-03
+RSP-0132,45-54,Male,3,no,2025-06-04
+RSP-0133,35-44,Non-binary,5,yes,2025-06-20
+RSP-0134,45-54,Male,4,yes,2025-06-25
+RSP-0135,35-44,Non-binary,3,no,2025-06-23
+RSP-0136,45-54,Prefer not to say,2,yes,2025-06-30
+RSP-0137,45-54,Male,4,yes,2025-06-24
+RSP-0138,55+,Male,4,yes,2025-06-01
+RSP-0139,18-24,Female,4,yes,2025-06-29
+RSP-0140,35-44,Female,3,no,2025-06-08
+RSP-0141,18-24,Male,2,no,2025-06-07
+RSP-0142,45-54,Prefer not to say,3,yes,2025-06-30
+RSP-0143,35-44,Female,2,no,2025-06-26
+RSP-0144,55+,Non-binary,5,yes,2025-06-14
+RSP-0145,18-24,Male,3,no,2025-06-11
+RSP-0146,25-34,Male,4,yes,2025-06-30
+RSP-0147,25-34,Non-binary,4,yes,2025-06-13
+RSP-0148,25-34,Female,4,yes,2025-06-01
+RSP-0149,45-54,Male,2,yes,2025-06-21
+RSP-0150,25-34,Male,2,yes,2025-06-18
+RSP-0151,25-34,Prefer not to say,4,yes,2025-06-14
+RSP-0152,35-44,Male,3,yes,2025-06-14
+RSP-0153,55+,Male,3,no,2025-06-15
+RSP-0154,35-44,Female,5,yes,2025-06-16
+RSP-0155,35-44,Prefer not to say,4,yes,2025-06-06
+RSP-0156,45-54,Prefer not to say,4,yes,2025-06-20
+RSP-0157,25-34,Prefer not to say,5,yes,2025-06-26
+RSP-0158,18-24,Female,5,yes,2025-06-14
+RSP-0159,35-44,Male,4,yes,2025-06-05
+RSP-0160,35-44,Prefer not to say,4,yes,2025-06-10
+RSP-0161,35-44,Prefer not to say,4,yes,2025-06-20
+RSP-0162,18-24,Male,3,no,2025-06-07
+RSP-0163,25-34,Non-binary,1,no,2025-06-24
+RSP-0164,45-54,Prefer not to say,4,yes,2025-06-14
+RSP-0165,35-44,Female,4,yes,2025-06-10
+RSP-0166,45-54,Female,5,yes,2025-06-30
+RSP-0167,45-54,Male,5,yes,2025-06-06
+RSP-0168,45-54,Non-binary,5,yes,2025-06-25
+RSP-0169,55+,Non-binary,5,yes,2025-06-21
+RSP-0170,18-24,Prefer not to say,4,yes,2025-06-30
+RSP-0171,25-34,Non-binary,3,yes,2025-06-27
+RSP-0172,18-24,Male,4,yes,2025-06-21
+RSP-0173,35-44,Male,4,yes,2025-07-01
+RSP-0174,35-44,Male,3,no,2025-06-22
+RSP-0175,18-24,Prefer not to say,2,yes,2025-06-23
+RSP-0176,45-54,Female,5,yes,2025-06-29
+RSP-0177,55+,Prefer not to say,5,yes,2025-06-29
+RSP-0178,25-34,Non-binary,5,yes,2025-06-09
+RSP-0179,55+,Prefer not to say,5,yes,2025-06-22
+RSP-0180,55+,Female,3,no,2025-06-29
+RSP-0181,18-24,Non-binary,4,yes,2025-06-25
+RSP-0182,25-34,Prefer not to say,3,no,2025-06-24
+RSP-0183,35-44,Female,1,yes,2025-06-16
+RSP-0184,18-24,Prefer not to say,2,no,2025-06-17
+RSP-0185,35-44,Male,5,yes,2025-06-06
+RSP-0186,35-44,Male,3,yes,2025-06-16
+RSP-0187,55+,Male,5,yes,2025-06-15
+RSP-0188,25-34,Male,3,no,2025-06-26
+RSP-0189,35-44,Prefer not to say,5,yes,2025-06-28
+RSP-0190,45-54,Female,4,yes,2025-06-20
+RSP-0191,25-34,Non-binary,2,yes,2025-06-04
+RSP-0192,18-24,Prefer not to say,3,no,2025-06-16
+RSP-0193,18-24,Female,1,no,2025-07-01
+RSP-0194,55+,Female,5,yes,2025-06-02
+RSP-0195,25-34,Prefer not to say,4,yes,2025-06-01
+RSP-0196,55+,Non-binary,4,yes,2025-07-01
+RSP-0197,45-54,Prefer not to say,4,yes,2025-06-11
+RSP-0198,35-44,Non-binary,4,yes,2025-06-29
+RSP-0199,35-44,Non-binary,5,yes,2025-07-01
+RSP-0200,45-54,Non-binary,4,yes,2025-06-02
