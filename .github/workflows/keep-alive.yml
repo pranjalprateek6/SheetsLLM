@@ -27,6 +27,9 @@ concurrency:
   group: keep-alive
   cancel-in-progress: true
 
+env:
+  BACKEND_URL: https://sheetsllm.onrender.com
+
 jobs:
   ping:
     runs-on: ubuntu-latest
@@ -35,7 +38,7 @@ jobs:
         run: |
           code=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 90 \
             --retry 2 --retry-delay 5 --retry-all-errors \
-            https://sheetsllm.onrender.com/health)
+            "$BACKEND_URL/health")
           echo "GET /health -> HTTP $code"
           if [ "$code" != "200" ]; then
             echo "::error::Backend health check returned HTTP $code"
@@ -43,7 +46,12 @@ jobs:
           fi
 
       - name: Touch Supabase (daily)
-        if: github.event_name == 'workflow_dispatch' || github.event.schedule == '23 3 * * *'
+        # always(): still attempt the Supabase touch even if the Render warm-up
+        # step failed (its retries may succeed, and skipping would risk the
+        # 7-day auto-pause over unrelated transient backend downtime).
+        if: >-
+          always() &&
+          (github.event_name == 'workflow_dispatch' || github.event.schedule == '23 3 * * *')
         run: |
           # A request with a bearer token forces the backend through
           # verify_token -> Supabase Auth, which registers project activity.
@@ -51,7 +59,7 @@ jobs:
           code=$(curl -sS -o /dev/null -w "%{http_code}" --max-time 90 \
             --retry 2 --retry-delay 5 --retry-all-errors \
             -H "Authorization: Bearer keep-alive-ping" \
-            https://sheetsllm.onrender.com/files)
+            "$BACKEND_URL/files")
           echo "GET /files (dummy token) -> HTTP $code"
           if [ "$code" != "401" ]; then
             echo "::error::Expected HTTP 401 from the auth check, got $code"
