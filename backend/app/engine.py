@@ -240,6 +240,48 @@ def get_schema_from_local(local_path: str | Path) -> dict[str, Any]:
     return {"columns": columns, "samples": samples}
 
 
+def get_schema_after_steps(
+    local_path: str | Path,
+    steps: list[dict],
+    *,
+    sample_rows: int = 3,
+    timeout: int | None = None,
+) -> dict[str, Any]:
+    """
+    Schema (real column names AND dtypes) plus sample rows as they exist after
+    replaying the stored transformation steps.
+
+    DESCRIBE on the CTE chain resolves names/types without executing the full
+    query; only the small LIMIT sample runs the chain. With no steps this
+    falls through to the enriched base-file schema.
+    """
+    if not steps:
+        return get_schema_from_local(local_path)
+
+    replay = build_replay_sql(steps)
+
+    def _inner():
+        con = get_connection()
+        lp = _sql_path(local_path)
+        con.execute(f"CREATE VIEW data AS SELECT * FROM read_parquet('{lp}')")
+
+        schema_df = con.execute(f"DESCRIBE {replay}").fetchdf()
+        columns = [
+            {"name": str(row["column_name"]), "dtype": str(row["column_type"])}
+            for _, row in schema_df.iterrows()
+        ]
+
+        sample_df = con.execute(
+            f"SELECT * FROM ({replay}) LIMIT {int(sample_rows)}"
+        ).fetchdf()
+        samples = sample_df.astype(str).values.tolist()
+
+        return {"columns": columns, "samples": samples}
+
+    t = timeout if timeout is not None else DUCKDB_QUERY_TIMEOUT
+    return _run_with_timeout(_inner, timeout=t)
+
+
 # ── Parquet Conversion ───────────────────────────────────────────────
 
 

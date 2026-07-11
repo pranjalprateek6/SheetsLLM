@@ -12,6 +12,7 @@ from app.engine import (
     build_replay_sql,
     convert_to_parquet,
     execute_sql_from_local,
+    get_schema_after_steps,
     get_schema_from_local,
     replay_transformations_local,
 )
@@ -103,3 +104,34 @@ def test_preview_limit(local_parquet):
     result = execute_sql_from_local(local_parquet, "SELECT * FROM data", preview_limit=2)
     assert result["total_rows"] == 3          # full count
     assert len(result["preview"]) == 2        # capped preview
+
+
+# ── Schema after steps (regression: dtypes were hardcoded to VARCHAR) ──
+
+def test_schema_after_steps_no_steps_falls_back(local_parquet):
+    schema = get_schema_after_steps(local_parquet, [])
+    names = [c["name"] for c in schema["columns"]]
+    assert names == ["name", "age", "city"]
+
+
+def test_schema_after_steps_keeps_real_dtypes(local_parquet):
+    steps = [{"sql_query": "SELECT * FROM data WHERE age > 28"}]
+    schema = get_schema_after_steps(local_parquet, steps)
+    dtypes = {c["name"]: c["dtype"] for c in schema["columns"]}
+    assert dtypes["age"] == "BIGINT"        # was reported as VARCHAR before the fix
+    assert dtypes["name"] == "VARCHAR"
+    assert schema["samples"]                # samples present, not []
+
+
+def test_schema_after_steps_computed_column_typed(local_parquet):
+    steps = [{"sql_query": "SELECT *, (age * 2) AS double_age FROM data"}]
+    schema = get_schema_after_steps(local_parquet, steps)
+    dtypes = {c["name"]: c["dtype"] for c in schema["columns"]}
+    assert "double_age" in dtypes
+    assert dtypes["double_age"] != "VARCHAR"    # numeric expression stays numeric
+
+
+def test_schema_after_steps_reflects_dropped_columns(local_parquet):
+    steps = [{"sql_query": "SELECT name, age FROM data"}]
+    schema = get_schema_after_steps(local_parquet, steps)
+    assert [c["name"] for c in schema["columns"]] == ["name", "age"]

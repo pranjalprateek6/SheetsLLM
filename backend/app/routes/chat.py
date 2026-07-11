@@ -15,7 +15,7 @@ from app.cache import (
     schema_fingerprint,
 )
 from app.engine import (
-    get_schema_from_local,
+    get_schema_after_steps,
     replay_transformations_local,
 )
 from app.llm.factory import get_llm
@@ -119,18 +119,11 @@ async def chat(request: Request):
     # Save user message
     db.create_chat_message(file_id=file_id, role="user", content=message)
 
-    # Get current schema (reflecting all existing transformations)
+    # Get current schema (real dtypes + samples, reflecting all existing steps)
     steps = db.get_transformations(file_id)
     try:
         local_path = get_local_parquet(r2_key)
-        if steps:
-            current = replay_transformations_local(local_path, steps, preview_limit=0)
-            schema = {
-                "columns": [{"name": c, "dtype": "VARCHAR"} for c in current["columns"]],
-                "samples": [],
-            }
-        else:
-            schema = get_schema_from_local(local_path)
+        schema = get_schema_after_steps(local_path, steps)
     except Exception as exc:
         logger.error("Schema retrieval failed: %s", exc)
         return _json_response(500, "SCHEMA_FAILED", f"Schema retrieval failed: {exc}")
