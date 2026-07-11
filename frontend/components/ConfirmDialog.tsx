@@ -1,5 +1,4 @@
 "use client";
-import { motion, AnimatePresence } from "framer-motion";
 import { AlertTriangle } from "lucide-react";
 
 interface ConfirmDialogProps {
@@ -23,72 +22,54 @@ export default function ConfirmDialog({
   cancelText = "Cancel",
   items = []
 }: ConfirmDialogProps) {
-  return (
-    <AnimatePresence>
-      {isOpen && (
-        <>
-          {/* Backdrop */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onCancel}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50"
-          />
-          
-          {/* Dialog */}
-          <div className="fixed inset-0 flex items-center justify-center z-50 p-4 pointer-events-none">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="glass-card rounded-3xl max-w-md w-full overflow-hidden pointer-events-auto"
-            >
-              <div className="p-8">
-                <div className="flex items-start gap-4">
-                  <div className="w-14 h-14 rounded-2xl bg-orange-500/10 flex items-center justify-center flex-shrink-0">
-                    <AlertTriangle className="h-7 w-7 text-orange-600 dark:text-orange-400" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-xl font-semibold text-black dark:text-white mb-2">
-                      {title}
-                    </h3>
-                    <p className="text-black/70 dark:text-white/70 leading-relaxed">
-                      {message}
-                    </p>
-                  </div>
-                </div>
-                
-                {items.length > 0 && (
-                  <ul className="mt-6 ml-[72px] space-y-2">
-                    {items.map((item, i) => (
-                      <li key={i} className="flex items-start gap-2 text-sm text-black/70 dark:text-white/70">
-                        <span className="text-orange-600 dark:text-orange-400 mt-0.5">•</span>
-                        <span>{item}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
+  if (!isOpen) return null;
 
-              <div className="flex items-center justify-end gap-3 px-8 py-6 bg-black/5 dark:bg-white/5 border-t border-black/10 dark:border-white/10">
-                <button
-                  onClick={onCancel}
-                  className="px-6 py-2.5 rounded-lg font-medium text-black/70 dark:text-white/70 hover:bg-black/5 dark:hover:bg-white/5 transition"
-                >
-                  {cancelText}
-                </button>
-                <button
-                  onClick={onConfirm}
-                  className="px-6 py-2.5 rounded-lg font-medium bg-black dark:bg-white text-white dark:text-black hover:bg-black/80 dark:hover:bg-white/80 transition"
-                >
-                  {confirmText}
-                </button>
+  return (
+    <>
+      <div onClick={onCancel} className="fixed inset-0 bg-black/50 z-50" />
+      <div className="fixed inset-0 flex items-center justify-center z-50 p-4 pointer-events-none">
+        <div className="bg-neutral-900 border border-white/10 max-w-md w-full overflow-hidden pointer-events-auto shadow-xl animate-fadeIn">
+          <div className="p-8">
+            <div className="flex items-start gap-4">
+              <div className="w-14 h-14 bg-cyan-500/10 flex items-center justify-center flex-shrink-0">
+                <AlertTriangle className="h-7 w-7 text-cyan-400" />
               </div>
-            </motion.div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-xl font-mono font-semibold text-white mb-2">
+                  {title}
+                </h3>
+                <p className="text-white/60 font-mono text-sm leading-relaxed">
+                  {message}
+                </p>
+              </div>
+            </div>
+            {items.length > 0 && (
+              <ul className="mt-6 ml-[72px] space-y-2">
+                {items.map((item, i) => (
+                  <li key={i} className="flex items-start gap-2 text-sm font-mono text-white/60">
+                    <span className="text-cyan-400 mt-0.5">&bull;</span>
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
-        </>
-      )}
-    </AnimatePresence>
+          <div className="flex items-center justify-end gap-3 px-8 py-6 bg-white/[0.02] border-t border-white/10">
+            <button
+              onClick={onCancel}
+              className="px-6 py-2.5 font-mono font-medium text-white/60 hover:bg-white/5 transition text-sm tracking-wider"
+            >
+              {cancelText.toUpperCase()}
+            </button>
+            <button
+              onClick={onConfirm}
+              className="px-6 py-2.5 font-medium btn-accent text-sm"
+            >
+              {confirmText.toUpperCase()}
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
   );
 }

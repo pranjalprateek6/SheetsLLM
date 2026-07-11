@@ -8,3 +8,10 @@ __pycache__/
 *.csv
 *.xlsx
 
+
+# local tooling / environments
+.claude/
+backend/.venv/
+backend/SheetsLLM/
+backend/audits/
+*.parquet

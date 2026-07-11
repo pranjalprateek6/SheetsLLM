@@ -2,14 +2,14 @@
 import { create } from "zustand";
 
 export type SchemaCol = { name: string; dtype: string };
-export type Schema = { columns: SchemaCol[]; samples: any[][] };
+export type Schema = { columns: SchemaCol[]; samples: string[][] };
 
 export type Status = "ready" | "processing" | "error";
 
 interface AppState {
   activeFile: { id: string; name: string } | null;
   schema: Schema | null;
-  preview: any[];
+  preview: Record<string, unknown>[];
   columns: string[];
   explain: string;
   loading: boolean;
@@ -20,7 +20,7 @@ interface AppState {
   // actions
   setActiveFile: (f: AppState["activeFile"]) => void;
   setSchema: (s: Schema | null) => void;
-  setPreview: (rows: any[], cols: string[]) => void;
+  setPreview: (rows: Record<string, unknown>[], cols: string[]) => void;
   setExplain: (t: string) => void;
   setLoading: (v: boolean) => void;
   setError: (msg: string | null) => void;
