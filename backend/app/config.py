@@ -36,6 +36,13 @@ DUCKDB_THREADS: int = int(os.getenv("DUCKDB_THREADS", "2"))
 DUCKDB_MEMORY_LIMIT: str = os.getenv("DUCKDB_MEMORY_LIMIT", "512MB")
 DUCKDB_QUERY_TIMEOUT: int = int(os.getenv("DUCKDB_QUERY_TIMEOUT", "30"))
 
+# ── Usage limits (free tier; 0 = unlimited) ─────────────────────────
+# Pre-billing these mainly act as a circuit breaker so one user cannot
+# exhaust the shared LLM quota. Tighten when subscription tiers land.
+FREE_MAX_UPLOADS_PER_MONTH: int = int(os.getenv("FREE_MAX_UPLOADS_PER_MONTH", "50"))
+FREE_MAX_TRANSFORMS_PER_MONTH: int = int(os.getenv("FREE_MAX_TRANSFORMS_PER_MONTH", "200"))
+FREE_MAX_CHAT_PER_MONTH: int = int(os.getenv("FREE_MAX_CHAT_PER_MONTH", "200"))
+
 # ── Auth ─────────────────────────────────────────────────────────────
 # When true, requests that fail JWT verification proceed as user "anonymous"
 # (local dev convenience). Default false: unauthenticated requests get 401.

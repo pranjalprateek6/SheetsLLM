@@ -13,6 +13,7 @@ from .undo import router as undo_router
 from .insights import router as insights_router
 from .upload import router as upload_router
 from .chat import router as chat_router
+from .usage import router as usage_router
 
 
 def register_routes(app: FastAPI) -> None:
@@ -27,3 +28,4 @@ def register_routes(app: FastAPI) -> None:
     app.include_router(insights_router)
     app.include_router(jobs_router)
     app.include_router(chat_router)
+    app.include_router(usage_router)

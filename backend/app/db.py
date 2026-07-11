@@ -180,6 +180,44 @@ def delete_all_transformations(file_id: str) -> int:
     return len(resp.data)
 
 
+# ── Usage metering ───────────────────────────────────────────────────
+
+
+def get_usage(user_id: str, month: str) -> dict | None:
+    """Fetch the usage row for (user, month). month is 'YYYY-MM-01'."""
+    resp = (
+        get_client()
+        .table("usage")
+        .select("*")
+        .eq("user_id", user_id)
+        .eq("month", month)
+        .limit(1)
+        .execute()
+    )
+    return resp.data[0] if resp.data else None
+
+
+def increment_usage(
+    user_id: str,
+    *,
+    uploads: int = 0,
+    transforms: int = 0,
+    chat_requests: int = 0,
+    rows_processed: int = 0,
+) -> None:
+    """Atomically increment usage counters via the increment_usage() SQL fn."""
+    get_client().rpc(
+        "increment_usage",
+        {
+            "p_user_id": user_id,
+            "p_uploads": uploads,
+            "p_transforms": transforms,
+            "p_chat_requests": chat_requests,
+            "p_rows_processed": rows_processed,
+        },
+    ).execute()
+
+
 # ── Audit Log ────────────────────────────────────────────────────────
 
 

@@ -23,6 +23,8 @@ from app.llm.prompts import SYSTEM_PROMPT, build_user_message, build_retry_messa
 from app.security import RateLimitExceeded, check_rate_limit
 from app.sql_validator import SQLValidationError, validate_sql
 from app.config import MAX_INSTRUCTION_LENGTH
+from app import usage
+from app.usage import UsageLimitExceeded
 
 logger = logging.getLogger("sheetsllm.routes.chat")
 
@@ -90,6 +92,12 @@ async def chat(request: Request):
             f"Too many requests. Retry after {exc.retry_after:.0f}s",
         )
 
+    # Monthly usage cap
+    try:
+        usage.enforce(user_id, "chat_requests")
+    except UsageLimitExceeded as exc:
+        return _json_response(429, "USAGE_LIMIT_EXCEEDED", str(exc))
+
     # Parse body
     try:
         body = await request.json()
@@ -143,6 +151,9 @@ async def chat(request: Request):
     except Exception as exc:
         logger.error("LLM generation failed: %s", exc)
         return _json_response(502, "LLM_FAILED", f"LLM error: {exc}")
+
+    # The LLM call is the metered cost, regardless of response type
+    usage.record(user_id, chat_requests=1)
 
     # Check for clarification
     clarification = _is_clarification(raw)
