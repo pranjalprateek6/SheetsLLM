@@ -11,14 +11,19 @@ from fastapi import APIRouter, Header, HTTPException, Query, Request, Response
 
 from app.config import MAX_COLUMNS, MAX_UPLOAD_MB, UPLOAD_MAX_BYTES
 from app import db, storage
-from app.engine import convert_to_parquet, detect_sheets, get_schema_from_local
+from app.engine import (
+    UnreadableFileError,
+    convert_to_parquet,
+    detect_sheets,
+    get_schema_from_local,
+)
 from app.insights import generate_insights
 from app.security import (
     FileValidationError,
     validate_file_magic,
     validate_no_macros,
 )
-from app import usage
+from app import events, usage
 from app.usage import UsageLimitExceeded
 
 logger = logging.getLogger("sheetsllm.routes.upload")
@@ -49,6 +54,7 @@ async def upload(
     try:
         usage.enforce(user_id, "uploads")
     except UsageLimitExceeded as exc:
+        events.record(user_id, "paywall_hit", action="uploads", used=exc.used, limit=exc.limit)
         return _json_response(429, "USAGE_LIMIT_EXCEEDED", str(exc))
 
     # ── Stream upload with size check ────────────────────────────────
@@ -101,10 +107,19 @@ async def upload(
         parquet_bytes, row_count, col_count = convert_to_parquet(
             file_bytes, filename, sheet_name=sheet_name
         )
+    except UnreadableFileError as exc:
+        # str(exc) is written for humans; the underlying parser error is
+        # chained onto it and already logged by the engine.
+        return _json_response(400, "CONVERSION_FAILED", str(exc))
     except Exception as exc:
-        logger.error("Parquet conversion failed: %s", exc)
+        # Never forward raw parser errors (DuckDB sniffer failures are a
+        # wall of text); log the detail, return something actionable.
+        logger.error("Parquet conversion failed for %s: %s", filename, exc)
         return _json_response(
-            400, "CONVERSION_FAILED", f"Failed to parse file: {exc}"
+            400,
+            "CONVERSION_FAILED",
+            "We couldn't read this file. Check that it's a valid CSV, XLSX, "
+            "JSON, TSV, or Parquet file and try again.",
         )
 
     if col_count > MAX_COLUMNS:

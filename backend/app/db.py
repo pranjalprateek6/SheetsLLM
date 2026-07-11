@@ -296,6 +296,15 @@ def upsert_subscription(user_id: str, **fields) -> dict:
     return resp.data[0]
 
 
+# ── Events (funnel analytics) ────────────────────────────────────────
+
+
+def insert_event(user_id: str, event: str, properties: dict) -> None:
+    get_client().table("events").insert(
+        {"user_id": user_id, "event": event, "properties": properties}
+    ).execute()
+
+
 # ── Recipes ──────────────────────────────────────────────────────────
 
 

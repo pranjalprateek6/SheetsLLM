@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from app.engine import (
+    UnreadableFileError,
     _retarget_from_data,
     _sql_path,
     build_replay_sql,
@@ -83,6 +84,55 @@ def test_convert_and_schema(local_parquet):
     schema = get_schema_from_local(local_parquet)
     names = [c["name"] for c in schema["columns"]]
     assert names == ["name", "age", "city"]
+
+
+class _FlakyCon:
+    """Connection stub: strict parse fails, lenient retry succeeds."""
+
+    def __init__(self):
+        self.calls = []
+
+    def execute(self, sql):
+        self.calls.append(sql)
+        if "strict_mode" not in sql:
+            raise RuntimeError("Error when sniffing file: Delimiter Candidates ...")
+
+
+class _DeadCon(_FlakyCon):
+    def execute(self, sql):
+        self.calls.append(sql)
+        raise RuntimeError("Error when sniffing file: Delimiter Candidates ...")
+
+
+def test_lenient_retry_after_strict_sniffer_failure():
+    from app.engine import _read_csv_lenient
+
+    con = _FlakyCon()
+    _read_csv_lenient(con, "C:/tmp/x.csv")  # no raise
+    assert len(con.calls) == 2
+    assert "strict_mode=false" in con.calls[1]
+    assert "null_padding=true" in con.calls[1]
+
+
+def test_unreadable_after_both_attempts_raises_friendly():
+    from app.engine import _read_csv_lenient
+
+    con = _DeadCon()
+    with pytest.raises(UnreadableFileError) as exc:
+        _read_csv_lenient(con, "C:/tmp/x.csv")
+    assert "couldn't read this file" in str(exc.value)
+    assert "Delimiter Candidates" not in str(exc.value)
+
+
+def test_unreadable_file_gets_friendly_error():
+    # Binary garbage with a .csv extension: both parse attempts fail and
+    # the error must be the human message, not the DuckDB sniffer dump.
+    garbage = bytes(range(256)) * 4
+    with pytest.raises(UnreadableFileError) as exc:
+        convert_to_parquet(garbage, "garbage.csv")
+    msg = str(exc.value)
+    assert "couldn't read this file" in msg
+    assert "Delimiter Candidates" not in msg  # no sniffer wall-of-text
 
 
 def test_schema_samples_json_safe_with_nulls():

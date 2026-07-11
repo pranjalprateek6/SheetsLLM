@@ -143,6 +143,18 @@ def handle_event(event: dict) -> None:
         return
 
     tier = "pro" if status in _ACTIVE_STATUSES else "free"
+
+    # Funnel event on the actual free -> pro transition only (webhooks for
+    # renewals/charges keep tier=pro and must not double-count).
+    try:
+        prior = db.get_subscription(user_id)
+        if tier == "pro" and (prior or {}).get("tier") != "pro":
+            from app import events
+
+            events.record(user_id, "subscription_activated", status=status)
+    except Exception:
+        pass  # analytics must never break webhook handling
+
     db.upsert_subscription(
         user_id,
         provider_subscription_id=sub_id,

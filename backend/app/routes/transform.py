@@ -33,7 +33,7 @@ from app.llm.factory import get_llm
 from app.llm.prompts import SYSTEM_PROMPT, build_retry_message, build_user_message
 from app.security import RateLimitExceeded, check_rate_limit
 from app.sql_validator import SQLValidationError, validate_sql
-from app import usage
+from app import events, usage
 from app.usage import UsageLimitExceeded
 
 logger = logging.getLogger("sheetsllm.routes.transform")
@@ -235,6 +235,7 @@ async def transform(request: Request, background_tasks: BackgroundTasks):
     try:
         usage.enforce(user_id, "transforms")
     except UsageLimitExceeded as exc:
+        events.record(user_id, "paywall_hit", action="transforms", used=exc.used, limit=exc.limit)
         return _json_response(429, "USAGE_LIMIT_EXCEEDED", str(exc))
 
     # ── Parse body ─────────────────────────────────────────────────────

@@ -13,7 +13,7 @@ import logging
 
 from fastapi import APIRouter, Request, Response
 
-from app import billing, db, usage
+from app import billing, db, events, usage
 from app.billing import BillingError
 
 logger = logging.getLogger("sheetsllm.routes.billing")
@@ -58,6 +58,7 @@ async def checkout(request: Request):
     except Exception as exc:
         logger.error("checkout failed: %s", exc)
         return _json_response(502, "PROVIDER_ERROR", "Could not start checkout")
+    events.record(user_id, "checkout_started")
     return {"url": url}
 
 
