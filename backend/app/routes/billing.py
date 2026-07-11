@@ -28,6 +28,14 @@ def _json_response(status: int, code: str, message: str, **extra) -> Response:
     )
 
 
+def _require_real_user(request: Request) -> str | None:
+    """Billing must never operate on the shared 'anonymous' pseudo-user.
+    In production ALLOW_ANONYMOUS is off so unauthenticated requests already
+    401; this is defense in depth for dev/misconfiguration."""
+    user_id = getattr(request.state, "user_id", "anonymous")
+    return None if user_id == "anonymous" else user_id
+
+
 @router.get("/billing/status")
 async def billing_status(request: Request):
     user_id = getattr(request.state, "user_id", "anonymous")
@@ -39,7 +47,9 @@ async def billing_status(request: Request):
 
 @router.post("/billing/checkout")
 async def checkout(request: Request):
-    user_id = getattr(request.state, "user_id", "anonymous")
+    user_id = _require_real_user(request)
+    if not user_id:
+        return _json_response(401, "UNAUTHORIZED", "Sign in to subscribe")
     email = getattr(request.state, "email", "") or None
     try:
         url = billing.create_checkout_session(user_id, email)
@@ -53,7 +63,9 @@ async def checkout(request: Request):
 
 @router.post("/billing/cancel")
 async def cancel(request: Request):
-    user_id = getattr(request.state, "user_id", "anonymous")
+    user_id = _require_real_user(request)
+    if not user_id:
+        return _json_response(401, "UNAUTHORIZED", "Sign in to manage billing")
     try:
         result = billing.cancel_subscription(user_id)
     except BillingError as exc:

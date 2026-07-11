@@ -73,6 +73,8 @@ function PricingContent() {
       } else {
         setError(d.message || "Could not cancel subscription.");
       }
+    } catch {
+      setError("Could not cancel subscription.");
     } finally {
       setBusy(false);
     }
