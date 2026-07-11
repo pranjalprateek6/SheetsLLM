@@ -64,7 +64,9 @@ def _is_clarification(raw: str) -> dict | None:
     return None
 
 
-def _generate_or_cache_sql(instruction: str, schema: dict) -> str | dict:
+def _generate_or_cache_sql(
+    instruction: str, schema: dict, *, privacy_mode: bool = False
+) -> str | dict:
     """
     Get SQL from cache or generate via LLM.
     Returns SQL string on success, or clarification dict if LLM needs more info.
@@ -77,7 +79,7 @@ def _generate_or_cache_sql(instruction: str, schema: dict) -> str | dict:
         logger.info("LLM cache HIT for key=%s", cache_key[:12])
         return cached
 
-    user_message = build_user_message(instruction, schema)
+    user_message = build_user_message(instruction, schema, privacy_mode=privacy_mode)
     llm = get_llm()
     raw_sql = llm.generate_sql(SYSTEM_PROMPT, user_message)
 
@@ -272,7 +274,9 @@ async def transform(request: Request, background_tasks: BackgroundTasks):
 
     # ── Generate / cache SQL ───────────────────────────────────────────
     try:
-        sql_or_clarification = _generate_or_cache_sql(instruction, schema)
+        sql_or_clarification = _generate_or_cache_sql(
+            instruction, schema, privacy_mode=db.get_privacy_mode(user_id)
+        )
     except SQLValidationError as exc:
         return _json_response(
             400, "INVALID_SQL", f"Generated SQL failed validation: {exc}",
