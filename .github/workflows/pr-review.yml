@@ -65,23 +65,24 @@ jobs:
           ## Summary
           2-4 sentences on what the change does and overall assessment.
 
-          ## 🚨 Security & malicious code
+          ## Security
           Injection risks, auth bypasses, secrets in code, path traversal, unsafe deserialization,
           supply-chain red flags, obfuscated/beaconing/exfiltrating code, backdoors. Also flag prompt-injection
           risks given LLM-generated SQL is executed. If clean, say "No issues found."
 
-          ## 🐛 Correctness
+          ## Correctness
           Real bugs with a concrete failure scenario (inputs -> wrong behavior). No style nits here.
 
-          ## 🧹 Quality & simplification
+          ## Quality
           Duplication, dead code, error-handling gaps, needless complexity. Be selective - top items only.
 
-          ## 🔧 Suggested fixes
+          ## Suggested fixes
           For each concrete finding above, a short fenced code block with the corrected code,
           prefixed by the file path. Skip if nothing actionable.
 
           Rules: cite file paths and line hints from the diff. Be specific, not generic.
-          Do not invent issues to fill sections. Severity-order findings. Keep the whole review under 600 words."""
+          Do not invent issues to fill sections. Severity-order findings. Keep the whole review under 600 words.
+          Style: professional and plain text - no emojis or decorative symbols anywhere in the review."""
 
           user = f"PR title: {os.environ.get('PR_TITLE','')}\n\nPR description:\n{os.environ.get('PR_BODY','') or '(none)'}\n\nDiff{' (truncated)' if truncated else ''}:\n```diff\n{diff}\n```"
 
@@ -107,7 +108,7 @@ jobs:
                       p.get("text", "") for p in parts if not p.get("thought")
                   ).strip()
                   if cand.get("finishReason") == "MAX_TOKENS":
-                      text += "\n\n> ⚠️ Review was cut off by the output token limit."
+                      text += "\n\n> Note: review was cut off by the output token limit."
                   if text:
                       print(f"Reviewed with {model}")
                       break
@@ -117,9 +118,9 @@ jobs:
                   errors.append(f"{model}: {e}")
 
           if not text:
-              text = "⚠️ AI review unavailable this run (" + "; ".join(errors) + "). Not blocking."
+              text = "AI review unavailable this run (" + "; ".join(errors) + "). Not blocking."
 
-          note = "\n\n> ⚠️ Diff was truncated for review.\n" if truncated else "\n"
+          note = "\n\n> Note: diff was truncated for review.\n" if truncated else "\n"
           open("review.md", "w", encoding="utf-8").write(text + note)
           PY
 
@@ -131,7 +132,7 @@ jobs:
           MARKER="<!-- ai-code-review -->"
           {
             echo "$MARKER"
-            echo "## 🤖 AI Code Review"
+            echo "## AI Code Review"
             echo ""
             cat review.md
             echo ""
