@@ -1,10 +1,14 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { Check, ShieldCheck } from "lucide-react";
 import AuthGuard from "@/components/AuthGuard";
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
-import { TextShimmer } from "@/components/ui/text-shimmer";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const FREE_FEATURES = [
   "50 uploads / month",
@@ -24,12 +28,32 @@ const PRO_FEATURES = [
   "Everything in Free",
 ];
 
+const FAQ = [
+  {
+    q: "What is a recipe?",
+    a: "A recipe is a saved cleanup pipeline. Describe your transformation once in plain English, save the steps, and re-apply them to next month's export in one click — no AI call, same result every time.",
+  },
+  {
+    q: "Does my data get sent to the AI?",
+    a: "Only a small schema summary (column names, types, and a few sample values) is sent to generate SQL — never your full dataset. Turn on strict privacy mode and the AI sees column names and types only.",
+  },
+  {
+    q: "What happens when I hit a Free limit?",
+    a: "Nothing is lost. Your files and history stay intact; uploads and transforms simply pause until the monthly reset, or resume immediately when you upgrade.",
+  },
+  {
+    q: "Can I cancel anytime?",
+    a: "Yes. Cancel with one click — you keep Pro access until the end of the paid period, then move back to Free without losing any data.",
+  },
+];
+
 function PricingContent() {
-  const router = useRouter();
   const [tier, setTier] = useState<string | null>(null);
   const [billingConfigured, setBillingConfigured] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [confirmCancel, setConfirmCancel] = useState(false);
 
   useEffect(() => {
     fetchWithAuth("/api/billing/status")
@@ -56,10 +80,8 @@ function PricingContent() {
     }
   };
 
-  const [notice, setNotice] = useState<string | null>(null);
-
   const cancel = async () => {
-    if (!confirm("Cancel your Pro subscription? You'll keep Pro access until the end of the current billing period.")) return;
+    setConfirmCancel(false);
     setBusy(true);
     setError(null);
     try {
@@ -68,7 +90,7 @@ function PricingContent() {
       if (r.ok) {
         setNotice(
           d.ends_at
-            ? `Subscription will end on ${new Date(d.ends_at).toLocaleDateString()}. You keep Pro until then.`
+            ? `Subscription ends on ${new Date(d.ends_at).toLocaleDateString()}. You keep Pro until then.`
             : "Subscription cancellation scheduled."
         );
       } else {
@@ -84,95 +106,132 @@ function PricingContent() {
   const isPro = tier === "pro";
 
   return (
-    <div className="min-h-[calc(100vh-56px)] px-4 py-12 max-w-4xl mx-auto">
-      <div className="text-center mb-10">
-        <h1 className="text-3xl font-bold text-white mb-2">Simple pricing</h1>
-        <p className="text-white/50 text-sm">
+    <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6">
+      <div className="mb-12 text-center">
+        <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
+          Simple pricing
+        </h1>
+        <p className="mt-3 text-muted-foreground">
           Start free. Upgrade when your cleanups become a routine.
         </p>
         {tier && (
-          <p className="mt-3 text-xs font-mono text-cyan-400">
-            You are on the {tier.toUpperCase()} plan
-          </p>
+          <Badge variant="secondary" className="mt-4 capitalize">
+            Current plan: {tier}
+          </Badge>
         )}
       </div>
 
       {error && (
-        <div className="mb-6 text-sm text-red-400 bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-center">
+        <div className="mb-6 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-center text-sm text-destructive">
           {error}
         </div>
       )}
       {notice && (
-        <div className="mb-6 text-sm text-cyan-300 bg-cyan-500/10 border border-cyan-500/30 rounded-lg p-3 text-center">
+        <div className="mb-6 rounded-lg border border-success/30 bg-success/5 p-3 text-center text-sm text-success">
           {notice}
         </div>
       )}
 
-      <div className="grid md:grid-cols-2 gap-6">
+      <div className="grid gap-6 md:grid-cols-2">
         {/* Free */}
-        <div className="card p-6 flex flex-col">
-          <h2 className="text-lg font-semibold text-white">Free</h2>
-          <p className="mt-1 text-3xl font-bold text-white">
-            $0<span className="text-sm font-normal text-white/40">/mo</span>
+        <div className="flex flex-col rounded-2xl border bg-card p-7 shadow-xs">
+          <h2 className="font-medium">Free</h2>
+          <p className="mt-2 text-4xl font-semibold tracking-tight">
+            ₹0<span className="text-base font-normal text-muted-foreground">/mo</span>
           </p>
-          <ul className="mt-6 space-y-2.5 flex-1">
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            For occasional cleanups.
+          </p>
+          <ul className="mt-6 flex-1 space-y-2.5">
             {FREE_FEATURES.map((f) => (
-              <li key={f} className="flex items-start gap-2 text-sm text-white/70">
-                <Check className="h-4 w-4 text-white/40 mt-0.5 flex-shrink-0" />
+              <li key={f} className="flex items-start gap-2.5 text-sm text-muted-foreground">
+                <Check className="mt-0.5 h-4 w-4 flex-shrink-0 text-foreground/40" />
                 {f}
               </li>
             ))}
           </ul>
-          <div className="mt-6 text-center text-xs font-mono text-white/30 py-2.5">
-            {isPro ? "Included in Pro" : "Your current plan"}
+          <div className="mt-7">
+            <Button variant="outline" className="w-full" disabled>
+              {isPro ? "Included in Pro" : "Your current plan"}
+            </Button>
           </div>
         </div>
 
         {/* Pro */}
-        <div className="card p-6 flex flex-col border-cyan-500/40 relative">
-          <div className="absolute -top-3 left-6 px-2 py-0.5 rounded bg-cyan-500 text-black text-[10px] font-mono font-bold">
-            RECOMMENDED
-          </div>
-          <h2 className="text-lg font-semibold text-white">Pro</h2>
-          <p className="mt-1 text-3xl font-bold text-white">
-            ₹499<span className="text-sm font-normal text-white/40">/mo</span>
+        <div className="relative flex flex-col rounded-2xl border-2 border-primary bg-card p-7 shadow-md">
+          <Badge className="absolute -top-3 left-6">Recommended</Badge>
+          <h2 className="font-medium">Pro</h2>
+          <p className="mt-2 text-4xl font-semibold tracking-tight">
+            ₹499<span className="text-base font-normal text-muted-foreground">/mo</span>
           </p>
-          <ul className="mt-6 space-y-2.5 flex-1">
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            For the export that lands every week.
+          </p>
+          <ul className="mt-6 flex-1 space-y-2.5">
             {PRO_FEATURES.map((f) => (
-              <li key={f} className="flex items-start gap-2 text-sm text-white/80">
-                <Check className="h-4 w-4 text-cyan-400 mt-0.5 flex-shrink-0" />
+              <li key={f} className="flex items-start gap-2.5 text-sm">
+                <Check className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary" />
                 {f}
               </li>
             ))}
           </ul>
-          {isPro ? (
-            <button
-              onClick={cancel}
-              disabled={busy}
-              className="mt-6 w-full py-2.5 rounded-lg bg-white/10 text-white text-sm font-medium hover:bg-white/15 transition disabled:opacity-50"
-            >
-              {busy ? "Working..." : "Cancel subscription"}
-            </button>
-          ) : (
-            <button
-              onClick={upgrade}
-              disabled={busy || !billingConfigured}
-              className="mt-6 w-full py-2.5 rounded-lg bg-cyan-500 text-black text-sm font-semibold hover:bg-cyan-400 transition disabled:opacity-50"
-            >
-              {!billingConfigured
-                ? "Coming soon"
-                : busy
-                ? "Redirecting..."
-                : "Upgrade to Pro"}
-            </button>
-          )}
+          <div className="mt-7">
+            {isPro ? (
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => setConfirmCancel(true)}
+                disabled={busy}
+              >
+                {busy ? "Working…" : "Cancel subscription"}
+              </Button>
+            ) : (
+              <Button className="w-full" onClick={upgrade} disabled={busy || !billingConfigured}>
+                {!billingConfigured ? "Coming soon" : busy ? "Redirecting…" : "Upgrade to Pro"}
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 
-      <p className="mt-8 text-center text-xs text-white/30 flex items-center justify-center gap-1.5">
+      <p className="mt-8 flex items-center justify-center gap-1.5 text-center text-xs text-muted-foreground">
         <ShieldCheck className="h-3.5 w-3.5" />
-        Your data never trains the AI. Enable strict privacy mode to send schema only.
+        Your data never trains the AI. Strict privacy mode sends schema only.
       </p>
+
+      {/* FAQ */}
+      <div className="mx-auto mt-16 max-w-2xl">
+        <h2 className="mb-6 text-center text-xl font-semibold tracking-tight">
+          Frequently asked questions
+        </h2>
+        <div className="divide-y rounded-2xl border bg-card px-6 shadow-xs">
+          {FAQ.map((item) => (
+            <details key={item.q} className="group py-4">
+              <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-medium [&::-webkit-details-marker]:hidden">
+                {item.q}
+                <span className="ml-4 text-muted-foreground transition-transform group-open:rotate-45">+</span>
+              </summary>
+              <p className="mt-2 pr-8 text-sm leading-relaxed text-muted-foreground">{item.a}</p>
+            </details>
+          ))}
+        </div>
+      </div>
+
+      <AlertDialog open={confirmCancel} onOpenChange={setConfirmCancel}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel your Pro subscription?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You keep Pro access until the end of the current billing period, then move to the
+              Free plan. Your files, recipes, and history are never deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep Pro</AlertDialogCancel>
+            <AlertDialogAction onClick={cancel}>Cancel subscription</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -1,25 +1,42 @@
 "use client";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useState, useRef, useEffect } from "react";
-import { useAuth } from "@/contexts/AuthContext";
-import { cn } from "@/lib/utils";
-import { User, LogOut, ChevronDown, ArrowRight, Menu, X, ShieldCheck } from "lucide-react";
-import { Button } from "@/components/ui/Button";
 import Image from "next/image";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { ChevronDown, LogOut, Menu, ShieldCheck, User, X } from "lucide-react";
+
+const APP_LINKS = [
+  { href: "/dashboard", label: "Files" },
+  { href: "/workspace", label: "Workspace" },
+  { href: "/pricing", label: "Pricing" },
+];
+
+const MARKETING_LINKS = [
+  { href: "/#product", label: "Product" },
+  { href: "/#privacy", label: "Privacy" },
+  { href: "/pricing", label: "Pricing" },
+];
 
 export default function Header() {
   const pathname = usePathname();
   const router = useRouter();
   const { user, loading, signOut } = useAuth();
-
-  // Hide header on auth page
-  if (pathname === "/auth") return null;
-  const [menuOpen, setMenuOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [privacyMode, setPrivacyMode] = useState<boolean | null>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   // Load the privacy setting when the dropdown first opens
   useEffect(() => {
@@ -31,7 +48,14 @@ export default function Header() {
     }
   }, [menuOpen, privacyMode, user]);
 
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
+
+  if (pathname === "/auth") return null;
+
   const togglePrivacy = async () => {
+    if (privacyMode === null) return; // still loading the authoritative value
     const next = !privacyMode;
     setPrivacyMode(next); // optimistic
     try {
@@ -40,174 +64,153 @@ export default function Header() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ privacy_mode: next }),
       });
-      // On failure, reset to unknown so the next dropdown open refetches
-      // the authoritative value instead of showing a possibly stale state.
+      // On failure, reset to unknown so the next open refetches the truth.
       if (!r.ok) setPrivacyMode(null);
     } catch {
       setPrivacyMode(null);
     }
   };
 
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  const navLink = (href: string, label: string) => (
-    <Link
-      href={href}
-      className={cn(
-        "text-xs font-mono tracking-wider transition-colors",
-        pathname === href
-          ? "text-white"
-          : "text-white/50 hover:text-cyan-400"
-      )}
-    >
-      {label}
-    </Link>
-  );
-
   const handleSignOut = async () => {
-    setMenuOpen(false);
     await signOut();
     router.push("/");
   };
 
-  // Signed out: logo centered, no nav
-  if (!loading && !user) {
-    return (
-      <header className="sticky top-0 z-50 w-full bg-transparent pt-4">
-        <div className="px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-center">
-            <Link href="/" className="flex items-center gap-3">
-              <Image src="/logo.png" alt="SheetsLLM" width={36} height={36} className="w-9 h-9" />
-              <span className="font-mono text-xl font-bold text-white">SheetsLLM</span>
-            </Link>
-          </div>
-        </div>
-      </header>
-    );
-  }
+  const links = user ? APP_LINKS : MARKETING_LINKS;
 
-  // Loading state
-  if (loading) {
-    return (
-      <header className="sticky top-0 z-50 w-full bg-transparent pt-4">
-        <div className="px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-center">
-            <Link href="/" className="flex items-center gap-3">
-              <Image src="/logo.png" alt="SheetsLLM" width={36} height={36} className="w-9 h-9" />
-              <span className="font-mono text-xl font-bold text-white">SheetsLLM</span>
-            </Link>
-          </div>
-        </div>
-      </header>
-    );
-  }
-
-  // Signed in: full navbar
   return (
-    <header className="sticky top-0 z-50 w-full bg-[#0A0A0A]/80 backdrop-blur-sm border-b border-white/5">
-      <div className="px-4 sm:px-6 lg:px-8">
-        <div className="flex h-14 items-center justify-between">
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-2.5">
-            <Image src="/logo.png" alt="SheetsLLM" width={28} height={28} className="w-7 h-7" />
-            <span className="font-mono text-lg font-bold text-white">SheetsLLM</span>
-          </Link>
+    <header className="sticky top-0 z-50 w-full border-b border-border/70 bg-background/80 backdrop-blur-md">
+      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:px-6">
+        {/* Logo */}
+        <Link href="/" className="flex items-center gap-2">
+          <Image src="/logo.png" alt="" width={26} height={26} className="h-[26px] w-[26px] rounded-md" />
+          <span className="text-[15px] font-semibold tracking-tight">SheetsLLM</span>
+        </Link>
 
-          {/* Desktop nav — center */}
-          <nav className="hidden md:flex items-center gap-8">
-            {navLink("/", "HOME")}
-            {navLink("/dashboard", "FILES")}
-            {navLink("/workspace", "WORKSPACE")}
-            {navLink("/pricing", "PRICING")}
-          </nav>
+        {/* Desktop nav */}
+        <nav className="hidden items-center gap-1 md:flex">
+          {links.map((l) => (
+            <Link
+              key={l.href}
+              href={l.href}
+              className={cn(
+                "rounded-md px-3 py-1.5 text-sm transition-colors",
+                pathname === l.href
+                  ? "text-foreground"
+                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
+              )}
+            >
+              {l.label}
+            </Link>
+          ))}
+        </nav>
 
-          {/* Right side */}
-          <div className="hidden md:flex items-center gap-4">
-            <div className="relative" ref={menuRef}>
-              <button
-                onClick={() => setMenuOpen(!menuOpen)}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono text-white hover:text-cyan-400 transition-colors"
-              >
-                <User className="h-4 w-4" />
-                <span className="max-w-[100px] truncate">
-                  {user?.email?.split("@")[0]?.toUpperCase()}
-                </span>
-                <ChevronDown className={cn("h-3 w-3 transition-transform", menuOpen && "rotate-180")} />
-              </button>
-
-              {menuOpen && (
-                <div className="absolute right-0 mt-2 w-56 bg-neutral-900 border border-white/10 py-1 shadow-lg">
-                  <div className="px-4 py-2 border-b border-white/5">
-                    <p className="text-[10px] font-mono text-white/40 uppercase tracking-wider">Signed in as</p>
-                    <p className="text-sm font-mono font-medium text-white truncate mt-0.5">
-                      {user?.email}
+        {/* Right side */}
+        <div className="hidden items-center gap-2 md:flex">
+          {loading ? null : user ? (
+            <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground">
+                  <User className="h-4 w-4" />
+                  <span className="max-w-[120px] truncate">{user.email?.split("@")[0]}</span>
+                  <ChevronDown className="h-3.5 w-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                <DropdownMenuLabel className="font-normal">
+                  <p className="text-xs text-muted-foreground">Signed in as</p>
+                  <p className="mt-0.5 truncate text-sm font-medium">{user.email}</p>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="items-start gap-2.5"
+                  role="menuitemcheckbox"
+                  aria-checked={!!privacyMode}
+                  onSelect={(e) => {
+                    e.preventDefault(); // keep the menu open while toggling
+                    togglePrivacy();
+                  }}
+                >
+                  <ShieldCheck
+                    className={cn("mt-0.5 h-4 w-4", privacyMode ? "text-success" : "text-muted-foreground")}
+                  />
+                  <div className="flex-1">
+                    <p className="text-sm">Strict privacy mode</p>
+                    <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                      The AI sees column names and types only — never your data.
                     </p>
                   </div>
-                  <button
-                    onClick={togglePrivacy}
-                    className="w-full flex items-center gap-2 px-4 py-2.5 text-xs font-mono text-white/80 hover:bg-white/5 transition-colors"
-                    title="When on, prompts sent to the AI contain column names and types only — never sample values or rows from your data."
-                  >
-                    <ShieldCheck className={cn("h-4 w-4", privacyMode ? "text-cyan-400" : "text-white/40")} />
-                    <span className="flex-1 text-left">PRIVACY MODE</span>
-                    <span
-                      className={cn(
-                        "relative inline-flex h-4 w-7 items-center rounded-full transition-colors",
-                        privacyMode ? "bg-cyan-500" : "bg-white/15"
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          "inline-block h-3 w-3 rounded-full bg-white transition-transform",
-                          privacyMode ? "translate-x-3.5" : "translate-x-0.5"
-                        )}
-                      />
-                    </span>
-                  </button>
-                  <p className="px-4 pb-2 text-[10px] font-mono leading-relaxed text-white/35">
-                    Schema-only prompts: the AI never sees sample values or rows.
-                  </p>
-                  <button
-                    onClick={handleSignOut}
-                    className="w-full flex items-center gap-2 px-4 py-2.5 text-xs font-mono text-red-400 hover:bg-red-500/10 transition-colors border-t border-white/5"
-                  >
-                    <LogOut className="h-4 w-4" />
-                    SIGN OUT
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Mobile menu button */}
-          <button
-            onClick={() => setMobileOpen(!mobileOpen)}
-            className="md:hidden p-2 text-white"
-          >
-            {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-          </button>
+                  <Switch checked={!!privacyMode} className="pointer-events-none mt-0.5" />
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href="/account">Account &amp; billing</Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={handleSignOut}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Sign out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <>
+              <Button variant="ghost" size="sm" asChild>
+                <Link href="/auth">Sign in</Link>
+              </Button>
+              <Button size="sm" asChild>
+                <Link href="/auth?mode=signup">Get started</Link>
+              </Button>
+            </>
+          )}
         </div>
 
-        {/* Mobile nav */}
-        {mobileOpen && (
-          <div className="md:hidden py-4 border-t border-white/5 space-y-4">
-            <nav className="flex flex-col gap-4">
-              {navLink("/", "HOME")}
-              {navLink("/dashboard", "FILES")}
-              {navLink("/workspace", "WORKSPACE")}
-              {navLink("/pricing", "PRICING")}
-            </nav>
-          </div>
-        )}
+        {/* Mobile menu button */}
+        <button
+          onClick={() => setMobileOpen(!mobileOpen)}
+          className="rounded-md p-2 text-muted-foreground hover:bg-accent md:hidden"
+          aria-label="Toggle menu"
+        >
+          {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+        </button>
       </div>
+
+      {/* Mobile nav */}
+      {mobileOpen && (
+        <div className="border-t border-border bg-background px-4 py-3 md:hidden">
+          <nav className="flex flex-col gap-1">
+            {links.map((l) => (
+              <Link
+                key={l.href}
+                href={l.href}
+                className="rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
+              >
+                {l.label}
+              </Link>
+            ))}
+            {!loading && !user && (
+              <div className="mt-2 flex gap-2 border-t border-border pt-3">
+                <Button variant="outline" size="sm" className="flex-1" asChild>
+                  <Link href="/auth">Sign in</Link>
+                </Button>
+                <Button size="sm" className="flex-1" asChild>
+                  <Link href="/auth?mode=signup">Get started</Link>
+                </Button>
+              </div>
+            )}
+            {!loading && user && (
+              <button
+                onClick={handleSignOut}
+                className="mt-2 flex items-center gap-2 rounded-md border-t border-border px-3 pb-1 pt-3 text-sm text-destructive"
+              >
+                <LogOut className="h-4 w-4" /> Sign out
+              </button>
+            )}
+          </nav>
+        </div>
+      )}
     </header>
   );
 }

@@ -3,6 +3,9 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Gauge, Zap } from "lucide-react";
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 type UsageSummary = {
   tier: string;
@@ -21,9 +24,9 @@ type UsageSummary = {
 };
 
 const METERS = [
-  { key: "uploads", label: "UPLOADS" },
-  { key: "transforms", label: "AI TRANSFORMS" },
-  { key: "chat_requests", label: "CHAT" },
+  { key: "uploads", label: "Uploads" },
+  { key: "transforms", label: "AI transforms" },
+  { key: "chat_requests", label: "Chat" },
 ] as const;
 
 const NUDGE_THRESHOLD = 0.8;
@@ -36,12 +39,12 @@ function resetDate(month: string) {
 }
 
 function barColor(pct: number) {
-  if (pct >= 1) return "bg-red-500";
-  if (pct >= NUDGE_THRESHOLD) return "bg-amber-400";
-  return "bg-cyan-500";
+  if (pct >= 1) return "bg-destructive";
+  if (pct >= NUDGE_THRESHOLD) return "bg-warning";
+  return "bg-primary";
 }
 
-export default function UsageCard() {
+export default function UsageCard({ embedded = false }: { embedded?: boolean }) {
   const router = useRouter();
   const [usage, setUsage] = useState<UsageSummary | null>(null);
 
@@ -67,60 +70,53 @@ export default function UsageCard() {
   const capped = meters.some((m) => m.limit > 0 && m.used >= m.limit);
 
   return (
-    <div className="bg-neutral-900 border border-white/10 p-5 mb-6">
-      <div className="flex items-center justify-between mb-4">
+    <div className={cn(!embedded && "mb-6 rounded-xl border bg-card p-5 shadow-xs")}>
+      <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Gauge className="h-4 w-4 text-white/40" />
-          <h2 className="text-xs font-mono font-semibold text-white tracking-wider">
-            USAGE THIS MONTH
-          </h2>
-          <span className="text-[10px] px-1.5 py-0.5 bg-white/5 text-white/40 uppercase font-mono">
-            {usage.tier}
-          </span>
+          <Gauge className="h-4 w-4 text-muted-foreground" />
+          <h2 className="text-sm font-medium">Usage this month</h2>
+          <Badge variant="secondary" className="capitalize">{usage.tier}</Badge>
         </div>
-        <span className="text-xs font-mono text-white/30">
-          Resets {resetDate(usage.month)}
-        </span>
+        <span className="text-xs text-muted-foreground">Resets {resetDate(usage.month)}</span>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         {meters.map((m) => (
           <div key={m.key}>
-            <div className="flex items-baseline justify-between mb-1.5">
-              <span className="text-[10px] font-mono text-white/40 tracking-wider">{m.label}</span>
-              <span className="text-xs font-mono text-white/60">
+            <div className="mb-1.5 flex items-baseline justify-between">
+              <span className="text-xs text-muted-foreground">{m.label}</span>
+              <span className="text-xs font-medium tabular-nums">
                 {m.used.toLocaleString()}
-                {m.limit > 0 ? ` / ${m.limit.toLocaleString()}` : ""}
+                {m.limit > 0 ? (
+                  <span className="text-muted-foreground"> / {m.limit.toLocaleString()}</span>
+                ) : null}
               </span>
             </div>
             {m.limit > 0 ? (
-              <div className="h-1.5 bg-white/5 overflow-hidden">
+              <div className="h-1.5 overflow-hidden rounded-full bg-muted">
                 <div
-                  className={`h-full transition-all ${barColor(m.pct)}`}
+                  className={cn("h-full rounded-full transition-all", barColor(m.pct))}
                   style={{ width: `${m.pct * 100}%` }}
                 />
               </div>
             ) : (
-              <p className="text-[10px] font-mono text-white/30">Unlimited</p>
+              <p className="text-xs text-muted-foreground">Unlimited</p>
             )}
           </div>
         ))}
       </div>
 
       {showNudge && (
-        <div className="flex items-center justify-between gap-3 mt-4 pt-4 border-t border-white/5">
-          <p className="text-xs font-mono text-white/50">
+        <div className="mt-4 flex items-center justify-between gap-3 border-t pt-4">
+          <p className="text-sm text-muted-foreground">
             {capped
               ? "You've hit a monthly limit on the Free plan."
               : "You're close to a monthly limit on the Free plan."}{" "}
             Pro raises caps to 1,000 uploads and 5,000 transforms.
           </p>
-          <button
-            onClick={() => router.push("/pricing")}
-            className="px-4 py-2 btn-accent inline-flex items-center gap-2 text-xs whitespace-nowrap"
-          >
-            <Zap className="h-3.5 w-3.5" /> UPGRADE TO PRO
-          </button>
+          <Button size="sm" onClick={() => router.push("/pricing")} className="whitespace-nowrap">
+            <Zap className="mr-1.5 h-3.5 w-3.5" /> Upgrade to Pro
+          </Button>
         </div>
       )}
     </div>

@@ -103,22 +103,22 @@ export default function DataGrid({
   );
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col rounded-xl border bg-card overflow-hidden">
       <div
         ref={parentRef}
-        className="overflow-auto flex-1 rounded-lg border border-gray-alpha-400 bg-background-100 p-0"
+        className="overflow-auto flex-1"
       >
         <table className="min-w-full text-sm font-sans border-collapse" style={{ tableLayout: "fixed" }}>
           {/* Column letter row */}
-          <thead className="sticky top-0 z-10">
-            <tr className="border-b border-gray-alpha-400">
-              <th className="w-[50px] min-w-[50px] text-center text-[11px] font-mono text-white/30 py-1 bg-background-100 sticky left-0 z-20">
+          <thead className="sticky top-0 z-10 bg-card">
+            <tr className="border-b bg-muted/50">
+              <th className="w-[50px] min-w-[50px] text-center text-[11px] text-muted-foreground py-1 sticky left-0 z-20 [background:linear-gradient(hsl(var(--muted)/.5),hsl(var(--muted)/.5)),hsl(var(--card))]">
                 &nbsp;
               </th>
               {head.map((_, i) => (
                 <th
                   key={i}
-                  className="px-2 py-1 text-center font-mono text-[11px] text-white/30 bg-background-100"
+                  className="px-2 py-1 text-center text-[11px] font-normal text-muted-foreground"
                   style={{ width: colWidths[head[i]] || 140 }}
                 >
                   {colLetter(i)}
@@ -126,24 +126,24 @@ export default function DataGrid({
               ))}
             </tr>
             {/* Column name row */}
-            <tr className="border-b border-gray-alpha-400">
-              <th className="w-[50px] min-w-[50px] bg-background-100 sticky left-0 z-20">&nbsp;</th>
+            <tr className="border-b bg-muted/50">
+              <th className="w-[50px] min-w-[50px] sticky left-0 z-20 [background:linear-gradient(hsl(var(--muted)/.5),hsl(var(--muted)/.5)),hsl(var(--card))]">&nbsp;</th>
               {head.map((h) => (
                 <th
                   key={h}
-                  className="h-10 px-2 text-left font-medium text-xs text-white bg-background-100 whitespace-nowrap relative select-none group"
+                  className="h-10 px-2 text-left text-xs font-medium text-muted-foreground whitespace-nowrap relative select-none group"
                   style={{ width: colWidths[h] || 140 }}
                 >
                   <button
-                    className="inline-flex items-center gap-1.5 hover:text-cyan-400 transition-colors font-mono tracking-wider"
+                    className="inline-flex items-center gap-1.5 hover:text-foreground transition-colors"
                     onClick={() => handleSort(h)}
                   >
                     <span className="truncate max-w-[120px]">{h}</span>
-                    {sortCol === h && sortDir === "asc" && <ArrowUp className="h-3 w-3 flex-shrink-0 text-cyan-400" />}
-                    {sortCol === h && sortDir === "desc" && <ArrowDown className="h-3 w-3 flex-shrink-0 text-cyan-400" />}
+                    {sortCol === h && sortDir === "asc" && <ArrowUp className="h-3 w-3 flex-shrink-0 text-primary" />}
+                    {sortCol === h && sortDir === "desc" && <ArrowDown className="h-3 w-3 flex-shrink-0 text-primary" />}
                   </button>
                   <div
-                    className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-cyan-500/50 opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-primary/40 opacity-0 group-hover:opacity-100 transition-opacity"
                     onMouseDown={(e) => handleResizeStart(h, e)}
                   />
                 </th>
@@ -154,16 +154,16 @@ export default function DataGrid({
             {/* Spacer after header */}
             <tr className="h-2" />
           </tbody>
-          <tbody className="[&_tr:nth-child(odd)]:bg-background-200 [&_tr:hover]:bg-white/[0.04]">
+          <tbody className="[&_tr:hover]:bg-muted/40">
             {loading ? (
               <tr>
                 <td className="px-3 py-8 text-center" colSpan={head.length + 1}>
-                  <TextShimmer className="font-mono text-sm" duration={1.2}>Loading data...</TextShimmer>
+                  <TextShimmer className="text-sm" duration={1.2}>Loading data...</TextShimmer>
                 </td>
               </tr>
             ) : sortedRows.length === 0 ? (
               <tr>
-                <td className="px-3 py-8 text-center text-white/30 font-mono" colSpan={head.length + 1}>
+                <td className="px-3 py-8 text-center text-sm text-muted-foreground" colSpan={head.length + 1}>
                   No data
                 </td>
               </tr>
@@ -182,10 +182,10 @@ export default function DataGrid({
                   return (
                     <tr
                       key={virtualRow.index}
-                      className="[&_td:first-child]:rounded-l [&_td:last-child]:rounded-r transition-colors"
+                      className="transition-colors"
                       style={{ height: virtualRow.size }}
                     >
-                      <td className="w-[50px] min-w-[50px] text-center text-[11px] font-mono text-white/30 select-none sticky left-0 z-[5] bg-background-100">
+                      <td className="w-[50px] min-w-[50px] text-center text-[11px] text-muted-foreground tabular-nums select-none sticky left-0 z-[5] bg-card">
                         {virtualRow.index + 1}
                       </td>
                       {head.map((h) => {
@@ -195,19 +195,19 @@ export default function DataGrid({
                         return (
                           <td
                             key={h}
-                            className="px-2 py-2 align-middle text-[13px] text-white/80 cursor-pointer relative"
+                            className="px-2 py-2 align-middle text-xs text-foreground cursor-pointer relative"
                             onClick={() => handleCopy(isNull ? "" : String(val), cellKey)}
                             title={isNull ? "NULL" : String(val)}
                           >
                             {isNull ? (
-                              <span className="text-[11px] px-1.5 py-0.5 bg-white/5 text-white/20 font-mono">
+                              <span className="text-[11px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground/70 font-mono">
                                 NULL
                               </span>
                             ) : (
-                              <div className="truncate max-w-[200px] font-mono text-[13px]">{String(val)}</div>
+                              <div className="truncate max-w-[200px] font-mono text-xs tabular-nums">{String(val)}</div>
                             )}
                             {copiedCell === cellKey && (
-                              <span className="absolute top-0.5 right-0.5 text-[10px] text-green-400 flex items-center">
+                              <span className="absolute top-0.5 right-0.5 text-[10px] text-success flex items-center">
                                 <Check className="h-3 w-3" />
                               </span>
                             )}

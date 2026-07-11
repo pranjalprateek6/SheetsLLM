@@ -1,7 +1,9 @@
 "use client";
 import { Suspense, useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
-import { X, Zap, FileSpreadsheet, History, BarChart3, BookMarked, Download, Upload, Lightbulb, Undo2 } from "lucide-react";
+import {
+  BarChart3, BookMarked, Download, FileSpreadsheet, History, Lightbulb, Undo2, Upload, X,
+} from "lucide-react";
 import DropZone from "@/components/DropZone";
 import DataGrid from "@/components/DataGrid";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -11,23 +13,32 @@ import RecipesDrawer, { type RecipeApplyResult } from "@/components/RecipesDrawe
 import ChatPanel from "@/components/ChatPanel";
 import ChartPanel from "@/components/ChartPanel";
 import CommandPalette from "@/components/CommandPalette";
-import OnboardingOverlay from "@/components/OnboardingOverlay";
+import GettingStarted, { markOnboardingStep } from "@/components/GettingStarted";
 import KeyboardShortcuts from "@/components/KeyboardShortcuts";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import AuthGuard from "@/components/AuthGuard";
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
 import { SAMPLE_DATASETS } from "@/lib/samples";
 import { TextShimmer } from "@/components/ui/text-shimmer";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 export default function Workspace() {
   return (
     <AuthGuard>
-      <Suspense fallback={<div className="flex items-center justify-center min-h-[50vh]"><TextShimmer className="font-mono text-sm" duration={1.2}>Loading workspace...</TextShimmer></div>}>
+      <Suspense fallback={<div className="flex min-h-[50vh] items-center justify-center"><TextShimmer className="text-sm" duration={1.2}>Loading workspace…</TextShimmer></div>}>
         <WorkspaceContent />
       </Suspense>
     </AuthGuard>
   );
 }
+
+const EXAMPLE_PROMPTS = [
+  "Remove rows with null values",
+  "Sort by date, newest first",
+  "Which column has the most nulls?",
+  "Add column Profit = Revenue - Cost",
+];
 
 function WorkspaceContent() {
   const searchParams = useSearchParams();
@@ -131,6 +142,7 @@ function WorkspaceContent() {
         setSchema(data.schema);
         setFileReady(true);
         setShowUpload(false);
+        markOnboardingStep("upload");
         return true;
       }
     } catch (error) {
@@ -275,11 +287,12 @@ function WorkspaceContent() {
     setRows(p.rows);
     if (typeof p.totalRows === "number") setRowCount(p.totalRows);
     if (typeof p.totalColumns === "number") setColumnCount(p.totalColumns);
+    markOnboardingStep("transform");
   }, []);
 
   return (
     <ErrorBoundary>
-      <div className="relative bg-[#0B0B0B]">
+      <div className="relative bg-background">
         {showTransform && (
           <KeyboardShortcuts
             onDownload={handleDownload}
@@ -294,26 +307,21 @@ function WorkspaceContent() {
 
         {/* Loading state when file_id present */}
         {loading && urlFileId && !fileReady && (
-          <div className="flex items-center justify-center min-h-[calc(100vh-56px)]">
-            <TextShimmer className="font-mono text-sm" duration={1.2}>Loading file...</TextShimmer>
+          <div className="flex min-h-[calc(100vh-56px)] items-center justify-center">
+            <TextShimmer className="text-sm" duration={1.2}>Loading file…</TextShimmer>
           </div>
         )}
 
         {/* Phase 1: Upload */}
         {showUpload && !fileReady && !(loading && urlFileId) && (
-          <div className="dotted-bg min-h-[calc(100vh-56px)] animate-fadeIn">
-            <div className="max-w-4xl mx-auto pt-12 px-4">
-              <div className="grid md:grid-cols-2 gap-5">
-                <div className="card p-6">
-                  <h2 className="font-semibold mb-4 text-white text-lg">
-                    Upload Your Spreadsheet
-                  </h2>
+          <div className="min-h-[calc(100vh-56px)] animate-fade-in-up bg-muted/30">
+            <div className="mx-auto max-w-4xl px-4 pt-12 sm:px-6">
+              <div className="grid gap-5 md:grid-cols-2">
+                <div className="rounded-2xl border bg-card p-6 shadow-xs">
+                  <h2 className="mb-4 text-lg font-semibold tracking-tight">Upload a spreadsheet</h2>
                   <DropZone disabled={loading} onDropFile={onUpload} />
-                  <p className="text-xs text-white/30 mt-3 font-medium">
-                    CSV, XLSX, JSON, TSV, Parquet
-                  </p>
-                  <div className="mt-5 pt-4 border-t border-white/5">
-                    <p className="text-xs font-medium text-white/30 uppercase tracking-wider mb-2">
+                  <div className="mt-5 border-t pt-4">
+                    <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       No file handy? Try a sample
                     </p>
                     <div className="space-y-1.5">
@@ -322,62 +330,39 @@ function WorkspaceContent() {
                           key={sample.id}
                           onClick={() => loadSample(sample.id)}
                           disabled={loading}
-                          className="w-full text-left px-3 py-2 rounded-lg bg-white/[0.03] border border-white/5 hover:border-cyan-800/40 hover:bg-cyan-900/10 transition-colors disabled:opacity-50"
+                          className="w-full rounded-lg border bg-background px-3 py-2 text-left shadow-xs transition-colors hover:border-primary/40 hover:bg-primary/[0.03] disabled:opacity-50"
                         >
-                          <span className="text-sm text-white">{sample.name}</span>
-                          <span className="block text-xs text-white/30 mt-0.5">{sample.description}</span>
+                          <span className="text-sm font-medium">{sample.name}</span>
+                          <span className="mt-0.5 block text-xs text-muted-foreground">{sample.description}</span>
                         </button>
                       ))}
                     </div>
                   </div>
                 </div>
-                <div className="space-y-3">
-                  <div className="card p-5">
+                <div className="space-y-4">
+                  <GettingStarted />
+                  <div className="rounded-2xl border bg-card p-5 shadow-xs">
                     <div className="flex items-start gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-cyan-900/30 flex items-center justify-center flex-shrink-0">
-                        <Zap className="h-4 w-4 text-cyan-400" />
+                      <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                        <Lightbulb className="h-4 w-4 text-primary" />
                       </div>
                       <div>
-                        <h3 className="font-medium text-sm mb-2 text-white">Quick Start</h3>
-                        <ol className="text-sm text-white/40 space-y-1 list-decimal list-inside">
-                          <li>Upload a file</li>
-                          <li>Ask Sage to transform your data</li>
-                          <li>Preview results instantly</li>
-                          <li>Download or refine further</li>
-                        </ol>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="card p-5">
-                    <div className="flex items-start gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-cyan-900/30 flex items-center justify-center flex-shrink-0">
-                        <FileSpreadsheet className="h-4 w-4 text-cyan-400" />
-                      </div>
-                      <div>
-                        <h3 className="font-medium text-sm mb-2 text-white">Example Prompts</h3>
-                        <ul className="text-sm text-white/40 space-y-1">
-                          <li>&bull; &quot;remove rows with null values&quot;</li>
-                          <li>&bull; &quot;sort by Date desc, limit 50&quot;</li>
-                          <li>&bull; &quot;which column has the most nulls?&quot;</li>
-                          <li>&bull; &quot;add column Profit = Revenue - Cost&quot;</li>
+                        <h3 className="mb-2 text-sm font-medium">Things you can say</h3>
+                        <ul className="space-y-1.5 text-sm text-muted-foreground">
+                          {EXAMPLE_PROMPTS.map((p) => (
+                            <li key={p}>&ldquo;{p}&rdquo;</li>
+                          ))}
                         </ul>
                       </div>
                     </div>
                   </div>
-                  <div className="card p-5">
-                    <div className="flex items-start gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-cyan-900/30 flex items-center justify-center flex-shrink-0">
-                        <Lightbulb className="h-4 w-4 text-cyan-400" />
-                      </div>
-                      <div>
-                        <h3 className="font-medium text-sm mb-2 text-white">Keyboard Shortcuts</h3>
-                        <ul className="text-sm text-white/40 space-y-1">
-                          <li>&bull; <kbd className="px-1 py-0.5 rounded bg-white/5 text-xs font-mono">Ctrl+Z</kbd> Undo</li>
-                          <li>&bull; <kbd className="px-1 py-0.5 rounded bg-white/5 text-xs font-mono">Ctrl+S</kbd> Download</li>
-                          <li>&bull; <kbd className="px-1 py-0.5 rounded bg-white/5 text-xs font-mono">Ctrl+K</kbd> Command palette</li>
-                        </ul>
-                      </div>
-                    </div>
+                  <div className="rounded-2xl border bg-card p-5 shadow-xs">
+                    <h3 className="mb-2 text-sm font-medium">Keyboard shortcuts</h3>
+                    <ul className="space-y-1.5 text-sm text-muted-foreground">
+                      <li><kbd className="rounded border bg-muted px-1.5 py-0.5 font-mono text-xs">Ctrl+K</kbd> Command palette</li>
+                      <li><kbd className="rounded border bg-muted px-1.5 py-0.5 font-mono text-xs">Ctrl+Z</kbd> Undo last step</li>
+                      <li><kbd className="rounded border bg-muted px-1.5 py-0.5 font-mono text-xs">Ctrl+S</kbd> Download CSV</li>
+                    </ul>
                   </div>
                 </div>
               </div>
@@ -387,52 +372,44 @@ function WorkspaceContent() {
 
         {/* Phase 2: File preview */}
         {fileReady && !showTransform && (
-          <div className="dotted-bg min-h-[calc(100vh-56px)] animate-fadeIn">
-            <div className="max-w-5xl mx-auto pt-8 px-4">
-              <div className="card p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="font-semibold text-white text-lg">
-                    File Uploaded Successfully!
-                  </h2>
-                  <button onClick={handleResetClick} className="p-1.5 hover:bg-white/5 text-white/40 transition-colors" title="Upload new file">
-                    <X className="h-5 w-5" />
-                  </button>
+          <div className="min-h-[calc(100vh-56px)] animate-fade-in-up bg-muted/30">
+            <div className="mx-auto max-w-5xl px-4 pt-8 sm:px-6">
+              <div className="rounded-2xl border bg-card p-6 shadow-xs">
+                <div className="mb-4 flex items-center justify-between">
+                  <h2 className="text-lg font-semibold tracking-tight">File uploaded</h2>
+                  <Button variant="ghost" size="icon" onClick={handleResetClick} title="Upload a different file">
+                    <X className="h-4 w-4" />
+                  </Button>
                 </div>
                 <div className="space-y-3">
-                  <div className="rounded-lg bg-white/[0.02] border border-white/5 p-4">
-                    <h3 className="font-medium text-sm text-white mb-2">File Details</h3>
-                    <div className="text-sm text-white/50 space-y-1">
-                      <p><span className="font-medium">Name:</span> {fileName}</p>
-                      <p><span className="font-medium">Rows:</span> {rowCount.toLocaleString()}</p>
-                      <p><span className="font-medium">Columns:</span> {columnCount.toLocaleString()}</p>
+                  <div className="rounded-xl border bg-muted/40 p-4">
+                    <h3 className="mb-2 text-sm font-medium">File details</h3>
+                    <div className="space-y-1 text-sm text-muted-foreground">
+                      <p><span className="font-medium text-foreground">Name:</span> {fileName}</p>
+                      <p><span className="font-medium text-foreground">Rows:</span> <span className="tabular-nums">{rowCount.toLocaleString()}</span></p>
+                      <p><span className="font-medium text-foreground">Columns:</span> <span className="tabular-nums">{columnCount.toLocaleString()}</span></p>
                     </div>
                   </div>
                   {schema?.columns && (
-                    <div className="rounded-lg bg-white/[0.02] border border-white/5 p-4">
-                      <h3 className="font-medium text-sm text-white mb-2">Schema</h3>
-                      <div className="overflow-x-auto pb-2">
-                        <div className="flex gap-2 flex-wrap">
-                          {schema.columns.map((col, idx) => (
-                            <div key={idx} className="inline-flex items-center gap-1 px-2 py-1 bg-cyan-900/15 border border-cyan-800/30 rounded text-xs whitespace-nowrap">
-                              <span className="font-medium text-white">{col.name}</span>
-                              <span className="text-white/30">({col.dtype})</span>
-                            </div>
-                          ))}
-                        </div>
+                    <div className="rounded-xl border bg-muted/40 p-4">
+                      <h3 className="mb-2 text-sm font-medium">Schema</h3>
+                      <div className="flex flex-wrap gap-2">
+                        {schema.columns.map((col, idx) => (
+                          <span key={idx} className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border bg-background px-2.5 py-1 font-mono text-xs shadow-xs">
+                            {col.name} <span className="text-muted-foreground">{col.dtype}</span>
+                          </span>
+                        ))}
                       </div>
                     </div>
                   )}
-                  <div className="rounded-lg bg-white/[0.02] border border-white/5 p-4">
-                    <h3 className="font-medium text-sm text-white mb-2">Preview (first 5 rows)</h3>
+                  <div className="rounded-xl border bg-muted/40 p-4">
+                    <h3 className="mb-2 text-sm font-medium">Preview (first 5 rows)</h3>
                     <DataGrid columns={columns} rows={rows.slice(0, 5)} loading={false} />
                   </div>
                   <div className="flex justify-center pt-3">
-                    <button
-                      onClick={() => setShowTransform(true)}
-                      className="px-6 py-3 btn-accent font-semibold text-sm"
-                    >
-                      Let&apos;s Transform &rarr;
-                    </button>
+                    <Button size="lg" onClick={() => setShowTransform(true)}>
+                      Start transforming →
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -442,48 +419,48 @@ function WorkspaceContent() {
 
         {/* Phase 3: Transform with Sage sidebar */}
         {fileReady && showTransform && (
-          <div className="animate-fadeIn h-[calc(100vh-56px)] flex">
+          <div className="flex h-[calc(100vh-56px)] animate-fade-in-up">
             {/* Main content area */}
-            <div className="flex-1 flex flex-col min-w-0">
+            <div className="flex min-w-0 flex-1 flex-col">
               {/* Compact toolbar */}
-              <div className="flex items-center gap-2 px-4 py-2 border-b border-white/5 bg-neutral-950 flex-shrink-0">
-                <div className="flex items-center gap-2 flex-1 min-w-0">
-                  <FileSpreadsheet className="h-4 w-4 text-cyan-500 flex-shrink-0" />
-                  <span className="text-sm font-medium text-white truncate font-mono">{fileName || "Untitled"}</span>
-                  <span className="text-xs text-white/20 flex-shrink-0 font-mono">
-                    {rowCount.toLocaleString()} rows &middot; {columnCount.toLocaleString()} cols
-                  </span>
+              <div className="flex flex-shrink-0 items-center gap-2 border-b bg-background px-4 py-2">
+                <div className="flex min-w-0 flex-1 items-center gap-2">
+                  <FileSpreadsheet className="h-4 w-4 flex-shrink-0 text-primary" />
+                  <span className="truncate text-sm font-medium">{fileName || "Untitled"}</span>
+                  <Badge variant="secondary" className="flex-shrink-0 font-normal tabular-nums text-muted-foreground">
+                    {rowCount.toLocaleString()} × {columnCount.toLocaleString()}
+                  </Badge>
                 </div>
-                <div className="flex items-center gap-1">
-                  <button onClick={handleUndo} className="p-1.5 hover:bg-white/5 text-white/30 hover:text-white transition-colors" title="Undo (Ctrl+Z)">
+                <div className="flex items-center gap-0.5">
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={handleUndo} title="Undo (Ctrl+Z)">
                     <Undo2 className="h-4 w-4" />
-                  </button>
-                  <button onClick={() => setChartOpen(true)} className="p-1.5 hover:bg-white/5 text-white/30 hover:text-white transition-colors" title="Quick chart">
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => setChartOpen(true)} title="Quick chart">
                     <BarChart3 className="h-4 w-4" />
-                  </button>
-                  <button onClick={() => setHistoryOpen(true)} className="p-1.5 hover:bg-white/5 text-white/30 hover:text-white transition-colors" title="History">
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => setHistoryOpen(true)} title="History">
                     <History className="h-4 w-4" />
-                  </button>
-                  <button onClick={() => setRecipesOpen(true)} className="p-1.5 hover:bg-white/5 text-white/30 hover:text-white transition-colors" title="Recipes">
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => setRecipesOpen(true)} title="Recipes">
                     <BookMarked className="h-4 w-4" />
-                  </button>
-                  <button onClick={handleDownload} className="p-1.5 hover:bg-white/5 text-white/30 hover:text-white transition-colors" title="Download CSV (Ctrl+S)">
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={handleDownload} title="Download CSV (Ctrl+S)">
                     <Download className="h-4 w-4" />
-                  </button>
-                  <button onClick={handleResetClick} className="p-1.5 hover:bg-white/5 text-white/30 hover:text-white transition-colors" title="Upload new file">
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={handleResetClick} title="Upload new file">
                     <Upload className="h-4 w-4" />
-                  </button>
+                  </Button>
                 </div>
               </div>
 
               {/* Data grid */}
-              <div className="flex-1 overflow-hidden p-2 bg-neutral-900/50">
+              <div className="flex-1 overflow-hidden bg-muted/30 p-2">
                 <DataGrid columns={columns} rows={rows} loading={loading} />
               </div>
             </div>
 
             {/* Sage sidebar */}
-            <div className="w-80 xl:w-96 flex-shrink-0">
+            <div className="w-80 flex-shrink-0 xl:w-96">
               <ChatPanel
                 fileId={fileId}
                 open={chatOpen}
@@ -513,7 +490,6 @@ function WorkspaceContent() {
         <SheetSelector isOpen={showSheetSelector} sheets={availableSheets} onSelect={handleSheetSelect} onCancel={() => { setShowSheetSelector(false); setPendingFile(null); setLoading(false); }} />
         <ChartPanel columns={columns} rows={rows} open={chartOpen} onClose={() => setChartOpen(false)} />
         <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} onUpload={handleFullReset} onUndo={handleUndo} onDownload={handleDownload} onReset={handleResetClick} onChat={() => setChatOpen(true)} onHistory={() => setHistoryOpen(true)} fileId={fileId} />
-        {showUpload && !fileReady && <OnboardingOverlay onClose={() => {}} onTrySample={loadSample} />}
       </div>
     </ErrorBoundary>
   );
