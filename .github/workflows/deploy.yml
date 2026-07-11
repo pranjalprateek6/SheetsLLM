@@ -48,8 +48,7 @@ jobs:
           echo "$resp"
           {
             echo "### Backend → Render"
-            echo "Triggered deploy of \`$REF\`."
-            echo "Track it: https://dashboard.render.com/web/srv-d3j9lendiees73ccbvi0/events"
+            echo "Triggered deploy of \`$REF\`. Track it in the Render dashboard → your service → Events."
           } >> "$GITHUB_STEP_SUMMARY"
 
   frontend:
@@ -80,10 +79,11 @@ jobs:
           fi
           if [ "$VERCEL_ENV" = "production" ]; then PROD="--prod"; else PROD=""; fi
 
-          # Pull project settings (incl. Root Directory = frontend) and build remotely-prebuilt.
-          vercel pull --yes --environment="$VERCEL_ENV" --token="$VERCEL_TOKEN"
-          vercel build $PROD --token="$VERCEL_TOKEN"
-          url=$(vercel deploy --prebuilt $PROD --token="$VERCEL_TOKEN")
+          # Non-prebuilt deploy: Vercel builds remotely using the project's own
+          # settings (Root Directory = frontend) and env vars — identical to a
+          # git push, so no local-build directory ambiguity. Project is linked
+          # via the VERCEL_ORG_ID / VERCEL_PROJECT_ID env vars.
+          url=$(vercel deploy --yes $PROD --token="$VERCEL_TOKEN")
           echo "Deployed $REF → $url"
           {
             echo "### Frontend → Vercel ($VERCEL_ENV)"
