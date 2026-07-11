@@ -26,7 +26,7 @@ from app.cache import (
 )
 from app.config import MAX_INSTRUCTION_LENGTH
 from app.engine import (
-    get_schema_from_local,
+    get_schema_after_steps,
     replay_transformations_local,
 )
 from app.llm.factory import get_llm
@@ -92,15 +92,9 @@ def _generate_or_cache_sql(instruction: str, schema: dict) -> str | dict:
 
 
 def _get_current_schema(r2_key: str, steps: list[dict]) -> dict:
-    """Get the schema reflecting all existing transformations."""
+    """Get the schema (real dtypes + samples) reflecting all existing steps."""
     local_path = get_local_parquet(r2_key)
-    if steps:
-        current = replay_transformations_local(local_path, steps, preview_limit=0)
-        return {
-            "columns": [{"name": c, "dtype": "VARCHAR"} for c in current["columns"]],
-            "samples": [],
-        }
-    return get_schema_from_local(local_path)
+    return get_schema_after_steps(local_path, steps)
 
 
 def _execute_transform(r2_key: str, steps: list[dict], sql: str) -> dict:
