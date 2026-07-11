@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from app import usage
 from app.engine import convert_to_parquet, replay_transformations_local
 from app.recipes import (
     RecipeError,
@@ -14,6 +15,18 @@ from app.recipes import (
     snapshot_steps,
     validate_recipe_steps,
 )
+
+
+# ── recipe limit by tier (the Pro gate) ───────────────────────────────
+
+def test_recipe_limit_free_is_capped(monkeypatch):
+    monkeypatch.setattr(usage.db, "get_subscription", lambda uid: None)  # free
+    assert usage.recipe_limit("u") == 1
+
+
+def test_recipe_limit_pro_is_unlimited(monkeypatch):
+    monkeypatch.setattr(usage.db, "get_subscription", lambda uid: {"tier": "pro"})
+    assert usage.recipe_limit("u") == 0  # 0 = unlimited
 
 
 # ── snapshot_steps ────────────────────────────────────────────────────

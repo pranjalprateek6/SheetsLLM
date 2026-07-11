@@ -25,9 +25,11 @@ import logging
 
 from app.config import (
     FREE_MAX_CHAT_PER_MONTH,
+    FREE_MAX_RECIPES,
     FREE_MAX_TRANSFORMS_PER_MONTH,
     FREE_MAX_UPLOADS_PER_MONTH,
     PRO_MAX_CHAT_PER_MONTH,
+    PRO_MAX_RECIPES,
     PRO_MAX_TRANSFORMS_PER_MONTH,
     PRO_MAX_UPLOADS_PER_MONTH,
 )
@@ -68,6 +70,18 @@ def month_key(now: _dt.datetime | None = None) -> str:
     """First day of the current UTC month, ISO format (matches the SQL fn)."""
     now = now or _dt.datetime.now(_dt.timezone.utc)
     return now.strftime("%Y-%m-01")
+
+
+# Total saved-recipe caps per tier (not monthly). 0 = unlimited.
+RECIPE_LIMITS: dict[str, int] = {
+    "free": FREE_MAX_RECIPES,
+    "pro": PRO_MAX_RECIPES,
+}
+
+
+def recipe_limit(user_id: str) -> int:
+    """Max total saved recipes for the user's tier. 0 means unlimited."""
+    return RECIPE_LIMITS.get(get_user_tier(user_id), FREE_MAX_RECIPES)
 
 
 def get_user_tier(user_id: str) -> str:
