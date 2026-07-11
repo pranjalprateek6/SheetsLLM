@@ -77,9 +77,15 @@ function PricingContent() {
     setAwaitingPayment(false);
   };
 
-  useEffect(() => stopPolling, []); // clear on unmount
+  useEffect(() => {
+    // On unmount only clear the timer — no state updates after unmount.
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, []);
 
   const startPolling = () => {
+    if (pollRef.current) clearInterval(pollRef.current); // never stack intervals
     setAwaitingPayment(true);
     const startedAt = Date.now();
     pollRef.current = setInterval(async () => {
@@ -238,7 +244,7 @@ function PricingContent() {
                 {busy ? "Working…" : "Cancel subscription"}
               </Button>
             ) : (
-              <Button className="w-full" onClick={upgrade} disabled={busy || !billingConfigured}>
+              <Button className="w-full" onClick={upgrade} disabled={busy || awaitingPayment || !billingConfigured}>
                 {!billingConfigured ? "Coming soon" : busy ? "Redirecting…" : "Upgrade to Pro"}
               </Button>
             )}

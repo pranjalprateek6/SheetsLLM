@@ -21,19 +21,17 @@ from app.db import get_client
 PAGE = 1000
 
 
-def fetch_all(table: str, columns: str) -> list[dict]:
+def fetch_all(table: str, columns: str, since: str | None = None) -> list[dict]:
+    """Paged fetch, optionally bounded to created_at >= since (ISO date)."""
     client = get_client()
     rows: list[dict] = []
     offset = 0
     while True:
         try:
-            page = (
-                client.table(table)
-                .select(columns)
-                .range(offset, offset + PAGE - 1)
-                .execute()
-                .data
-            )
+            query = client.table(table).select(columns)
+            if since:
+                query = query.gte("created_at", since)
+            page = query.range(offset, offset + PAGE - 1).execute().data
         except Exception as exc:
             print(f"  (skipping {table}: {exc})")
             return rows
@@ -72,11 +70,16 @@ def main() -> int:
     parser.add_argument("--months", type=int, default=3)
     args = parser.parse_args()
 
+    # Bound the scan to the reporting window (files is fetched unbounded
+    # because transformations join through it and may reference older files).
+    today = dt.date.today().replace(day=1)
+    cutoff = (today - dt.timedelta(days=31 * args.months)).replace(day=1).isoformat()
+
     signups = fetch_signups()
     files = fetch_all("files", "id,user_id,created_at")
-    transforms = fetch_all("transformations", "file_id,created_at")
-    recipes = fetch_all("recipes", "user_id,created_at")
-    events = fetch_all("events", "user_id,event,created_at")
+    transforms = fetch_all("transformations", "file_id,created_at", since=cutoff)
+    recipes = fetch_all("recipes", "user_id,created_at", since=cutoff)
+    events = fetch_all("events", "user_id,event,created_at", since=cutoff)
     subs = fetch_all("subscriptions", "user_id,tier,updated_at,created_at")
 
     file_owner = {f["id"]: f["user_id"] for f in files}
