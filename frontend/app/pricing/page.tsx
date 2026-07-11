@@ -1,6 +1,6 @@
 "use client";
-import { useEffect, useState } from "react";
-import { Check, ShieldCheck } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Check, Loader2, ShieldCheck } from "lucide-react";
 import AuthGuard from "@/components/AuthGuard";
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
 import { Button } from "@/components/ui/button";
@@ -65,14 +65,54 @@ function PricingContent() {
       .catch(() => setTier("free"));
   }, []);
 
+  // Razorpay's hosted subscription page has no return redirect, so checkout
+  // opens in a new tab and this page polls billing status until the webhook
+  // flips the tier — the user lands back on a page that already knows.
+  const [awaitingPayment, setAwaitingPayment] = useState(false);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const stopPolling = () => {
+    if (pollRef.current) clearInterval(pollRef.current);
+    pollRef.current = null;
+    setAwaitingPayment(false);
+  };
+
+  useEffect(() => stopPolling, []); // clear on unmount
+
+  const startPolling = () => {
+    setAwaitingPayment(true);
+    const startedAt = Date.now();
+    pollRef.current = setInterval(async () => {
+      if (Date.now() - startedAt > 10 * 60 * 1000) {
+        stopPolling();
+        return;
+      }
+      try {
+        const r = await fetchWithAuth("/api/billing/status");
+        const d = await r.json();
+        if (d.tier === "pro") {
+          stopPolling();
+          setTier("pro");
+          setNotice("Payment received — welcome to Pro! Your new limits are active.");
+        }
+      } catch {
+        /* keep polling */
+      }
+    }, 4000);
+  };
+
   const upgrade = async () => {
     setBusy(true);
     setError(null);
     try {
       const r = await fetchWithAuth("/api/billing/checkout", { method: "POST" });
       const d = await r.json();
-      if (r.ok && d.url) window.location.href = d.url;
-      else setError(d.message || "Could not start checkout.");
+      if (r.ok && d.url) {
+        window.open(d.url, "_blank", "noopener");
+        startPolling();
+      } else {
+        setError(d.message || "Could not start checkout.");
+      }
     } catch {
       setError("Could not start checkout.");
     } finally {
@@ -129,6 +169,18 @@ function PricingContent() {
       {notice && (
         <div className="mb-6 rounded-lg border border-success/30 bg-success/5 p-3 text-center text-sm text-success">
           {notice}
+        </div>
+      )}
+      {awaitingPayment && (
+        <div className="mb-6 flex items-center justify-center gap-3 rounded-lg border bg-card p-3 text-sm shadow-xs">
+          <Loader2 className="h-4 w-4 animate-spin text-primary" />
+          <span>
+            Complete the payment in the Razorpay tab — this page updates automatically once
+            it goes through.
+          </span>
+          <button onClick={stopPolling} className="text-muted-foreground underline-offset-2 hover:underline">
+            Cancel
+          </button>
         </div>
       )}
 

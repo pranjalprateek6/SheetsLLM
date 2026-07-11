@@ -15,7 +15,7 @@ from time import perf_counter
 
 from fastapi import APIRouter, Request, Response
 
-from app import db, usage
+from app import db, events, usage
 from app.cache import get_local_parquet
 from app.engine import replay_transformations_local
 from app.recipes import (
@@ -85,6 +85,7 @@ async def create_recipe(request: Request):
     # Recipe count is the Pro gate: free tier is capped, Pro is unlimited.
     limit = usage.recipe_limit(user_id)
     if limit and len(db.list_recipes(user_id)) >= limit:
+        events.record(user_id, "paywall_hit", action="recipes", limit=limit)
         return _json_response(
             402, "RECIPE_LIMIT_REACHED",
             f"The free plan includes {limit} saved recipe"

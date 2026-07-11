@@ -23,7 +23,7 @@ from app.llm.prompts import SYSTEM_PROMPT, build_user_message, build_retry_messa
 from app.security import RateLimitExceeded, check_rate_limit
 from app.sql_validator import SQLValidationError, validate_sql
 from app.config import MAX_INSTRUCTION_LENGTH
-from app import usage
+from app import events, usage
 from app.usage import UsageLimitExceeded
 
 logger = logging.getLogger("sheetsllm.routes.chat")
@@ -96,6 +96,7 @@ async def chat(request: Request):
     try:
         usage.enforce(user_id, "chat_requests")
     except UsageLimitExceeded as exc:
+        events.record(user_id, "paywall_hit", action="chat_requests", used=exc.used, limit=exc.limit)
         return _json_response(429, "USAGE_LIMIT_EXCEEDED", str(exc))
 
     # Parse body

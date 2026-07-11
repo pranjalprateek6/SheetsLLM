@@ -65,6 +65,7 @@ function WorkspaceContent() {
   const [chartOpen, setChartOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [sampleSuggestions, setSampleSuggestions] = useState<string[] | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -118,12 +119,18 @@ function WorkspaceContent() {
   const onUpload = async (file: File, sheetName?: string, suggestions?: string[]) => {
     setLoading(true);
     setSampleSuggestions(suggestions ?? null);
+    setUploadError(null);
     try {
       const url = sheetName ? `/api/upload?sheet_name=${encodeURIComponent(sheetName)}` : "/api/upload";
       const form = new FormData();
       form.append("file", file);
       const r = await fetchWithAuth(url, { method: "POST", body: form });
       const data = await r.json();
+
+      if (!r.ok) {
+        setUploadError(data.message || "Upload failed. Please try again.");
+        return false;
+      }
 
       if (data.requires_sheet_selection && data.sheets) {
         setAvailableSheets(data.sheets);
@@ -147,6 +154,7 @@ function WorkspaceContent() {
       }
     } catch (error) {
       console.error("Upload error:", error);
+      setUploadError("Upload failed — check your connection and try again.");
     } finally {
       setLoading(false);
     }
@@ -320,6 +328,11 @@ function WorkspaceContent() {
                 <div className="rounded-2xl border bg-card p-6 shadow-xs">
                   <h2 className="mb-4 text-lg font-semibold tracking-tight">Upload a spreadsheet</h2>
                   <DropZone disabled={loading} onDropFile={onUpload} />
+                  {uploadError && (
+                    <div className="mt-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm text-destructive">
+                      {uploadError}
+                    </div>
+                  )}
                   <div className="mt-5 border-t pt-4">
                     <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       No file handy? Try a sample

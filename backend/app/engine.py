@@ -300,6 +300,40 @@ def get_schema_after_steps(
 # ── Parquet Conversion ───────────────────────────────────────────────
 
 
+class UnreadableFileError(Exception):
+    """File could not be parsed even leniently. str() is safe to show users."""
+
+
+def _read_csv_lenient(con, tmp_path: str, *, delim: str | None = None) -> None:
+    """CSV ingest with a lenient second attempt.
+
+    Real-world exports (mixed line endings, ragged rows) can fail DuckDB's
+    strict sniffer with a wall-of-text error. Retry with strict mode off and
+    null padding before giving up with a message a human can act on.
+    """
+    delim_arg = f", delim='{delim}'" if delim else ""
+    try:
+        con.execute(
+            f"CREATE TABLE staging AS SELECT * FROM read_csv_auto('{tmp_path}'{delim_arg})"
+        )
+        return
+    except Exception as first_exc:
+        logger.warning("csv strict parse failed, retrying leniently: %s", first_exc)
+        try:
+            con.execute(
+                "CREATE TABLE staging AS SELECT * FROM read_csv_auto("
+                f"'{tmp_path}'{delim_arg}, strict_mode=false, null_padding=true)"
+            )
+            return
+        except Exception:
+            raise UnreadableFileError(
+                "We couldn't read this file as a CSV. It may use inconsistent "
+                "formatting — mixed line endings, uneven columns, or an unusual "
+                "delimiter. Re-saving it as a standard CSV from your spreadsheet "
+                "tool usually fixes this."
+            ) from first_exc
+
+
 def convert_to_parquet(
     file_bytes: bytes, filename: str, *, sheet_name: str | None = None
 ) -> tuple[bytes, int, int]:
@@ -345,14 +379,10 @@ def convert_to_parquet(
                 f"CREATE TABLE staging AS SELECT * FROM read_json_auto('{tmp_path}')"
             )
         elif lower.endswith(".tsv"):
-            con.execute(
-                f"CREATE TABLE staging AS SELECT * FROM read_csv_auto('{tmp_path}', delim='\\t')"
-            )
+            _read_csv_lenient(con, tmp_path, delim="\\t")
         else:
             # Default: CSV
-            con.execute(
-                f"CREATE TABLE staging AS SELECT * FROM read_csv_auto('{tmp_path}')"
-            )
+            _read_csv_lenient(con, tmp_path)
 
         arrow_table = con.execute("SELECT * FROM staging").fetch_arrow_table()
     finally:
