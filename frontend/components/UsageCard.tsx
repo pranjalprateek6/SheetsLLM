@@ -30,6 +30,7 @@ const NUDGE_THRESHOLD = 0.8;
 
 function resetDate(month: string) {
   const d = new Date(`${month}T00:00:00Z`);
+  if (isNaN(d.getTime())) return "next month";
   d.setUTCMonth(d.getUTCMonth() + 1);
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" });
 }
