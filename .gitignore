@@ -15,3 +15,4 @@ backend/.venv/
 backend/SheetsLLM/
 backend/audits/
 *.parquet
+.vercel/
