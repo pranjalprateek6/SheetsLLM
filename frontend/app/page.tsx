@@ -7,7 +7,7 @@ import {
   ArrowRight, Upload, MessageSquare, Eye, Zap, Shield, Filter,
   Table, Download, Undo2, Sparkles, TrendingUp, Clock, GitMerge, Users,
 } from "lucide-react";
-import { Button } from "@/components/ui/Button";
+import { Button } from "@/components/ui/button";
 
 const DotLottieReact = dynamic(
   () => import("@lottiefiles/dotlottie-react").then((m) => m.DotLottieReact),
