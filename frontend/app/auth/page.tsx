@@ -2,7 +2,6 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { AlertCircle, CheckCircle2, ShieldCheck } from "lucide-react";
@@ -77,7 +76,8 @@ function AuthContent() {
       >
         {/* Logo */}
         <Link href="/" className="mb-8 flex items-center justify-center gap-2">
-          <Image src="/logo.png" alt="" width={32} height={32} className="h-8 w-8 rounded-lg" />
+          {/* eslint-disable-next-line @next/next/no-img-element -- static SVG, no optimizer needed */}
+          <img src="/logo.svg" alt="" width={32} height={32} className="h-8 w-8" />
           <span className="text-lg font-semibold tracking-tight">SheetsLLM</span>
         </Link>
 
