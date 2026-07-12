@@ -108,9 +108,12 @@ function WorkspaceContent() {
   ];
   const personalizedPrompts =
     matchedSampleIds.length > 0
-      ? SAMPLE_DATASETS.filter((s) => matchedSampleIds.includes(s.id))
-          .flatMap((s) => s.suggestions)
-          .slice(0, 4)
+      ? Array.from(
+          new Set(
+            SAMPLE_DATASETS.filter((s) => matchedSampleIds.includes(s.id))
+              .flatMap((s) => s.suggestions)
+          )
+        ).slice(0, 4)
       : EXAMPLE_PROMPTS;
 
   useEffect(() => {
@@ -467,8 +470,10 @@ function WorkspaceContent() {
                     <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       No file handy? Try a sample
                     </p>
+                    {/* One-frame gate: render the list only after saved intents
+                        are read, so returning users never see it reorder */}
                     <div className="space-y-1.5">
-                      {orderedSamples.map((sample) => {
+                      {intentsLoaded && orderedSamples.map((sample) => {
                         const picked = matchedSampleIds.includes(sample.id);
                         return (
                           <button
