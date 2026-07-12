@@ -92,7 +92,7 @@ function AccountContent() {
   const restoreChecklist = () => {
     try { localStorage.removeItem(ONBOARDING_DISMISSED_KEY); } catch {}
     setChecklistDismissed(false);
-    toast.success("Checklist restored — you'll see it on the workspace upload screen.");
+    toast.success("Checklist restored. You'll see it on the workspace upload screen.");
   };
 
   const handleSignOut = async () => {
@@ -177,7 +177,7 @@ function AccountContent() {
               <div>
                 <p className="text-sm font-medium">Strict privacy mode</p>
                 <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-                  When on, prompts sent to the AI contain column names and types only — never
+                  When on, prompts sent to the AI contain column names and types only, never
                   sample values or rows from your data.
                 </p>
               </div>

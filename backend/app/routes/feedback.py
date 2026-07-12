@@ -49,7 +49,7 @@ async def submit_feedback(request: Request):
     except RateLimitExceeded:
         return _json_response(
             429, "RATE_LIMITED",
-            "You've sent a lot of feedback recently — thank you! Try again later.",
+            "You've sent a lot of feedback recently. Thank you! Try again later.",
         )
 
     try:

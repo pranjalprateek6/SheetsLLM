@@ -80,7 +80,7 @@ export default function OnboardingIntent({
         <div className="min-w-[220px]">
           <h3 className="text-sm font-medium">What kind of files land on your desk?</h3>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Pick any that fit — we&apos;ll line up the right sample and starter ideas.
+            Pick any that fit and we&apos;ll line up the right sample and starter ideas.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -112,7 +112,7 @@ export default function OnboardingIntent({
             onClick={skip}
             className="whitespace-nowrap text-xs text-muted-foreground underline-offset-2 hover:underline"
           >
-            Skip — I&apos;ll just upload
+            Skip, I&apos;ll just upload
           </button>
         </div>
       </div>

@@ -23,12 +23,12 @@ const PILLARS = [
   {
     icon: BookMarked,
     title: "Reusable recipes",
-    body: "Describe the cleanup once. Every future export runs the exact same steps in one click — no re-prompting, no AI drift.",
+    body: "Describe the cleanup once. Every future export runs the exact same steps in one click. No re-prompting, no AI drift.",
   },
   {
     icon: Lock,
     title: "Private by design",
-    body: "Only your column names and types go to the AI — never your rows. Strict mode makes that a guarantee you can show your auditor.",
+    body: "Only your column names and types go to the AI, never your rows. Strict mode makes that a guarantee you can show your auditor.",
   },
   {
     icon: History,
@@ -54,7 +54,7 @@ const STEPS = [
     icon: RefreshCw,
     step: "3",
     title: "Save it as a recipe",
-    body: "Next month's file? One click re-applies every step — deterministically, with no AI call at all.",
+    body: "Next month's file? One click re-applies every step deterministically, with no AI call at all.",
   },
 ];
 
@@ -211,7 +211,7 @@ export default function LandingPage() {
             </h2>
             <p className="mt-4 leading-relaxed text-muted-foreground">
               ChatGPT-style tools upload your whole file to the model. SheetsLLM sends only a
-              schema summary — column names, types, and aggregate stats — and runs generated,
+              schema summary (column names, types, and aggregate stats) and runs generated,
               validated SQL on your data in our sandbox.
             </p>
             <p className="mt-3 leading-relaxed text-muted-foreground">
@@ -288,8 +288,8 @@ export default function LandingPage() {
             <h2 className="text-3xl font-semibold tracking-tight">Show your work</h2>
             <p className="mt-4 leading-relaxed text-muted-foreground">
               Every transformation is stored as an inspectable step: the instruction you gave, the
-              SQL that ran, and the row counts it changed. Undo one step or revert to any point —
-              the original file is never touched.
+              SQL that ran, and the row counts it changed. Undo one step or revert to any point.
+              The original file is never touched.
             </p>
             <p className="mt-3 leading-relaxed text-muted-foreground">
               When finance asks &ldquo;what happened to this column?&rdquo;, you have the answer.

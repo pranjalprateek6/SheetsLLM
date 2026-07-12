@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Gauge, Zap } from "lucide-react";
+import { Gauge, Sparkles, Zap } from "lucide-react";
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -17,6 +17,7 @@ type UsageSummary = {
     chat_requests: number;
     rows_processed: number;
   };
+  recipe_applies?: number;
   limits: {
     uploads: number;
     transforms: number;
@@ -110,6 +111,26 @@ export default function UsageCard({ embedded = false }: { embedded?: boolean }) 
         </div>
         <span className="text-xs text-muted-foreground">Resets {resetDate(usage.month)}</span>
       </div>
+
+      {/* The numbers say what you used; this line says what it got you. */}
+      {(usage.used.rows_processed > 0 || (usage.recipe_applies ?? 0) > 0) && (
+        <p className="mb-4 text-sm">
+          <Sparkles className="mr-1.5 inline h-3.5 w-3.5 text-primary" aria-hidden />
+          This month you cleaned{" "}
+          <span className="font-medium tabular-nums">
+            {usage.used.rows_processed.toLocaleString()}
+          </span>{" "}
+          rows
+          {(usage.recipe_applies ?? 0) > 0 && (
+            <>
+              {" "}and skipped{" "}
+              <span className="font-medium tabular-nums">{usage.recipe_applies}</span>{" "}
+              manual cleanup{usage.recipe_applies === 1 ? "" : "s"} with recipes
+            </>
+          )}
+          .
+        </p>
+      )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         {meters.map((m) => (

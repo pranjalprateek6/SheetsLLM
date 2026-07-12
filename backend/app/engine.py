@@ -454,7 +454,7 @@ def _read_csv_lenient(con, tmp_path: str, *, delim: str | None = None) -> None:
         except Exception:
             raise UnreadableFileError(
                 "We couldn't read this file as a CSV. It may use inconsistent "
-                "formatting — mixed line endings, uneven columns, or an unusual "
+                "formatting: mixed line endings, uneven columns, or an unusual "
                 "delimiter. Re-saving it as a standard CSV from your spreadsheet "
                 "tool usually fixes this."
             ) from first_exc

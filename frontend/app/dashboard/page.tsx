@@ -162,7 +162,7 @@ export default function DashboardPage() {
       toast.success(`Deleted "${name}"`);
     } catch (e) {
       console.error("Delete failed:", e);
-      toast.error(`Couldn't delete "${name}" — the file is untouched.`);
+      toast.error(`Couldn't delete "${name}" . The file is untouched.`);
     } finally { setActionLoading(null); }
   };
 
@@ -364,7 +364,7 @@ export default function DashboardPage() {
               <EmptyState
                 variant="files"
                 title="No files yet"
-                description="Upload a spreadsheet — or start from a sample dataset — and describe your cleanup in plain English."
+                description="Upload a spreadsheet, or start from a sample dataset, and describe your cleanup in plain English."
                 action={
                   <Button onClick={() => router.push("/workspace")}>
                     <Upload className="mr-2 h-4 w-4" /> Upload your first file

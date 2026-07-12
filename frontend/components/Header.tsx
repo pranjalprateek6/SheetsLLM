@@ -161,7 +161,7 @@ export default function Header() {
                   <div className="flex-1">
                     <p className="text-sm">Strict privacy mode</p>
                     <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-                      The AI sees column names and types only — never your data.
+                      The AI sees column names and types only, never your data.
                     </p>
                   </div>
                   <Switch checked={!!privacyMode} className="pointer-events-none mt-0.5" />

@@ -410,6 +410,22 @@ def create_audit_entry(
     return resp.data[0]
 
 
+def count_audit_actions(user_id: str, action: str, since_iso: str) -> int:
+    """Count a user's audit entries of one action type since a timestamp.
+    Powers the dashboard's 'manual cleanups avoided' insight."""
+    resp = (
+        get_client()
+        .table("audit_log")
+        .select("id", count="exact")
+        .eq("user_id", user_id)
+        .eq("action", action)
+        .gte("created_at", since_iso)
+        .limit(1)
+        .execute()
+    )
+    return resp.count or 0
+
+
 def list_audit_entries(
     file_id: str, page: int = 1, page_size: int = 20
 ) -> dict:

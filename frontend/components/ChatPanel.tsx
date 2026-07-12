@@ -141,7 +141,7 @@ export default function ChatPanel({
           setMessages((prev) => [...prev, { role: "assistant", content: data.message || "Something went wrong.", message_type: "error" }]);
         } else {
           // Unrecognized response shape — never let "Thinking…" vanish silently.
-          setMessages((prev) => [...prev, { role: "assistant", content: "I didn't get a usable response — please try rephrasing.", message_type: "error" }]);
+          setMessages((prev) => [...prev, { role: "assistant", content: "I didn't get a usable response. Please try rephrasing.", message_type: "error" }]);
         }
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") {

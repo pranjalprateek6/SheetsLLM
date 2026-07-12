@@ -142,7 +142,7 @@ export default function HeroDemo() {
                   className="mt-2.5 inline-flex items-center gap-1.5 rounded-lg border border-primary/25 bg-primary/5 px-2.5 py-1.5 text-[11px] font-medium text-primary"
                 >
                   <BookMarked className="h-3.5 w-3.5" />
-                  Saved as recipe — re-run on April&apos;s file in one click
+                  Saved as recipe. Re-run it on April&apos;s file in one click
                 </motion.div>
               </motion.div>
             )}

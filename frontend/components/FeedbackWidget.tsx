@@ -46,14 +46,14 @@ export default function FeedbackWidget({
       });
       const data = await res.json();
       if (!res.ok) {
-        toast.error(data.message || "Couldn't send feedback — please try again.");
+        toast.error(data.message || "Couldn't send feedback. Please try again.");
       } else {
         setOpen(false);
         setMessage("");
-        toast.success("Thanks — feedback received!");
+        toast.success("Thanks! Feedback received.");
       }
     } catch {
-      toast.error("Couldn't send feedback — check your connection.");
+      toast.error("Couldn't send feedback. Check your connection.");
     } finally {
       setSending(false);
     }

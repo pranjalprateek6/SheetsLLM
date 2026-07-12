@@ -38,11 +38,11 @@ export default function FounderNote() {
         <X className="h-3.5 w-3.5" />
       </button>
       <p className="pr-8 text-sm leading-relaxed text-muted-foreground">
-        Every month, the same messy export — the same 40 minutes fixing it by
+        Every month, the same messy export and the same 40 minutes fixing it by
         hand. Describe that cleanup once, save it as a recipe, and never do it
         manually again. If anything feels off, the Feedback button up top
         reaches me directly.{" "}
-        <span className="whitespace-nowrap font-medium text-foreground">— Pranjal, founder</span>
+        <span className="whitespace-nowrap font-medium text-foreground">Pranjal, founder</span>
       </p>
     </div>
   );

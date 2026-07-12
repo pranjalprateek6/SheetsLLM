@@ -3,9 +3,9 @@ import ToolShell from "@/components/tools/ToolShell";
 import DedupeTool from "@/components/tools/DedupeTool";
 
 export const metadata: Metadata = {
-  title: "Free CSV Duplicate Remover — Deduplicate CSV Online (No Upload)",
+  title: "Free CSV Duplicate Remover: Deduplicate CSV Online (No Upload)",
   description:
-    "Remove duplicate rows from a CSV file in your browser. Match on the whole row or specific columns. Free, private, no signup — your file never leaves your computer.",
+    "Remove duplicate rows from a CSV file in your browser. Match on the whole row or specific columns. Free, private, no signup. Your file never leaves your computer.",
   alternates: { canonical: "/tools/csv-deduplicate" },
 };
 
@@ -13,7 +13,7 @@ export default function Page() {
   return (
     <ToolShell
       title="CSV duplicate remover"
-      intro="Delete duplicate rows from any CSV file — match on the entire row or just the columns you choose, then download the cleaned file."
+      intro="Delete duplicate rows from any CSV file. Match on the entire row or just the columns you choose, then download the cleaned file."
       steps={[
         "Choose your CSV file. It's parsed locally in your browser, never uploaded.",
         "Optionally pick the columns that define a duplicate (like email or order ID). No selection means the whole row must match.",
@@ -34,7 +34,7 @@ export default function Page() {
         },
         {
           q: "Does it handle quoted fields and commas inside values?",
-          a: "Yes — parsing follows the CSV standard (RFC 4180), so quoted fields, embedded commas, and line breaks inside cells are handled correctly.",
+          a: "Yes. Parsing follows the CSV standard (RFC 4180), so quoted fields, embedded commas, and line breaks inside cells are handled correctly.",
         },
       ]}
     >

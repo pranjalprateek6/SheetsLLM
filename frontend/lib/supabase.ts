@@ -17,7 +17,7 @@ if (
 ) {
   // Surfaces misconfiguration in the browser without breaking the build.
   console.error(
-    "Missing NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY — authentication will not work."
+    "Missing NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY. Authentication will not work."
   );
 }
 

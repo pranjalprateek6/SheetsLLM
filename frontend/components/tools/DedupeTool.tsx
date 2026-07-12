@@ -127,7 +127,7 @@ export default function DedupeTool() {
 
           {result && (
             <p className="mt-3 text-sm text-success">
-              Removed {formatCount(result.removed)} duplicate row{result.removed === 1 ? "" : "s"} —
+              Removed {formatCount(result.removed)} duplicate row{result.removed === 1 ? "" : "s"} and
               downloaded {formatCount(result.kept)} unique rows.
             </p>
           )}

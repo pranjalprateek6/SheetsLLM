@@ -33,7 +33,7 @@ export default function SchemaPanel({
           <SheetTitle>Schema</SheetTitle>
           <SheetDescription>
             {columns.length} column{columns.length === 1 ? "" : "s"}
-            {fileName ? ` — ${fileName}` : ""}
+            {fileName ? `: ${fileName}` : ""}
           </SheetDescription>
         </SheetHeader>
         <div className="flex-1 overflow-y-auto px-5 py-3">

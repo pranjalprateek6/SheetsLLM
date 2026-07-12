@@ -90,3 +90,37 @@ def test_summary_shape(monkeypatch):
     assert s["used"]["transforms"] == 7
     assert set(s["limits"]) == {"uploads", "transforms", "chat_requests"}
     assert s["month"].endswith("-01")
+
+
+# ── recipe_applies in the summary (dashboard insight) ─────────────────
+
+def test_summary_includes_recipe_applies(monkeypatch):
+    from app import usage
+
+    monkeypatch.setattr(usage.db, "get_subscription", lambda uid: None)
+    monkeypatch.setattr(usage.db, "get_usage", lambda uid, month: {"uploads": 1})
+    captured = {}
+
+    def _count(user_id, action, since_iso):
+        captured.update(user=user_id, action=action, since=since_iso)
+        return 3
+
+    monkeypatch.setattr(usage.db, "count_audit_actions", _count)
+    s = usage.summary("u1")
+    assert s["recipe_applies"] == 3
+    assert captured["action"] == "recipe_apply"
+    assert captured["since"].endswith("T00:00:00Z")
+
+
+def test_summary_recipe_applies_fails_open(monkeypatch):
+    from app import usage
+
+    monkeypatch.setattr(usage.db, "get_subscription", lambda uid: None)
+    monkeypatch.setattr(usage.db, "get_usage", lambda uid, month: None)
+
+    def _boom(*a, **kw):
+        raise RuntimeError("db down")
+
+    monkeypatch.setattr(usage.db, "count_audit_actions", _boom)
+    s = usage.summary("u1")
+    assert s["recipe_applies"] == 0

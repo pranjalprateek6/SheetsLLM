@@ -9,7 +9,7 @@ export default function NotFound() {
         <EmptyState
           variant="lost"
           title="Page not found"
-          description="This page doesn't exist — maybe the link is old, or a typo snuck in."
+          description="This page doesn't exist. Maybe the link is old, or a typo snuck in."
           action={
             <div className="flex justify-center gap-2">
               <Button variant="outline" asChild>
