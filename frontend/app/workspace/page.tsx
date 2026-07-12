@@ -23,6 +23,9 @@ import { SAMPLE_DATASETS } from "@/lib/samples";
 import { TextShimmer } from "@/components/ui/text-shimmer";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export default function Workspace() {
   return (
@@ -197,21 +200,23 @@ function WorkspaceContent() {
     }
   };
 
-  const handleDownload = useCallback(async () => {
+  const handleDownload = useCallback(async (format: string = "csv") => {
     if (!fileId) return;
     try {
-      const r = await fetchWithAuth(`/api/download?file_id=${fileId}&format=csv`);
+      const r = await fetchWithAuth(`/api/download?file_id=${fileId}&format=${format}`);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const blob = await r.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = fileName.replace(/\.[^/.]+$/, "") + "_transformed.csv";
+      a.download = fileName.replace(/\.[^/.]+$/, "") + `_transformed.${format}`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
     } catch (e) {
       console.error("Download failed", e);
+      toast.error("Download failed. Please try again.");
     }
   }, [fileId, fileName]);
 
@@ -514,9 +519,20 @@ function WorkspaceContent() {
                   <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => setRecipesOpen(true)} title="Recipes">
                     <BookMarked className="h-4 w-4" />
                   </Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={handleDownload} title="Download CSV (Ctrl+S)">
-                    <Download className="h-4 w-4" />
-                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" title="Download (Ctrl+S = CSV)" aria-label="Download">
+                        <Download className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => handleDownload("csv")}>CSV</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleDownload("xlsx")}>Excel (.xlsx)</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleDownload("json")}>JSON</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleDownload("tsv")}>TSV</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleDownload("parquet")}>Parquet</DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                   <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={handleResetClick} title="Upload new file">
                     <Upload className="h-4 w-4" />
                   </Button>

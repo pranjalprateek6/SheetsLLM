@@ -71,14 +71,26 @@ def get_file(file_id: str, user_id: str) -> dict | None:
     return resp.data[0] if resp.data else None
 
 
-def list_files(user_id: str, page: int = 1, page_size: int = 20) -> dict:
+def list_files(
+    user_id: str,
+    page: int = 1,
+    page_size: int = 20,
+    q: str | None = None,
+    sort: str = "created_at",
+    direction: str = "desc",
+) -> dict:
     offset = (page - 1) * page_size
-    resp = (
+    query = (
         get_client()
         .table("files")
         .select("*", count="exact")
         .eq("user_id", user_id)
-        .order("created_at", desc=True)
+    )
+    if q:
+        query = query.ilike("name", f"%{q}%")
+    resp = (
+        query
+        .order(sort, desc=(direction == "desc"))
         .range(offset, offset + page_size - 1)
         .execute()
     )

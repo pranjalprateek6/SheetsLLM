@@ -11,3 +11,15 @@ export async function GET(
   const json = await resp.json();
   return NextResponse.json(json, { status: resp.status });
 }
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: { fileId: string } }
+) {
+  const resp = await fetch(`${BACKEND_URL()}/chat/${params.fileId}`, {
+    method: "DELETE",
+    headers: backendHeaders(req),
+  });
+  const json = await resp.json();
+  return NextResponse.json(json, { status: resp.status });
+}
