@@ -80,21 +80,30 @@ def execute_sql_from_local(
         # EXPLAIN dry run — catch errors before full execution
         con.execute(f"EXPLAIN {sql}")
 
-        result = con.execute(sql).fetchdf()
+        # Never materialize the full result for a preview: a 1M-row result
+        # into pandas can OOM the instance. Count server-side, fetch only
+        # the preview slice.
+        # Newline before the closing paren so a trailing "-- comment" in the
+        # query can't comment out the wrapper's syntax.
+        total_rows = con.execute(
+            f"SELECT COUNT(*) FROM (\n{sql}\n) AS _preview_count"
+        ).fetchone()[0]
+        result = con.execute(
+            f"SELECT * FROM (\n{sql}\n) AS _preview LIMIT {int(preview_limit)}"
+        ).fetchdf()
 
-        total_rows = len(result)
         total_columns = len(result.columns)
         columns = [str(c) for c in result.columns]
 
         import numpy as np
 
-        preview = result.head(preview_limit).replace({np.nan: None})
+        preview = result.replace({np.nan: None})
         preview_rows = preview.to_dict(orient="records")
 
         return {
             "preview": preview_rows,
             "columns": columns,
-            "total_rows": total_rows,
+            "total_rows": int(total_rows),
             "total_columns": total_columns,
         }
 

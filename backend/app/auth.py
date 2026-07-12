@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+
 import logging
 
 from fastapi import HTTPException, Request
@@ -48,7 +50,9 @@ async def verify_token(request: Request) -> dict:
 
     try:
         supabase = _get_supabase()
-        user_resp = supabase.auth.get_user(token)
+        # Blocking network call — offload so a slow Supabase Auth response
+        # can't stall the event loop for every other in-flight request.
+        user_resp = await asyncio.to_thread(supabase.auth.get_user, token)
         user = user_resp.user
         return {"user_id": user.id, "email": user.email}
     except Exception as exc:

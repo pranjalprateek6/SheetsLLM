@@ -8,9 +8,14 @@ interface AuthState {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  signUp: (email: string, password: string) => Promise<{ error: string | null }>;
+  signUp: (
+    email: string,
+    password: string
+  ) => Promise<{ error: string | null; needsConfirmation?: boolean }>;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
+  resetPassword: (email: string) => Promise<{ error: string | null }>;
+  updatePassword: (password: string) => Promise<{ error: string | null }>;
   getAccessToken: () => string | null;
 }
 
@@ -44,10 +49,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signUp = useCallback(async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signUp({ email, password });
     if (error) return { error: error.message };
-    // If session is returned, user is auto-confirmed (no email confirmation required)
-    if (data.session) return { error: null };
-    // Otherwise, email confirmation is required
-    return { error: null };
+    // A session means auto-confirm is on; no session means Supabase sent a
+    // confirmation email and sign-in will fail until it's clicked.
+    return { error: null, needsConfirmation: !data.session };
   }, []);
 
   const signIn = useCallback(async (email: string, password: string) => {
@@ -60,12 +64,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
   }, []);
 
+  const resetPassword = useCallback(async (email: string) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/auth/reset`,
+    });
+    return { error: error ? error.message : null };
+  }, []);
+
+  const updatePassword = useCallback(async (password: string) => {
+    const { error } = await supabase.auth.updateUser({ password });
+    return { error: error ? error.message : null };
+  }, []);
+
   const getAccessToken = useCallback(() => {
     return session?.access_token ?? null;
   }, [session]);
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signUp, signIn, signOut, getAccessToken }}>
+    <AuthContext.Provider
+      value={{ user, session, loading, signUp, signIn, signOut, resetPassword, updatePassword, getAccessToken }}
+    >
       {children}
     </AuthContext.Provider>
   );

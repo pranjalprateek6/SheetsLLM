@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import uuid
@@ -104,8 +105,8 @@ async def upload(
 
     # ── Convert to Parquet ───────────────────────────────────────────
     try:
-        parquet_bytes, row_count, col_count = convert_to_parquet(
-            file_bytes, filename, sheet_name=sheet_name
+        parquet_bytes, row_count, col_count = await asyncio.to_thread(
+            convert_to_parquet, file_bytes, filename, sheet_name=sheet_name
         )
     except UnreadableFileError as exc:
         # str(exc) is written for humans; the underlying parser error is
@@ -135,7 +136,7 @@ async def upload(
     # ── Upload to Storage ────────────────────────────────────────────
     r2_key = storage.r2_key_for_file(user_id, file_id)
     try:
-        storage.upload_parquet(r2_key, parquet_bytes)
+        await asyncio.to_thread(storage.upload_parquet, r2_key, parquet_bytes)
     except Exception as exc:
         logger.error("Storage upload failed: %s", exc)
         return _json_response(500, "STORAGE_FAILED", "Failed to store file")
@@ -146,8 +147,8 @@ async def upload(
 
     local_path = None
     try:
-        local_path = get_local_parquet(r2_key)
-        schema = get_schema_from_local(local_path)
+        local_path = await asyncio.to_thread(get_local_parquet, r2_key)
+        schema = await asyncio.to_thread(get_schema_from_local, local_path)
     except Exception as exc:
         logger.error("Schema inference failed: %s", exc)
         schema = {"columns": [], "samples": []}
@@ -177,15 +178,15 @@ async def upload(
     # ── Build preview ────────────────────────────────────────────────
     try:
         if not local_path:
-            local_path = get_local_parquet(r2_key)
-        preview = execute_sql_from_local(local_path, "SELECT * FROM data")
+            local_path = await asyncio.to_thread(get_local_parquet, r2_key)
+        preview = await asyncio.to_thread(execute_sql_from_local, local_path, "SELECT * FROM data")
     except Exception as exc:
         logger.error("Preview query failed: %s", exc)
         preview = {"columns": [], "preview": [], "total_rows": 0, "total_columns": 0}
 
     # ── Auto-insights ─────────────────────────────────────────────────
     try:
-        insights = generate_insights(local_path) if local_path else None
+        insights = (await asyncio.to_thread(generate_insights, local_path)) if local_path else None
     except Exception as exc:
         logger.error("Insights generation failed: %s", exc)
         insights = None

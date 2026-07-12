@@ -25,7 +25,7 @@ def _json_response(status: int, code: str, message: str, **extra) -> Response:
 
 
 @router.get("/files")
-async def list_files(
+def list_files(
     request: Request,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
@@ -41,7 +41,7 @@ async def list_files(
 
 
 @router.get("/files/{file_id}")
-async def get_file(request: Request, file_id: str):
+def get_file(request: Request, file_id: str):
     user_id = getattr(request.state, "user_id", "anonymous")
     file_rec = db.get_file(file_id, user_id)
     if not file_rec:
@@ -80,7 +80,7 @@ async def update_file(request: Request, file_id: str):
 
 
 @router.delete("/files/{file_id}")
-async def delete_file(request: Request, file_id: str):
+def delete_file(request: Request, file_id: str):
     user_id = getattr(request.state, "user_id", "anonymous")
 
     file_rec = db.get_file(file_id, user_id)
@@ -115,7 +115,7 @@ async def delete_file(request: Request, file_id: str):
 
 
 @router.post("/files/{file_id}/duplicate")
-async def duplicate_file(request: Request, file_id: str):
+def duplicate_file(request: Request, file_id: str):
     user_id = getattr(request.state, "user_id", "anonymous")
 
     file_rec = db.get_file(file_id, user_id)
@@ -173,7 +173,7 @@ async def duplicate_file(request: Request, file_id: str):
 
 
 @router.get("/files/{file_id}/history")
-async def get_history(request: Request, file_id: str):
+def get_history(request: Request, file_id: str):
     user_id = getattr(request.state, "user_id", "anonymous")
 
     file_rec = db.get_file(file_id, user_id)
@@ -192,7 +192,7 @@ async def get_history(request: Request, file_id: str):
 
 
 @router.post("/files/{file_id}/revert/{step_num}")
-async def revert_to_step(request: Request, file_id: str, step_num: int):
+def revert_to_step(request: Request, file_id: str, step_num: int):
     user_id = getattr(request.state, "user_id", "anonymous")
 
     file_rec = db.get_file(file_id, user_id)

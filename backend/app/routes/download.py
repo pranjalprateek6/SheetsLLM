@@ -25,7 +25,7 @@ def _json_response(status: int, code: str, message: str, **extra) -> Response:
 
 
 @router.get("/download")
-async def download(
+def download(
     request: Request,
     file_id: str = Query(...),
     format: str = Query("csv"),

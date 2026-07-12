@@ -37,7 +37,7 @@ def _require_real_user(request: Request) -> str | None:
 
 
 @router.get("/billing/status")
-async def billing_status(request: Request):
+def billing_status(request: Request):
     user_id = getattr(request.state, "user_id", "anonymous")
     return {
         "tier": usage.get_user_tier(user_id),
@@ -46,7 +46,7 @@ async def billing_status(request: Request):
 
 
 @router.post("/billing/checkout")
-async def checkout(request: Request):
+def checkout(request: Request):
     user_id = _require_real_user(request)
     if not user_id:
         return _json_response(401, "UNAUTHORIZED", "Sign in to subscribe")
@@ -63,7 +63,7 @@ async def checkout(request: Request):
 
 
 @router.post("/billing/cancel")
-async def cancel(request: Request):
+def cancel(request: Request):
     user_id = _require_real_user(request)
     if not user_id:
         return _json_response(401, "UNAUTHORIZED", "Sign in to manage billing")

@@ -16,7 +16,12 @@ def _get_gemini_client():
     if _GEMINI_CLIENT is None:
         if not GEMINI_API_KEY:
             raise RuntimeError("GEMINI_API_KEY not set")
-        _GEMINI_CLIENT = genai.Client(api_key=GEMINI_API_KEY)
+        _GEMINI_CLIENT = genai.Client(
+            api_key=GEMINI_API_KEY,
+            # Without an explicit timeout the SDK can hang indefinitely on a
+            # stalled connection and pin its worker thread forever (value ms).
+            http_options=types.HttpOptions(timeout=60_000),
+        )
     return _GEMINI_CLIENT
 
 

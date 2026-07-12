@@ -10,6 +10,6 @@ router = APIRouter()
 
 
 @router.get("/usage")
-async def get_usage(request: Request):
+def get_usage(request: Request):
     user_id = getattr(request.state, "user_id", "anonymous")
     return usage.summary(user_id)
