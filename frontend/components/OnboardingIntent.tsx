@@ -19,11 +19,18 @@ export const INTENTS_KEY = "sllm_intents";
 
 export type Intent = "sales" | "hr" | "survey" | "other";
 
+export const INTENT_LABELS: Record<Intent, string> = {
+  sales: "Sales & revenue",
+  hr: "People & HR",
+  survey: "Surveys & feedback",
+  other: "All sorts",
+};
+
 const OPTIONS: { key: Intent; label: string; icon: typeof BarChart3 }[] = [
-  { key: "sales", label: "Sales & revenue", icon: BarChart3 },
-  { key: "hr", label: "People & HR", icon: Users },
-  { key: "survey", label: "Surveys & feedback", icon: ClipboardList },
-  { key: "other", label: "All sorts", icon: Sparkles },
+  { key: "sales", label: INTENT_LABELS.sales, icon: BarChart3 },
+  { key: "hr", label: INTENT_LABELS.hr, icon: Users },
+  { key: "survey", label: INTENT_LABELS.survey, icon: ClipboardList },
+  { key: "other", label: INTENT_LABELS.other, icon: Sparkles },
 ];
 
 export function loadIntents(): Intent[] | null {
@@ -48,10 +55,14 @@ export default function OnboardingIntent({
 }) {
   const [selected, setSelected] = useState<Intent[]>([]);
 
+  // "All sorts" means no routing preference — it can't combine with a
+  // specific domain, so selecting either side clears the other.
   const toggle = (key: Intent) =>
-    setSelected((prev) =>
-      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
-    );
+    setSelected((prev) => {
+      if (prev.includes(key)) return prev.filter((k) => k !== key);
+      if (key === "other") return ["other"];
+      return [...prev.filter((k) => k !== "other"), key];
+    });
 
   const confirm = () => {
     saveIntents(selected);
