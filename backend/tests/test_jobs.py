@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+import uuid
 from types import SimpleNamespace
 
 import pytest
@@ -204,33 +205,56 @@ class TestWriteThrough:
 
 class TestRestartRecovery:
     def test_orphaned_processing_job_marked_failed(self, monkeypatch):
-        table = FakeTable(rows=[_db_row("j1", status="processing")])
+        jid = str(uuid.uuid4())
+        table = FakeTable(rows=[_db_row(jid, status="processing")])
         monkeypatch.setattr(jobs, "_table", lambda: table)
 
-        job = jobs.get_job("j1", user_id="u1")
+        job = jobs.get_job(jid, user_id="u1")
         assert job["status"] == "failed"
         assert job["error"] == jobs.LOST_JOB_ERROR
         # And the persisted copy was flipped too, guarded on status
         mark = table.ops("update")[-1]
         assert mark.payload["status"] == "failed"
-        assert ("eq", "id", "j1") in mark.filters
+        assert ("eq", "id", jid) in mark.filters
         assert ("eq", "status", "processing") in mark.filters
 
     def test_completed_job_survives_restart(self, monkeypatch):
+        jid = str(uuid.uuid4())
         table = FakeTable(rows=[
-            _db_row("j2", status="completed", progress=100, result={"rows": 9}),
+            _db_row(jid, status="completed", progress=100, result={"rows": 9}),
         ])
         monkeypatch.setattr(jobs, "_table", lambda: table)
 
-        job = jobs.get_job("j2", user_id="u1")
+        job = jobs.get_job(jid, user_id="u1")
         assert job["status"] == "completed"
         assert job["result"] == {"rows": 9}
-        assert job["job_id"] == "j2"
+        assert job["job_id"] == jid
         # ISO timestamps normalized to epoch floats like memory jobs
         assert isinstance(job["created_at"], float)
         assert table.ops("update") == []  # nothing to flip
 
-    def test_db_fallback_enforces_ownership(self, monkeypatch):
-        table = FakeTable(rows=[_db_row("j3", user_id="someone-else")])
+    def test_recovered_job_cached_in_memory(self, monkeypatch):
+        jid = str(uuid.uuid4())
+        table = FakeTable(rows=[_db_row(jid, status="processing")])
         monkeypatch.setattr(jobs, "_table", lambda: table)
-        assert jobs.get_job("j3", user_id="u1") is None
+
+        first = jobs.get_job(jid, user_id="u1")
+        assert first["status"] == "failed"
+        selects_after_first = len(table.ops("select"))
+
+        # Second poll must be served from memory — no further DB reads
+        second = jobs.get_job(jid, user_id="u1")
+        assert second["status"] == "failed"
+        assert len(table.ops("select")) == selects_after_first
+
+    def test_non_uuid_job_id_skips_db(self, monkeypatch):
+        table = FakeTable(rows=[])
+        monkeypatch.setattr(jobs, "_table", lambda: table)
+        assert jobs.get_job("not-a-uuid") is None
+        assert table.ops("select") == []
+
+    def test_db_fallback_enforces_ownership(self, monkeypatch):
+        jid = str(uuid.uuid4())
+        table = FakeTable(rows=[_db_row(jid, user_id="someone-else")])
+        monkeypatch.setattr(jobs, "_table", lambda: table)
+        assert jobs.get_job(jid, user_id="u1") is None

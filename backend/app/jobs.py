@@ -132,6 +132,12 @@ def get_job(job_id: str, user_id: str | None = None) -> dict | None:
         return dict(job)
 
     # Memory miss — the process may have restarted mid-job.
+    try:
+        uuid.UUID(job_id)
+    except ValueError:
+        # Not a job ID we could ever have issued; skip the DB roundtrip
+        # (postgrest would 400 on the UUID column and pollute the logs).
+        return None
     resp = _db_call("select", lambda: (
         _table().select("*").eq("id", job_id).limit(1).execute()
     ))
@@ -150,7 +156,11 @@ def get_job(job_id: str, user_id: str | None = None) -> dict | None:
             "updated_at": _now_iso(),
         }).eq("id", job_id).eq("status", "processing").execute())
         logger.warning("Job %s found orphaned after restart — marked failed", job_id)
-    return persisted
+    # Cache the recovered job so repeat polls stay in memory (normal
+    # eviction applies — recovered jobs are always terminal states).
+    with _lock:
+        _jobs.setdefault(job_id, dict(persisted))
+    return dict(persisted)
 
 
 def update_job(
