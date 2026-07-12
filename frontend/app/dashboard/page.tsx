@@ -162,7 +162,7 @@ export default function DashboardPage() {
       toast.success(`Deleted "${name}"`);
     } catch (e) {
       console.error("Delete failed:", e);
-      toast.error(`Couldn't delete "${name}" . The file is untouched.`);
+      toast.error(`Couldn't delete "${name}". The file is untouched.`);
     } finally { setActionLoading(null); }
   };
 

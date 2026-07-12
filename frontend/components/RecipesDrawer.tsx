@@ -95,10 +95,14 @@ export default function RecipesDrawer({
       setError(null);
       setNotice(null);
       setUpgradeWall(null);
+      // Reset the save form so a stale name from a previous file can't
+      // block the smart default on the next open.
+      setShowSave(false);
+      setName("");
       fetchRecipes();
       fetchStepCount();
     }
-  }, [open, fetchRecipes, fetchStepCount]);
+  }, [open, fileId, fetchRecipes, fetchStepCount]);
 
   const saveRecipe = async () => {
     if (!fileId || !name.trim()) return;

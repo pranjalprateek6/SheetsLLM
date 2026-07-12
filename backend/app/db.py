@@ -420,7 +420,7 @@ def count_audit_actions(user_id: str, action: str, since_iso: str) -> int:
         .eq("user_id", user_id)
         .eq("action", action)
         .gte("created_at", since_iso)
-        .limit(1)
+        .limit(0)  # count only — no row payload needed
         .execute()
     )
     return resp.count or 0
