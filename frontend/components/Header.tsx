@@ -51,7 +51,7 @@ export default function Header() {
     setMobileOpen(false);
   }, [pathname]);
 
-  if (pathname === "/auth") return null;
+  if (pathname.startsWith("/auth")) return null;
 
   const togglePrivacy = async () => {
     if (privacyMode === null) return; // still loading the authoritative value

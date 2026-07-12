@@ -2,6 +2,28 @@
 
 from __future__ import annotations
 
+import re
+
+# DuckDB wraps data literals in single quotes ("Could not convert string
+# 'jane@acme.com' ..."); identifiers use double quotes. Redacting the
+# single-quoted spans removes cell values while keeping column references,
+# so the retry can still fix the query.
+_SINGLE_QUOTED = re.compile(r"'(?:[^']|'')*'")
+
+
+def sanitize_error_for_llm(error: str, *, privacy_mode: bool) -> str:
+    """Make a DuckDB error safe to forward to the LLM.
+
+    Always trims to the first line (sniffer errors are walls of text). In
+    strict privacy mode, additionally redacts single-quoted literals, which
+    is where DuckDB embeds offending cell values — those must never reach
+    the model.
+    """
+    first_line = error.strip().splitlines()[0][:500] if error.strip() else "execution failed"
+    if privacy_mode:
+        return _SINGLE_QUOTED.sub("'<redacted>'", first_line)
+    return first_line
+
 SYSTEM_PROMPT = """You are a SQL query generator for DuckDB.
 
 Given a table schema and a natural language instruction, return a single SELECT statement.

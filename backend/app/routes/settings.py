@@ -22,7 +22,7 @@ def _json_response(status: int, code: str, message: str, **extra) -> Response:
 
 
 @router.get("/settings")
-async def get_settings(request: Request):
+def get_settings(request: Request):
     user_id = getattr(request.state, "user_id", "anonymous")
     row = db.get_user_settings(user_id)
     return {"privacy_mode": bool(row and row.get("privacy_mode"))}

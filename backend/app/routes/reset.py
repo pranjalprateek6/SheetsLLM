@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 
@@ -47,8 +48,8 @@ async def reset(request: Request):
     deleted_count = db.delete_all_transformations(file_id)
 
     # ── Return original data ───────────────────────────────────────────
-    local_path = get_local_parquet(r2_key)
-    result = execute_sql_from_local(local_path, "SELECT * FROM data")
+    local_path = await asyncio.to_thread(get_local_parquet, r2_key)
+    result = await asyncio.to_thread(execute_sql_from_local, local_path, "SELECT * FROM data")
 
     # ── Update file metadata to original counts ────────────────────────
     try:

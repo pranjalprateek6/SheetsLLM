@@ -10,6 +10,7 @@ Integrates:
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from time import perf_counter
@@ -30,7 +31,12 @@ from app.engine import (
     replay_transformations_local,
 )
 from app.llm.factory import get_llm
-from app.llm.prompts import SYSTEM_PROMPT, build_retry_message, build_user_message
+from app.llm.prompts import (
+    SYSTEM_PROMPT,
+    build_retry_message,
+    build_user_message,
+    sanitize_error_for_llm,
+)
 from app.security import RateLimitExceeded, check_rate_limit
 from app.sql_validator import SQLValidationError, validate_sql
 from app import events, usage
@@ -109,7 +115,8 @@ def _execute_transform(r2_key: str, steps: list[dict], sql: str) -> dict:
 
 
 def _execute_with_retry(
-    r2_key: str, steps: list[dict], sql: str, instruction: str, schema: dict
+    r2_key: str, steps: list[dict], sql: str, instruction: str, schema: dict,
+    *, privacy_mode: bool = False,
 ) -> tuple[dict, str]:
     """
     Execute the SQL. On failure, ask the LLM to fix it and retry once.
@@ -123,7 +130,8 @@ def _execute_with_retry(
 
     # ── Retry: send error back to LLM ──────────────────────────────
     try:
-        retry_message = build_retry_message(instruction, sql, str(first_error))
+        safe_error = sanitize_error_for_llm(str(first_error), privacy_mode=privacy_mode)
+        retry_message = build_retry_message(instruction, sql, safe_error)
         llm = get_llm()
         raw_retry = llm.generate_sql(SYSTEM_PROMPT, retry_message)
         fixed_sql = validate_sql(raw_retry)
@@ -188,11 +196,14 @@ def _run_transform_job(
     sql: str,
     schema: dict,
     start_time: float,
+    privacy_mode: bool = False,
 ) -> None:
     """Background task for large-file transforms."""
     try:
         jobs.update_job(job_id, progress=30)
-        result, final_sql = _execute_with_retry(r2_key, steps, sql, instruction, schema)
+        result, final_sql = _execute_with_retry(
+            r2_key, steps, sql, instruction, schema, privacy_mode=privacy_mode
+        )
 
         jobs.update_job(job_id, progress=70)
         step_number = _save_transform(
@@ -268,15 +279,16 @@ async def transform(request: Request, background_tasks: BackgroundTasks):
     # ── Get current schema ─────────────────────────────────────────────
     steps = db.get_transformations(file_id)
     try:
-        schema = _get_current_schema(r2_key, steps)
+        schema = await asyncio.to_thread(_get_current_schema, r2_key, steps)
     except Exception as exc:
         logger.error("Schema retrieval failed: %s", exc)
         return _json_response(500, "SCHEMA_FAILED", f"Schema retrieval failed: {exc}")
 
     # ── Generate / cache SQL ───────────────────────────────────────────
+    privacy_mode = db.get_privacy_mode(user_id)
     try:
-        sql_or_clarification = _generate_or_cache_sql(
-            instruction, schema, privacy_mode=db.get_privacy_mode(user_id)
+        sql_or_clarification = await asyncio.to_thread(
+            _generate_or_cache_sql, instruction, schema, privacy_mode=privacy_mode
         )
     except SQLValidationError as exc:
         return _json_response(
@@ -305,13 +317,16 @@ async def transform(request: Request, background_tasks: BackgroundTasks):
         background_tasks.add_task(
             _run_transform_job,
             job_id, file_id, user_id, r2_key, steps,
-            instruction, sql, schema, start_time,
+            instruction, sql, schema, start_time, privacy_mode,
         )
         return {"job_id": job_id, "status": "processing"}
 
     # ── Sync execution with retry ──────────────────────────────────────
     try:
-        result, final_sql = _execute_with_retry(r2_key, steps, sql, instruction, schema)
+        result, final_sql = await asyncio.to_thread(
+            _execute_with_retry,
+            r2_key, steps, sql, instruction, schema, privacy_mode=privacy_mode,
+        )
     except Exception as exc:
         logger.error("SQL execution failed: %s | sql=%s", exc, sql)
         return _json_response(

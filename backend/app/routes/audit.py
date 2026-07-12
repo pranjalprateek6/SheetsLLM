@@ -10,7 +10,7 @@ router = APIRouter()
 
 
 @router.get("/audit/{file_id}")
-async def get_audit_log(
+def get_audit_log(
     request: Request,
     file_id: str,
     page: int = Query(1, ge=1),

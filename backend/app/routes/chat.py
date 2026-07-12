@@ -3,6 +3,7 @@ GET /chat/{file_id} — Retrieve chat history for a file.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from time import perf_counter
@@ -19,7 +20,13 @@ from app.engine import (
     replay_transformations_local,
 )
 from app.llm.factory import get_llm
-from app.llm.prompts import SYSTEM_PROMPT, build_user_message, build_retry_message, CHAT_SYSTEM_PROMPT
+from app.llm.prompts import (
+    CHAT_SYSTEM_PROMPT,
+    SYSTEM_PROMPT,
+    build_retry_message,
+    build_user_message,
+    sanitize_error_for_llm,
+)
 from app.security import RateLimitExceeded, check_rate_limit
 from app.sql_validator import SQLValidationError, validate_sql
 from app.config import MAX_INSTRUCTION_LENGTH
@@ -64,7 +71,7 @@ def _is_insight_response(raw: str) -> dict | None:
 
 
 @router.get("/chat/{file_id}")
-async def get_chat_history(file_id: str, request: Request):
+def get_chat_history(file_id: str, request: Request):
     """Retrieve chat messages for a file."""
     user_id = getattr(request.state, "user_id", "anonymous")
 
@@ -131,8 +138,8 @@ async def chat(request: Request):
     # Get current schema (real dtypes + samples, reflecting all existing steps)
     steps = db.get_transformations(file_id)
     try:
-        local_path = get_local_parquet(r2_key)
-        schema = get_schema_after_steps(local_path, steps)
+        local_path = await asyncio.to_thread(get_local_parquet, r2_key)
+        schema = await asyncio.to_thread(get_schema_after_steps, local_path, steps)
     except Exception as exc:
         logger.error("Schema retrieval failed: %s", exc)
         return _json_response(500, "SCHEMA_FAILED", f"Schema retrieval failed: {exc}")
@@ -142,15 +149,16 @@ async def chat(request: Request):
     conversation_context = _build_conversation_context(recent_messages)
 
     # Generate response with conversational context
+    privacy_mode = db.get_privacy_mode(user_id)
     user_message = build_user_message(
-        message, schema, privacy_mode=db.get_privacy_mode(user_id)
+        message, schema, privacy_mode=privacy_mode
     )
     if conversation_context:
         user_message = f"Previous conversation:\n{conversation_context}\n\nNew request:\n{user_message}"
 
     llm = get_llm()
     try:
-        raw = llm.generate_sql(CHAT_SYSTEM_PROMPT, user_message)
+        raw = await asyncio.to_thread(llm.generate_sql, CHAT_SYSTEM_PROMPT, user_message)
     except Exception as exc:
         logger.error("LLM generation failed: %s", exc)
         return _json_response(502, "LLM_FAILED", f"LLM error: {exc}")
@@ -196,17 +204,18 @@ async def chat(request: Request):
 
     # Execute with retry
     try:
-        local_path = get_local_parquet(r2_key)
+        local_path = await asyncio.to_thread(get_local_parquet, r2_key)
         new_steps = steps + [{"step_number": len(steps) + 1, "sql_query": sql}]
-        result = replay_transformations_local(local_path, new_steps)
+        result = await asyncio.to_thread(replay_transformations_local, local_path, new_steps)
     except Exception as first_error:
         logger.warning("First execution failed, attempting retry: %s", first_error)
         try:
-            retry_message = build_retry_message(message, sql, str(first_error))
-            raw_retry = llm.generate_sql(CHAT_SYSTEM_PROMPT, retry_message)
+            safe_error = sanitize_error_for_llm(str(first_error), privacy_mode=privacy_mode)
+            retry_message = build_retry_message(message, sql, safe_error)
+            raw_retry = await asyncio.to_thread(llm.generate_sql, CHAT_SYSTEM_PROMPT, retry_message)
             fixed_sql = validate_sql(raw_retry)
             new_steps = steps + [{"step_number": len(steps) + 1, "sql_query": fixed_sql}]
-            result = replay_transformations_local(local_path, new_steps)
+            result = await asyncio.to_thread(replay_transformations_local, local_path, new_steps)
             sql = fixed_sql
         except Exception as retry_error:
             logger.error("Retry also failed: %s", retry_error)

@@ -25,7 +25,7 @@ def _json_response(status: int, code: str, message: str, **extra) -> Response:
 
 
 @router.get("/insights/{file_id}")
-async def get_insights(file_id: str, request: Request):
+def get_insights(file_id: str, request: Request):
     """Get auto-generated insights for a file."""
     user_id = getattr(request.state, "user_id", "anonymous")
 

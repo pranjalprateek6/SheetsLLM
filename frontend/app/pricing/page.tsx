@@ -107,6 +107,8 @@ function PricingContent() {
     }, 4000);
   };
 
+  const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
+
   const upgrade = async () => {
     setBusy(true);
     setError(null);
@@ -114,6 +116,10 @@ function PricingContent() {
       const r = await fetchWithAuth("/api/billing/checkout", { method: "POST" });
       const d = await r.json();
       if (r.ok && d.url) {
+        setCheckoutUrl(d.url);
+        // Popup blockers return null from window.open — keep the URL so the
+        // waiting banner can offer a direct link instead of pointing at a
+        // tab that never opened.
         window.open(d.url, "_blank", "noopener");
         startPolling();
       } else {
@@ -178,12 +184,22 @@ function PricingContent() {
         </div>
       )}
       {awaitingPayment && (
-        <div className="mb-6 flex items-center justify-center gap-3 rounded-lg border bg-card p-3 text-sm shadow-xs">
+        <div className="mb-6 flex flex-wrap items-center justify-center gap-3 rounded-lg border bg-card p-3 text-sm shadow-xs">
           <Loader2 className="h-4 w-4 animate-spin text-primary" />
           <span>
             Complete the payment in the Razorpay tab — this page updates automatically once
             it goes through.
           </span>
+          {checkoutUrl && (
+            <a
+              href={checkoutUrl}
+              target="_blank"
+              rel="noopener"
+              className="font-medium text-primary underline-offset-2 hover:underline"
+            >
+              Tab didn&apos;t open? Click here
+            </a>
+          )}
           <button onClick={stopPolling} className="text-muted-foreground underline-offset-2 hover:underline">
             Cancel
           </button>

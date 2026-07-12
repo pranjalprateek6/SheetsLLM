@@ -9,6 +9,7 @@ POST   /recipes/{id}/apply   append the recipe's steps to another file
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from time import perf_counter
@@ -117,7 +118,7 @@ async def create_recipe(request: Request):
 
 
 @router.get("/recipes")
-async def list_recipes(request: Request):
+def list_recipes(request: Request):
     user_id = getattr(request.state, "user_id", "anonymous")
     recipes = db.list_recipes(user_id)
     return {
@@ -136,7 +137,7 @@ async def list_recipes(request: Request):
 
 
 @router.get("/recipes/{recipe_id}")
-async def get_recipe(request: Request, recipe_id: str):
+def get_recipe(request: Request, recipe_id: str):
     user_id = getattr(request.state, "user_id", "anonymous")
     recipe = db.get_recipe(recipe_id, user_id)
     if not recipe:
@@ -145,7 +146,7 @@ async def get_recipe(request: Request, recipe_id: str):
 
 
 @router.delete("/recipes/{recipe_id}")
-async def delete_recipe(request: Request, recipe_id: str):
+def delete_recipe(request: Request, recipe_id: str):
     user_id = getattr(request.state, "user_id", "anonymous")
     if not db.delete_recipe(recipe_id, user_id):
         return _json_response(404, "RECIPE_NOT_FOUND", "Recipe not found")
@@ -192,8 +193,8 @@ async def apply_recipe(request: Request, recipe_id: str):
     # Dry run + execute: replay includes an EXPLAIN before execution, which is
     # the authoritative compatibility check for the target file's schema.
     try:
-        local_path = get_local_parquet(file_rec["r2_key"])
-        result = replay_transformations_local(local_path, combined)
+        local_path = await asyncio.to_thread(get_local_parquet, file_rec["r2_key"])
+        result = await asyncio.to_thread(replay_transformations_local, local_path, combined)
     except Exception as exc:
         target_cols = [c.get("name") for c in _base_columns(file_rec)]
         missing = missing_columns(recipe.get("required_columns") or [], target_cols)

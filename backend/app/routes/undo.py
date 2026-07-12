@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 
@@ -53,12 +54,12 @@ async def undo(request: Request):
     db.delete_transformations_after(file_id, last_step - 1)
 
     # ── Replay remaining steps (or original if none left) ──────────────
-    local_path = get_local_parquet(r2_key)
+    local_path = await asyncio.to_thread(get_local_parquet, r2_key)
     remaining_steps = steps[:-1]
     if remaining_steps:
-        result = replay_transformations_local(local_path, remaining_steps)
+        result = await asyncio.to_thread(replay_transformations_local, local_path, remaining_steps)
     else:
-        result = execute_sql_from_local(local_path, "SELECT * FROM data")
+        result = await asyncio.to_thread(execute_sql_from_local, local_path, "SELECT * FROM data")
 
     # ── Update file metadata ───────────────────────────────────────────
     try:
