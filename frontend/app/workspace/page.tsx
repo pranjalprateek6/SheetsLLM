@@ -69,6 +69,7 @@ function WorkspaceContent() {
   const [showSheetSelector, setShowSheetSelector] = useState(false);
   const [availableSheets, setAvailableSheets] = useState<string[]>([]);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [pendingUploadId, setPendingUploadId] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [recipesOpen, setRecipesOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(true);
@@ -136,15 +137,30 @@ function WorkspaceContent() {
     }
   };
 
-  const onUpload = async (file: File, sheetName?: string, suggestions?: string[]) => {
+  const onUpload = async (file: File, sheetName?: string, suggestions?: string[], pendingId?: string | null) => {
     setLoading(true);
     setSampleSuggestions(suggestions ?? null);
     setUploadError(null);
     try {
-      const url = sheetName ? `/api/upload?sheet_name=${encodeURIComponent(sheetName)}` : "/api/upload";
-      const form = new FormData();
-      form.append("file", file);
-      const r = await fetchWithAuth(url, { method: "POST", body: form });
+      const params = new URLSearchParams();
+      if (sheetName) params.set("sheet_name", sheetName);
+      if (pendingId) params.set("pending_id", pendingId);
+      const qs = params.toString();
+      const url = `/api/upload${qs ? `?${qs}` : ""}`;
+
+      let r: Response;
+      if (pendingId) {
+        // The backend still has the bytes stashed — no re-upload needed
+        r = await fetchWithAuth(url, { method: "POST" });
+        if (r.status === 410) {
+          // Stash expired — fall back to re-uploading the file itself
+          return await onUpload(file, sheetName, suggestions);
+        }
+      } else {
+        const form = new FormData();
+        form.append("file", file);
+        r = await fetchWithAuth(url, { method: "POST", body: form });
+      }
       const data = await r.json();
 
       if (!r.ok) {
@@ -155,6 +171,7 @@ function WorkspaceContent() {
       if (data.requires_sheet_selection && data.sheets) {
         setAvailableSheets(data.sheets);
         setPendingFile(file);
+        setPendingUploadId(data.file_id ?? null);
         setShowSheetSelector(true);
         return false;
       }
@@ -188,7 +205,8 @@ function WorkspaceContent() {
   const handleSheetSelect = (sheetName: string) => {
     if (pendingFile) {
       setShowSheetSelector(false);
-      onUpload(pendingFile, sheetName);
+      onUpload(pendingFile, sheetName, undefined, pendingUploadId);
+      setPendingUploadId(null);
     }
   };
 
@@ -597,7 +615,7 @@ function WorkspaceContent() {
           }}
         />
         <ConfirmDialog isOpen={showResetDialog} onConfirm={handleFullReset} onCancel={() => setShowResetDialog(false)} title="Are you sure you want to reset?" message="This will clear your current work and return to the upload screen." confirmText="Reset" cancelText="Cancel" items={["Clear your current file and all transformations", "Return to the upload screen"]} />
-        <SheetSelector isOpen={showSheetSelector} sheets={availableSheets} onSelect={handleSheetSelect} onCancel={() => { setShowSheetSelector(false); setPendingFile(null); setLoading(false); }} />
+        <SheetSelector isOpen={showSheetSelector} sheets={availableSheets} onSelect={handleSheetSelect} onCancel={() => { setShowSheetSelector(false); setPendingFile(null); setPendingUploadId(null); setLoading(false); }} />
         <ChartPanel columns={columns} rows={rows} open={chartOpen} onClose={() => setChartOpen(false)} />
         <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} onUpload={handleFullReset} onUndo={handleUndo} onDownload={handleDownload} onReset={handleResetClick} onChat={() => setChatOpen(true)} onHistory={() => setHistoryOpen(true)} fileId={fileId} />
       </div>

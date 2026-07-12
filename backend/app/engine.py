@@ -427,7 +427,13 @@ def detect_sheets(file_bytes: bytes, filename: str) -> list[str] | None:
 
     import pandas as pd
 
-    excel = pd.ExcelFile(io.BytesIO(file_bytes))
+    try:
+        excel = pd.ExcelFile(io.BytesIO(file_bytes))
+    except Exception as exc:
+        # Corrupt/truncated workbook — don't 500 here; let the conversion
+        # path produce its friendly CONVERSION_FAILED error instead.
+        logger.warning("Sheet detection failed for %s: %s", filename, exc)
+        return None
     if len(excel.sheet_names) > 1:
         return excel.sheet_names
     return None

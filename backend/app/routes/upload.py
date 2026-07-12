@@ -11,7 +11,7 @@ from time import perf_counter
 from fastapi import APIRouter, Header, HTTPException, Query, Request, Response
 
 from app.config import MAX_COLUMNS, MAX_UPLOAD_MB, UPLOAD_MAX_BYTES
-from app import db, storage
+from app import cache, db, storage
 from app.engine import (
     UnreadableFileError,
     convert_to_parquet,
@@ -44,6 +44,7 @@ async def upload(
     request: Request,
     x_filename: str = Header(default="upload.csv"),
     sheet_name: str | None = Query(None),
+    pending_id: str | None = Query(None),
 ):
     request_id = getattr(request.state, "request_id", "unknown")
     user_id = getattr(request.state, "user_id", "anonymous")
@@ -58,32 +59,45 @@ async def upload(
         events.record(user_id, "paywall_hit", action="uploads", used=exc.used, limit=exc.limit)
         return _json_response(429, "USAGE_LIMIT_EXCEEDED", str(exc))
 
-    # ── Stream upload with size check ────────────────────────────────
-    content_length = request.headers.get("content-length")
-    if content_length:
-        try:
-            if int(content_length) > UPLOAD_MAX_BYTES:
+    if pending_id is not None:
+        # ── Redeem a stashed multi-sheet upload (no re-POST of bytes) ─
+        pending = cache.get_pending_upload(pending_id, user_id)
+        if pending is None:
+            return _json_response(
+                410, "PENDING_UPLOAD_EXPIRED",
+                "The uploaded file is no longer cached — please upload it again.",
+            )
+        file_bytes, filename = pending
+        # Reuse the provisional id: no record was created under it, the
+        # stash key is server-issued, and it keeps redeem idempotent.
+        file_id = pending_id
+    else:
+        # ── Stream upload with size check ─────────────────────────────
+        content_length = request.headers.get("content-length")
+        if content_length:
+            try:
+                if int(content_length) > UPLOAD_MAX_BYTES:
+                    return _json_response(
+                        413, "UPLOAD_TOO_LARGE", f"Max upload size is {MAX_UPLOAD_MB} MB"
+                    )
+            except ValueError:
+                pass
+
+        chunks: list[bytes] = []
+        bytes_seen = 0
+        async for chunk in request.stream():
+            if not chunk:
+                continue
+            bytes_seen += len(chunk)
+            if bytes_seen > UPLOAD_MAX_BYTES:
                 return _json_response(
                     413, "UPLOAD_TOO_LARGE", f"Max upload size is {MAX_UPLOAD_MB} MB"
                 )
-        except ValueError:
-            pass
+            chunks.append(chunk)
 
-    chunks: list[bytes] = []
-    bytes_seen = 0
-    async for chunk in request.stream():
-        if not chunk:
-            continue
-        bytes_seen += len(chunk)
-        if bytes_seen > UPLOAD_MAX_BYTES:
-            return _json_response(
-                413, "UPLOAD_TOO_LARGE", f"Max upload size is {MAX_UPLOAD_MB} MB"
-            )
-        chunks.append(chunk)
-
-    file_bytes = b"".join(chunks)
-    if not file_bytes:
-        return _json_response(400, "EMPTY_FILE", "No file data received")
+        file_bytes = b"".join(chunks)
+        if not file_bytes:
+            return _json_response(400, "EMPTY_FILE", "No file data received")
 
     # ── Security validation ────────────────────────────────────────────
     try:
@@ -97,6 +111,10 @@ async def upload(
     if sheet_name is None:
         sheets = detect_sheets(file_bytes, filename)
         if sheets:
+            # Stash the bytes so the sheet pick doesn't re-POST the file
+            await asyncio.to_thread(
+                cache.stash_pending_upload, file_id, user_id, filename, file_bytes
+            )
             return {
                 "requires_sheet_selection": True,
                 "sheets": sheets,
@@ -207,6 +225,10 @@ async def upload(
         )
     except Exception:
         pass  # Non-critical
+
+    # The stashed original (if any) has served its purpose
+    if pending_id is not None:
+        cache.discard_pending_upload(pending_id)
 
     usage.record(user_id, uploads=1, rows_processed=row_count)
 
