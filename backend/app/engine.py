@@ -188,6 +188,45 @@ def execute_full_result_local(
     return con.execute(sql)
 
 
+# COPY options per export format. JSON uses ARRAY true so the output is a
+# single array of records, matching the shape pandas to_json(orient='records')
+# used to produce.
+_EXPORT_COPY_OPTIONS = {
+    "csv": "FORMAT CSV, HEADER",
+    "tsv": "FORMAT CSV, HEADER, DELIMITER '\\t'",
+    "json": "FORMAT JSON, ARRAY true",
+    "parquet": "FORMAT PARQUET, COMPRESSION ZSTD",
+}
+
+
+def export_full_result_local(
+    local_path: str | Path,
+    steps: list[dict],
+    fmt: str,
+    out_path: str | Path,
+    *,
+    timeout: int | None = None,
+) -> None:
+    """Replay all steps and COPY the result straight to ``out_path``.
+
+    The result set goes DuckDB → disk without ever materializing in Python
+    memory (a 1M-row fetchdf() could OOM the instance)."""
+    options = _EXPORT_COPY_OPTIONS.get(fmt)
+    if options is None:
+        raise ValueError(f"Unsupported export format: {fmt}")
+    sql = build_replay_sql(steps)
+
+    def _inner():
+        con = get_connection()
+        lp = _sql_path(local_path)
+        con.execute(f"CREATE VIEW data AS SELECT * FROM read_parquet('{lp}')")
+        op = _sql_path(out_path)
+        con.execute(f"COPY (\n{sql}\n) TO '{op}' ({options})")
+
+    t = timeout if timeout is not None else DUCKDB_QUERY_TIMEOUT
+    _run_with_timeout(_inner, timeout=t)
+
+
 # ── Schema Inference ─────────────────────────────────────────────────
 
 
