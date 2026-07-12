@@ -96,6 +96,9 @@ export default function UsageCard({ embedded = false }: { embedded?: boolean }) 
   const maxPct = Math.max(...meters.map((m) => m.pct));
   const showNudge = usage.tier === "free" && maxPct >= NUDGE_THRESHOLD;
   const capped = meters.some((m) => m.limit > 0 && m.used >= m.limit);
+  // Deep-link the pricing page to the cap that triggered the nudge, so it
+  // opens mid-conversation instead of cold.
+  const tightest = meters.reduce((a, b) => (b.pct > a.pct ? b : a), meters[0]);
 
   return (
     <div className={cn(!embedded && "mb-6 rounded-xl border bg-card p-5 shadow-xs")}>
@@ -142,7 +145,7 @@ export default function UsageCard({ embedded = false }: { embedded?: boolean }) 
               : "You're close to a monthly limit on the Free plan."}{" "}
             Pro raises caps to 1,000 uploads and 5,000 transforms.
           </p>
-          <Button size="sm" onClick={() => router.push("/pricing")} className="whitespace-nowrap">
+          <Button size="sm" onClick={() => router.push(`/pricing?reason=${tightest.key}`)} className="whitespace-nowrap">
             <Zap className="mr-1.5 h-3.5 w-3.5" /> Upgrade to Pro
           </Button>
         </div>
