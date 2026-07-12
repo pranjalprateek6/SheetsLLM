@@ -310,7 +310,9 @@ async def transform(request: Request, background_tasks: BackgroundTasks):
 
     # ── Async for large files ──────────────────────────────────────────
     if row_count > _ASYNC_THRESHOLD:
-        job_id = jobs.create_job(
+        # create_job write-throughs to Supabase — keep it off the event loop
+        job_id = await asyncio.to_thread(
+            jobs.create_job,
             user_id, "transform",
             metadata={"file_id": file_id, "instruction": instruction},
         )
