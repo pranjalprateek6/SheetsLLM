@@ -24,14 +24,40 @@ def _json_response(status: int, code: str, message: str, **extra) -> Response:
     )
 
 
+_ALLOWED_SORTS = {"created_at", "name", "row_count"}
+_ALLOWED_DIRS = {"asc", "desc"}
+
+
+def _normalize_sort(sort: str | None, direction: str | None) -> tuple[str, str]:
+    """Validate sort/dir against allowlists, falling back to defaults."""
+    sort = (sort or "").strip().lower()
+    direction = (direction or "").strip().lower()
+    if sort not in _ALLOWED_SORTS:
+        sort = "created_at"
+    if direction not in _ALLOWED_DIRS:
+        direction = "desc"
+    return sort, direction
+
+
 @router.get("/files")
 def list_files(
     request: Request,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
+    q: str | None = Query(None),
+    sort: str = Query("created_at"),
+    dir: str = Query("desc"),
 ):
     user_id = getattr(request.state, "user_id", "anonymous")
-    result = db.list_files(user_id, page=page, page_size=page_size)
+    sort_field, direction = _normalize_sort(sort, dir)
+    result = db.list_files(
+        user_id,
+        page=page,
+        page_size=page_size,
+        q=q,
+        sort=sort_field,
+        direction=direction,
+    )
     return {
         "files": result["items"],
         "total": result["total"],

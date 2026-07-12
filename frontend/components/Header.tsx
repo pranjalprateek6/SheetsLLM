@@ -15,7 +15,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChevronDown, LogOut, Menu, ShieldCheck, User, X } from "lucide-react";
+import { ChevronDown, LogOut, Menu, Moon, ShieldCheck, Sun, User, X } from "lucide-react";
+import { useTheme } from "next-themes";
 
 const APP_LINKS = [
   { href: "/dashboard", label: "Files" },
@@ -28,6 +29,25 @@ const MARKETING_LINKS = [
   { href: "/#privacy", label: "Privacy" },
   { href: "/pricing", label: "Pricing" },
 ];
+
+function ThemeToggle() {
+  const { resolvedTheme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  if (!mounted) return <span className="h-8 w-8" aria-hidden />; // avoid hydration mismatch
+  const dark = resolvedTheme === "dark";
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      className="h-8 w-8 text-muted-foreground"
+      onClick={() => setTheme(dark ? "light" : "dark")}
+      aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
+    >
+      {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+    </Button>
+  );
+}
 
 export default function Header() {
   const pathname = usePathname();
@@ -107,6 +127,7 @@ export default function Header() {
 
         {/* Right side */}
         <div className="hidden items-center gap-2 md:flex">
+          <ThemeToggle />
           {loading ? null : user ? (
             <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
               <DropdownMenuTrigger asChild>
@@ -167,14 +188,17 @@ export default function Header() {
           )}
         </div>
 
-        {/* Mobile menu button */}
+        {/* Mobile: theme + menu */}
+        <div className="flex items-center gap-1 md:hidden">
+        <ThemeToggle />
         <button
           onClick={() => setMobileOpen(!mobileOpen)}
-          className="rounded-md p-2 text-muted-foreground hover:bg-accent md:hidden"
+          className="rounded-md p-2 text-muted-foreground hover:bg-accent"
           aria-label="Toggle menu"
         >
           {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </button>
+        </div>
       </div>
 
       {/* Mobile nav */}

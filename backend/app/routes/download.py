@@ -76,6 +76,15 @@ def download(
         content = buf.getvalue()
         media_type = "application/octet-stream"
         ext = "parquet"
+    elif fmt == "xlsx":
+        df = result_conn.fetchdf()
+        buf = io.BytesIO()
+        df.to_excel(buf, index=False, engine="openpyxl")
+        content = buf.getvalue()
+        media_type = (
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+        ext = "xlsx"
     else:
         return _json_response(400, "INVALID_FORMAT", f"Unsupported format: {fmt}")
 

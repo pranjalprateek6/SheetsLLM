@@ -1,10 +1,14 @@
 "use client";
-import { useRef, useState, useMemo, useCallback } from "react";
+import { useRef, useState, useMemo, useCallback, useEffect } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { ArrowUp, ArrowDown, Check } from "lucide-react";
+import { ArrowUp, ArrowDown, Check, Rows3, Rows4 } from "lucide-react";
 import { TextShimmer } from "@/components/ui/text-shimmer";
 
 type SortDir = "asc" | "desc" | null;
+type Density = "compact" | "comfortable";
+
+const DENSITY_KEY = "sllm_grid_density";
+const ROW_HEIGHT: Record<Density, number> = { compact: 36, comfortable: 44 };
 
 function colLetter(index: number): string {
   let s = "";
@@ -33,6 +37,23 @@ export default function DataGrid({
   const [sortDir, setSortDir] = useState<SortDir>(null);
   const [copiedCell, setCopiedCell] = useState<string | null>(null);
   const [colWidths, setColWidths] = useState<Record<string, number>>({});
+  const [density, setDensity] = useState<Density>("compact");
+
+  // Read persisted density after mount (avoids SSR/client hydration mismatch).
+  useEffect(() => {
+    try {
+      if (window.localStorage.getItem(DENSITY_KEY) === "comfortable") {
+        setDensity("comfortable");
+      }
+    } catch {}
+  }, []);
+
+  const changeDensity = useCallback((d: Density) => {
+    setDensity(d);
+    try {
+      window.localStorage.setItem(DENSITY_KEY, d);
+    } catch {}
+  }, []);
 
   const sortedRows = useMemo(() => {
     if (!sortCol || !sortDir || onSort) return rows;
@@ -54,9 +75,15 @@ export default function DataGrid({
   const rowVirtualizer = useVirtualizer({
     count: sortedRows.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 36,
+    estimateSize: () => ROW_HEIGHT[density],
     overscan: 15,
   });
+
+  // Re-measure virtual rows when density changes so cached sizes are discarded.
+  useEffect(() => {
+    rowVirtualizer.measure();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [density]);
 
   const handleSort = useCallback(
     (col: string) => {
@@ -195,7 +222,7 @@ export default function DataGrid({
                         return (
                           <td
                             key={h}
-                            className="px-2 py-2 align-middle text-xs text-foreground cursor-pointer relative"
+                            className={`px-2 ${density === "comfortable" ? "py-2" : "py-1"} align-middle text-xs text-foreground cursor-pointer relative`}
                             onClick={() => handleCopy(isNull ? "" : String(val), cellKey)}
                             title={isNull ? "NULL" : String(val)}
                           >
@@ -230,6 +257,46 @@ export default function DataGrid({
             )}
           </tbody>
         </table>
+      </div>
+      {/* Status bar */}
+      <div className="flex h-7 flex-shrink-0 items-center justify-between border-t bg-card px-3">
+        <span className="text-[11px] tabular-nums text-muted-foreground">
+          {rows.length.toLocaleString()} rows × {head.length.toLocaleString()} cols
+        </span>
+        <div
+          className="flex items-center gap-0.5 rounded-md bg-muted p-0.5"
+          role="group"
+          aria-label="Row density"
+        >
+          <button
+            type="button"
+            title="Compact rows"
+            aria-label="Compact rows"
+            aria-pressed={density === "compact"}
+            onClick={() => changeDensity("compact")}
+            className={`flex h-5 w-6 items-center justify-center rounded transition-colors ${
+              density === "compact"
+                ? "bg-card text-foreground shadow-xs"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Rows4 className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            title="Comfortable rows"
+            aria-label="Comfortable rows"
+            aria-pressed={density === "comfortable"}
+            onClick={() => changeDensity("comfortable")}
+            className={`flex h-5 w-6 items-center justify-center rounded transition-colors ${
+              density === "comfortable"
+                ? "bg-card text-foreground shadow-xs"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Rows3 className="h-4 w-4" />
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -1,5 +1,6 @@
 """POST /chat — Conversational transform with message history.
 GET /chat/{file_id} — Retrieve chat history for a file.
+DELETE /chat/{file_id} — Clear chat history for a file.
 """
 from __future__ import annotations
 
@@ -82,6 +83,20 @@ def get_chat_history(file_id: str, request: Request):
 
     messages = db.get_chat_messages(file_id)
     return {"file_id": file_id, "messages": messages}
+
+
+@router.delete("/chat/{file_id}")
+def clear_chat_history(file_id: str, request: Request):
+    """Delete all chat messages for a file."""
+    user_id = getattr(request.state, "user_id", "anonymous")
+
+    # Verify file ownership
+    file_rec = db.get_file(file_id, user_id)
+    if not file_rec:
+        return _json_response(404, "FILE_NOT_FOUND", "File not found")
+
+    db.delete_chat_messages(file_id)
+    return {"deleted": True}
 
 
 @router.post("/chat")

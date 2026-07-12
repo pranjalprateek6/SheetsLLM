@@ -1,8 +1,13 @@
 "use client";
 import { useRef, useState, useEffect, useCallback } from "react";
+import { toast } from "sonner";
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
-import { Bot, ChevronDown, Code2, RotateCcw, Send, Sparkles, Undo2, User } from "lucide-react";
+import { Bot, ChevronDown, Code2, Eraser, RotateCcw, Send, Sparkles, Square, Undo2, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { TextShimmer } from "@/components/ui/text-shimmer";
 import { cn } from "@/lib/utils";
 
@@ -40,8 +45,21 @@ export default function ChatPanel({
   const [expandedSql, setExpandedSql] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [stage, setStage] = useState(0);
+  const [confirmClear, setConfirmClear] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  // Staged progress while Sage works — honest labels for the real pipeline
+  // (generate -> validate -> execute), rotated on a timer.
+  const STAGES = ["Writing SQL…", "Validating…", "Running on your data…"];
+  useEffect(() => {
+    if (!sending) { setStage(0); return; }
+    const t = setInterval(() => setStage((v) => Math.min(v + 1, STAGES.length - 1)), 2600);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sending]);
 
   useEffect(() => {
     if (!fileId || !open) return;
@@ -89,11 +107,15 @@ export default function ChatPanel({
       // Reset textarea height
       if (inputRef.current) inputRef.current.style.height = "auto";
 
+      const controller = new AbortController();
+      abortRef.current = controller;
+
       try {
         const res = await fetchWithAuth("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ file_id: fileId, message: msg }),
+          signal: controller.signal,
         });
         const data = await res.json();
 
@@ -114,10 +136,18 @@ export default function ChatPanel({
           setMessages((prev) => [...prev, { role: "assistant", content: data.message, message_type: "insight" }]);
         } else if (data.code) {
           setMessages((prev) => [...prev, { role: "assistant", content: data.message || "Something went wrong.", message_type: "error" }]);
+        } else {
+          // Unrecognized response shape — never let "Thinking…" vanish silently.
+          setMessages((prev) => [...prev, { role: "assistant", content: "I didn't get a usable response — please try rephrasing.", message_type: "error" }]);
         }
-      } catch {
-        setMessages((prev) => [...prev, { role: "assistant", content: "Failed to send message. Please try again.", message_type: "error" }]);
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") {
+          setMessages((prev) => [...prev, { role: "assistant", content: "Stopped. (The request may still finish on the server.)", message_type: "error" }]);
+        } else {
+          setMessages((prev) => [...prev, { role: "assistant", content: "Failed to send message. Please try again.", message_type: "error" }]);
+        }
       } finally {
+        abortRef.current = null;
         setSending(false);
       }
     },
@@ -143,6 +173,18 @@ export default function ChatPanel({
             <h3 className="text-sm font-semibold">Sage</h3>
           </div>
           <div className="flex items-center gap-0.5">
+            {messages.length > 0 && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-muted-foreground"
+                onClick={() => setConfirmClear(true)}
+                title="Clear conversation"
+                aria-label="Clear conversation"
+              >
+                <Eraser className="h-3.5 w-3.5" />
+              </Button>
+            )}
             {onUndo && (
               <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={onUndo} title="Undo last step">
                 <Undo2 className="h-3.5 w-3.5" />
@@ -278,12 +320,48 @@ export default function ChatPanel({
             <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md bg-primary/10">
               <Bot className="h-3 w-3 text-primary" />
             </div>
-            <div className="rounded-xl bg-muted px-3 py-2">
-              <TextShimmer className="text-xs" duration={1}>Thinking…</TextShimmer>
+            <div className="flex items-center gap-2 rounded-xl bg-muted px-3 py-2">
+              <TextShimmer className="text-xs" duration={1}>{STAGES[stage]}</TextShimmer>
+              <button
+                onClick={() => abortRef.current?.abort()}
+                className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground"
+                aria-label="Stop"
+              >
+                <Square className="h-2.5 w-2.5 fill-current" /> Stop
+              </button>
             </div>
           </div>
         )}
       </div>
+
+      <AlertDialog open={confirmClear} onOpenChange={setConfirmClear}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clear this conversation?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Removes the chat history for this file. Your data and transformation steps are not affected.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep it</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                setConfirmClear(false);
+                try {
+                  const r = await fetchWithAuth(`/api/chat/${fileId}`, { method: "DELETE" });
+                  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+                  setMessages([]);
+                  toast.success("Conversation cleared");
+                } catch {
+                  toast.error("Couldn't clear the conversation.");
+                }
+              }}
+            >
+              Clear
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Input */}
       <div className="flex-shrink-0 border-t px-3 py-3">

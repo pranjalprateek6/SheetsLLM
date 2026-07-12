@@ -1,12 +1,12 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import AuthGuard from "@/components/AuthGuard";
 import UsageCard from "@/components/UsageCard";
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
 import {
-  ArrowUpDown, Copy, Download, FileSpreadsheet, Grid3X3, List, MoreHorizontal, Pencil, Search, Trash2, Upload,
+  ArrowDown, ArrowUp, Copy, Download, FileSpreadsheet, Grid3X3, List, MoreHorizontal, Pencil, Search, Trash2, Upload,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,7 +16,8 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub,
+  DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
@@ -45,25 +46,49 @@ function formatDate(iso: string) {
   });
 }
 
+type SortKey = "created_at" | "name" | "row_count";
+type SortDir = "asc" | "desc";
+
+const PAGE_SIZE = 50;
+
 export default function DashboardPage() {
   const router = useRouter();
   const [files, setFiles] = useState<FileItem[]>([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [view, setView] = useState<"grid" | "list">("list");
-  const [sortBy, setSortBy] = useState<"created_at" | "name" | "row_count">("created_at");
+  const [sortBy, setSortBy] = useState<SortKey>("created_at");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [page, setPage] = useState(1);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<FileItem | null>(null);
   const [loadError, setLoadError] = useState(false);
 
+  // Debounce the search input; reset to the first page when the query settles.
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedSearch(search);
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
   const fetchFiles = useCallback(async () => {
     setLoading(true);
     setLoadError(false);
     try {
-      const res = await fetchWithAuth("/api/files?page=1&page_size=50");
+      const params = new URLSearchParams({
+        page: String(page),
+        page_size: String(PAGE_SIZE),
+        sort: sortBy,
+        dir: sortDir,
+      });
+      if (debouncedSearch.trim()) params.set("q", debouncedSearch.trim());
+      const res = await fetchWithAuth(`/api/files?${params.toString()}`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setFiles(data.files || []);
@@ -74,17 +99,34 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [page, sortBy, sortDir, debouncedSearch]);
 
   useEffect(() => { fetchFiles(); }, [fetchFiles]);
 
-  const filtered = files
-    .filter((f) => f.name.toLowerCase().includes(search.toLowerCase()))
-    .sort((a, b) => {
-      if (sortBy === "name") return a.name.localeCompare(b.name);
-      if (sortBy === "row_count") return b.row_count - a.row_count;
-      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  const handleSort = (col: SortKey) => {
+    if (sortBy === col) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortBy(col);
+      setSortDir(col === "name" ? "asc" : "desc");
+    }
+    setPage(1);
+  };
+
+  // Grid view sorts client-side on the current page using the same sort state.
+  const gridFiles = useMemo(() => {
+    return [...files].sort((a, b) => {
+      let cmp = 0;
+      if (sortBy === "name") cmp = a.name.localeCompare(b.name);
+      else if (sortBy === "row_count") cmp = a.row_count - b.row_count;
+      else cmp = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      return sortDir === "asc" ? cmp : -cmp;
     });
+  }, [files, sortBy, sortDir]);
+
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const rangeStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const rangeEnd = Math.min(page * PAGE_SIZE, total);
 
   const handleOpen = (fileId: string) => router.push(`/workspace?file_id=${fileId}`);
 
@@ -112,6 +154,7 @@ export default function DashboardPage() {
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       setFiles((prev) => prev.filter((f) => f.id !== fileId));
       setTotal((t) => Math.max(0, t - 1));
+      if (files.length === 1 && page > 1) setPage(page - 1);
       toast.success(`Deleted "${name}"`);
     } catch (e) {
       console.error("Delete failed:", e);
@@ -134,14 +177,15 @@ export default function DashboardPage() {
     finally { setActionLoading(null); }
   };
 
-  const handleDownload = async (fileId: string, name: string) => {
+  const handleDownload = async (fileId: string, name: string, format: string) => {
     try {
-      const res = await fetchWithAuth(`/api/download?file_id=${fileId}&format=csv`);
+      const res = await fetchWithAuth(`/api/download?file_id=${fileId}&format=${format}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = name.replace(/\.[^/.]+$/, "") + ".csv";
+      a.download = name.replace(/\.[^/.]+$/, "") + `.${format}`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -150,6 +194,27 @@ export default function DashboardPage() {
       console.error("Download failed:", e);
       toast.error("Download failed. Please try again.");
     }
+  };
+
+  const sortableHead = (label: string, col: SortKey, className?: string) => {
+    const active = sortBy === col;
+    return (
+      <TableHead
+        className={className}
+        aria-sort={active ? (sortDir === "asc" ? "ascending" : "descending") : undefined}
+      >
+        <button
+          type="button"
+          className={`inline-flex items-center gap-1 transition-colors hover:text-foreground ${active ? "text-foreground" : ""}`}
+          onClick={() => handleSort(col)}
+        >
+          {label}
+          {active && (sortDir === "asc"
+            ? <ArrowUp className="h-4 w-4" />
+            : <ArrowDown className="h-4 w-4" />)}
+        </button>
+      </TableHead>
+    );
   };
 
   const rowActions = (file: FileItem) => (
@@ -173,9 +238,25 @@ export default function DashboardPage() {
         <DropdownMenuItem onClick={() => handleDuplicate(file.id)}>
           <Copy className="mr-2 h-4 w-4" /> Duplicate
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => handleDownload(file.id, file.name)}>
-          <Download className="mr-2 h-4 w-4" /> Download CSV
-        </DropdownMenuItem>
+        <DropdownMenuSub>
+          <DropdownMenuSubTrigger>
+            <Download className="mr-2 h-4 w-4" /> Download as…
+          </DropdownMenuSubTrigger>
+          <DropdownMenuSubContent>
+            <DropdownMenuItem onClick={() => handleDownload(file.id, file.name, "csv")}>
+              CSV
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleDownload(file.id, file.name, "xlsx")}>
+              Excel (.xlsx)
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleDownload(file.id, file.name, "json")}>
+              JSON
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => handleDownload(file.id, file.name, "tsv")}>
+              TSV
+            </DropdownMenuItem>
+          </DropdownMenuSubContent>
+        </DropdownMenuSub>
         <DropdownMenuSeparator />
         <DropdownMenuItem
           className="text-destructive focus:text-destructive"
@@ -235,14 +316,6 @@ export default function DashboardPage() {
           <Button
             variant="outline"
             size="icon"
-            onClick={() => setSortBy(sortBy === "created_at" ? "name" : sortBy === "name" ? "row_count" : "created_at")}
-            title={`Sorted by ${sortBy === "created_at" ? "date" : sortBy === "name" ? "name" : "rows"}`}
-          >
-            <ArrowUpDown className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="outline"
-            size="icon"
             onClick={() => setView(view === "grid" ? "list" : "grid")}
             title={view === "grid" ? "List view" : "Grid view"}
           >
@@ -268,7 +341,7 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {!loading && !loadError && filtered.length === 0 && (
+        {!loading && !loadError && files.length === 0 && (
           <div className="rounded-xl border border-dashed py-16 text-center">
             <FileSpreadsheet className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
             <p className="font-medium">{search ? "No files match your search" : "No files yet"}</p>
@@ -285,20 +358,20 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {!loading && !loadError && filtered.length > 0 && view === "list" && (
+        {!loading && !loadError && files.length > 0 && view === "list" && (
           <div className="overflow-hidden rounded-xl border bg-card shadow-xs">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
+                  {sortableHead("Name", "name")}
                   <TableHead className="w-24 text-right">Size</TableHead>
-                  <TableHead className="w-28 text-right">Rows</TableHead>
-                  <TableHead className="w-32">Created</TableHead>
+                  {sortableHead("Rows", "row_count", "w-28 text-right")}
+                  {sortableHead("Created", "created_at", "w-32")}
                   <TableHead className="w-12" />
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((file) => (
+                {files.map((file) => (
                   <TableRow
                     key={file.id}
                     className="cursor-pointer"
@@ -326,9 +399,9 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {!loading && !loadError && filtered.length > 0 && view === "grid" && (
+        {!loading && !loadError && files.length > 0 && view === "grid" && (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {filtered.map((file) => (
+            {gridFiles.map((file) => (
               <div
                 key={file.id}
                 className="group cursor-pointer rounded-xl border bg-card p-5 shadow-xs transition-shadow hover:shadow-md"
@@ -352,6 +425,32 @@ export default function DashboardPage() {
                 <p className="mt-0.5 text-xs text-muted-foreground">{formatDate(file.created_at)}</p>
               </div>
             ))}
+          </div>
+        )}
+
+        {!loading && !loadError && total > PAGE_SIZE && (
+          <div className="mt-4 flex items-center justify-between">
+            <p className="text-sm tabular-nums text-muted-foreground">
+              {rangeStart.toLocaleString()}–{rangeEnd.toLocaleString()} of {total.toLocaleString()}
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages}
+              >
+                Next
+              </Button>
+            </div>
           </div>
         )}
 
