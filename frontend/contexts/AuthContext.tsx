@@ -13,6 +13,7 @@ interface AuthState {
     password: string
   ) => Promise<{ error: string | null; needsConfirmation?: boolean }>;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
+  signInWithGoogle: () => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: string | null }>;
   updatePassword: (password: string) => Promise<{ error: string | null }>;
@@ -60,6 +61,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: null };
   }, []);
 
+  const signInWithGoogle = useCallback(async () => {
+    // Full-page redirect to Google via Supabase; the session lands back on
+    // /auth (detectSessionInUrl) and the page routes from there.
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/auth`,
+        skipBrowserRedirect: true,
+      },
+    });
+    if (error) return { error: error.message };
+    if (!data?.url) return { error: "Could not start Google sign-in." };
+
+    // Pre-flight: a not-yet-enabled provider answers this URL with a raw
+    // 400 JSON page instead of redirecting — navigating would strand the
+    // user on it. Probe first; only leave the page on a real redirect.
+    try {
+      const probe = await fetch(data.url, { redirect: "manual" });
+      if (probe.status === 400) {
+        const body = await probe.json().catch(() => null);
+        return { error: body?.msg || "provider is not enabled" };
+      }
+    } catch {
+      // Opaque redirect or network hiccup — proceed with the navigation.
+    }
+    window.location.assign(data.url);
+    return { error: null };
+  }, []);
+
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
   }, []);
@@ -82,7 +112,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, session, loading, signUp, signIn, signOut, resetPassword, updatePassword, getAccessToken }}
+      value={{ user, session, loading, signUp, signIn, signInWithGoogle, signOut, resetPassword, updatePassword, getAccessToken }}
     >
       {children}
     </AuthContext.Provider>

@@ -1,6 +1,9 @@
 "use client";
+import { useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   ArrowRight, BookMarked, FileSpreadsheet, History, Lock, MessageSquare, RefreshCw, ShieldCheck, Upload,
 } from "lucide-react";
@@ -64,6 +67,15 @@ const SCHEMA_CHIPS = [
 ];
 
 export default function LandingPage() {
+  const { user, loading } = useAuth();
+  const router = useRouter();
+
+  // Signed-in users live in the app — the marketing page is for prospects.
+  // The only way back here is signing out.
+  useEffect(() => {
+    if (!loading && user) router.replace("/dashboard");
+  }, [user, loading, router]);
+
   return (
     <div className="overflow-x-clip">
       {/* ── Hero ─────────────────────────────────────────────────── */}
