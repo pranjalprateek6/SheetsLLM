@@ -14,6 +14,7 @@ import duckdb
 import pyarrow.parquet as pq
 
 from app.config import (
+    CHECKPOINT_EVERY_N_STEPS,
     DUCKDB_MEMORY_LIMIT,
     DUCKDB_QUERY_TIMEOUT,
     DUCKDB_THREADS,
@@ -121,9 +122,14 @@ def replay_transformations_local(
     up_to: int | None = None,
     preview_limit: int = MAX_PREVIEW_ROWS,
 ) -> dict[str, Any]:
-    """Replay transformation steps using a local Parquet file (cached)."""
-    sql = build_replay_sql(steps, up_to=up_to)
-    return execute_sql_from_local(local_path, sql, preview_limit=preview_limit)
+    """Replay transformation steps using a local Parquet file (cached).
+
+    Long chains resume from the nearest materialized checkpoint instead of
+    replaying everything from base (see _resolve_checkpoint)."""
+    target_steps = steps[:up_to] if up_to is not None else steps
+    source, remaining = _resolve_checkpoint(local_path, target_steps)
+    sql = build_replay_sql(remaining)
+    return execute_sql_from_local(source, sql, preview_limit=preview_limit)
 
 
 _FROM_DATA_RE = re.compile(r"\bFROM\s+data\b", re.IGNORECASE)
@@ -173,6 +179,75 @@ def build_replay_sql(
     return f"WITH {', '.join(ctes)} SELECT * FROM step_{last_step}"
 
 
+# ── Chain checkpoints ─────────────────────────────────────────────────
+
+
+def _materialize_segment(
+    source_path: str | Path, steps: list[dict], out_path: str
+) -> None:
+    """COPY the replay of ``steps`` over ``source_path`` to a Parquet file."""
+    sql = build_replay_sql(steps)
+
+    def _inner():
+        con = get_connection()
+        sp = _sql_path(source_path)
+        con.execute(f"CREATE VIEW data AS SELECT * FROM read_parquet('{sp}')")
+        op = _sql_path(out_path)
+        con.execute(f"COPY (\n{sql}\n) TO '{op}' (FORMAT PARQUET, COMPRESSION ZSTD)")
+
+    _run_with_timeout(_inner)
+
+
+def _resolve_checkpoint(
+    local_path: str | Path, steps: list[dict]
+) -> tuple[str, list[dict]]:
+    """Reduce a replay to (source_parquet, remaining_steps).
+
+    Every CHECKPOINT_EVERY_N_STEPS steps the intermediate result is
+    materialized to a local Parquet (content-addressed by base path +
+    the exact SQL prefix, so undo/revert/edit hashes differently and
+    just misses — no invalidation logic). Replays then run at most
+    ~N steps from the nearest checkpoint instead of the whole chain.
+    Fails open to a full replay from base on any error.
+    """
+    n = len(steps)
+    k_interval = CHECKPOINT_EVERY_N_STEPS
+    if k_interval <= 0 or n < k_interval:
+        return str(local_path), steps
+    k = (n // k_interval) * k_interval
+
+    from app import cache  # deferred: cache imports storage; keep engine light
+
+    try:
+        # Nearest existing checkpoint at a multiple of the interval
+        base_path, base_k = str(local_path), 0
+        for kk in range(k, 0, -k_interval):
+            hit = cache.get_checkpoint(cache.checkpoint_key(local_path, steps[:kk]))
+            if hit:
+                base_path, base_k = hit, kk
+                break
+
+        if base_k < k:
+            # Advance the checkpoint to k with one bounded query
+            tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".parquet")
+            tmp.close()
+            _materialize_segment(base_path, steps[base_k:k], tmp.name)
+            cache.set_checkpoint(
+                cache.checkpoint_key(local_path, steps[:k]), tmp.name
+            )
+            logger.info(
+                "Chain checkpoint materialized at step %d (from %d)", k, base_k
+            )
+            base_path, base_k = tmp.name, k
+
+        return base_path, steps[base_k:]
+    except Exception as exc:
+        logger.warning(
+            "Checkpoint resolution failed, falling back to full replay: %s", exc
+        )
+        return str(local_path), steps
+
+
 # ── Full result (for downloads) ──────────────────────────────────────
 
 
@@ -181,9 +256,10 @@ def execute_full_result_local(
     steps: list[dict],
 ) -> "duckdb.DuckDBPyConnection":
     """Replay all steps from a local Parquet file. Returns DuckDB result."""
-    sql = build_replay_sql(steps)
+    source, remaining = _resolve_checkpoint(local_path, steps)
+    sql = build_replay_sql(remaining)
     con = get_connection()
-    lp = _sql_path(local_path)
+    lp = _sql_path(source)
     con.execute(f"CREATE VIEW data AS SELECT * FROM read_parquet('{lp}')")
     return con.execute(sql)
 
@@ -214,11 +290,12 @@ def export_full_result_local(
     options = _EXPORT_COPY_OPTIONS.get(fmt)
     if options is None:
         raise ValueError(f"Unsupported export format: {fmt}")
-    sql = build_replay_sql(steps)
+    source, remaining = _resolve_checkpoint(local_path, steps)
+    sql = build_replay_sql(remaining)
 
     def _inner():
         con = get_connection()
-        lp = _sql_path(local_path)
+        lp = _sql_path(source)
         con.execute(f"CREATE VIEW data AS SELECT * FROM read_parquet('{lp}')")
         op = _sql_path(out_path)
         con.execute(f"COPY (\n{sql}\n) TO '{op}' ({options})")
@@ -321,11 +398,12 @@ def get_schema_after_steps(
     if not steps:
         return get_schema_from_local(local_path)
 
-    replay = build_replay_sql(steps)
+    source, remaining = _resolve_checkpoint(local_path, steps)
+    replay = build_replay_sql(remaining)
 
     def _inner():
         con = get_connection()
-        lp = _sql_path(local_path)
+        lp = _sql_path(source)
         con.execute(f"CREATE VIEW data AS SELECT * FROM read_parquet('{lp}')")
 
         schema_df = con.execute(f"DESCRIBE {replay}").fetchdf()
