@@ -125,7 +125,10 @@ def _execute_with_retry(
     try:
         result = _execute_transform(r2_key, steps, sql)
         return result, sql
-    except Exception as first_error:
+    except Exception as exc:
+        # Bind to an outer name: Python unbinds `except ... as` variables
+        # when the block exits, and the retry below needs the error text.
+        first_error = exc
         logger.warning("First execution failed, attempting retry: %s", first_error)
 
     # ── Retry: send error back to LLM ──────────────────────────────
