@@ -7,6 +7,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import HeroDemo from "@/components/marketing/HeroDemo";
+import ProductShot from "@/components/marketing/ProductShot";
 
 const fadeUp = {
   initial: { opacity: 0, y: 16 },
@@ -165,6 +166,24 @@ export default function LandingPage() {
               <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{s.body}</p>
             </motion.div>
           ))}
+        </div>
+      </section>
+
+      {/* ── The workspace ────────────────────────────────────────── */}
+      <section className="border-t bg-card">
+        <div className="mx-auto max-w-5xl px-4 py-20 sm:px-6 sm:py-24">
+          <motion.div {...fadeUp} className="mb-10 text-center">
+            <h2 className="text-3xl font-semibold tracking-tight">
+              Your data on the left, Sage on the right
+            </h2>
+            <p className="mx-auto mt-3 max-w-xl text-muted-foreground">
+              A live grid of your file next to a chat that edits it. Every change previews
+              instantly, saves as a step, and stays one click from undone.
+            </p>
+          </motion.div>
+          <motion.div {...fadeUp} transition={{ ...fadeUp.transition, delay: 0.1 }}>
+            <ProductShot />
+          </motion.div>
         </div>
       </section>
 
