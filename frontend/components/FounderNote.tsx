@@ -4,7 +4,9 @@ import { X } from "lucide-react";
 
 /* A short personal note on the first visit — products that feel made
    with intention convert and retain better than anonymous ones. One
-   dismissal, remembered forever. */
+   dismissal, remembered forever. Rendered as a slim full-width strip
+   under the upload grid so it reads as a sign-off, not another card
+   competing in the sidebar. */
 
 const DISMISSED_KEY = "sllm_founder_note_dismissed";
 
@@ -27,7 +29,7 @@ export default function FounderNote() {
   };
 
   return (
-    <div className="relative rounded-2xl border bg-card p-5 shadow-xs">
+    <div className="relative rounded-2xl border bg-muted/30 px-5 py-4">
       <button
         onClick={dismiss}
         className="absolute right-3 top-3 rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
@@ -35,13 +37,13 @@ export default function FounderNote() {
       >
         <X className="h-3.5 w-3.5" />
       </button>
-      <p className="text-sm leading-relaxed text-muted-foreground">
-        Every month, the same messy export — and the same 40 minutes fixing
-        it by hand. I built SheetsLLM so you describe that cleanup once,
-        save it as a recipe, and never do it manually again. If anything
-        feels off, the Feedback button up top reaches me directly.
+      <p className="pr-8 text-sm leading-relaxed text-muted-foreground">
+        Every month, the same messy export — the same 40 minutes fixing it by
+        hand. Describe that cleanup once, save it as a recipe, and never do it
+        manually again. If anything feels off, the Feedback button up top
+        reaches me directly.{" "}
+        <span className="whitespace-nowrap font-medium text-foreground">— Pranjal, founder</span>
       </p>
-      <p className="mt-3 text-sm font-medium">— Pranjal, founder</p>
     </div>
   );
 }

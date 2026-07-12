@@ -16,7 +16,7 @@ import ChartPanel from "@/components/ChartPanel";
 import CommandPalette from "@/components/CommandPalette";
 import FounderNote from "@/components/FounderNote";
 import GettingStarted, { markOnboardingStep, ONBOARDING_FLAGS } from "@/components/GettingStarted";
-import OnboardingIntent, { loadIntents, type Intent } from "@/components/OnboardingIntent";
+import OnboardingIntent, { INTENT_LABELS, loadIntents, type Intent } from "@/components/OnboardingIntent";
 import KeyboardShortcuts from "@/components/KeyboardShortcuts";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import AuthGuard from "@/components/AuthGuard";
@@ -91,11 +91,19 @@ function WorkspaceContent() {
   // null = question not yet answered; [] = skipped
   const [intents, setIntents] = useState<Intent[] | null>(null);
   const [intentsLoaded, setIntentsLoaded] = useState(false);
+  // True only in the render right after answering — powers the visible
+  // "here's what your answer changed" confirmation where the question was.
+  const [justAnswered, setJustAnswered] = useState(false);
 
   useEffect(() => {
     setIntents(loadIntents());
     setIntentsLoaded(true);
   }, []);
+
+  const handleIntentsDone = (chosen: Intent[]) => {
+    setIntents(chosen);
+    if (chosen.length > 0) setJustAnswered(true);
+  };
 
   // Answers unlock something visible: matching samples float to the top
   // and the starter prompts speak the user's domain.
@@ -114,7 +122,11 @@ function WorkspaceContent() {
               .flatMap((s) => s.suggestions)
           )
         ).slice(0, 4)
-      : EXAMPLE_PROMPTS;
+      : (intents ?? []).includes("other")
+        ? // "All sorts" = no routing preference — answer with variety:
+          // one starter idea from each domain plus a generic cleanup.
+          [...SAMPLE_DATASETS.map((s) => s.suggestions[0]), EXAMPLE_PROMPTS[0]]
+        : EXAMPLE_PROMPTS;
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -456,7 +468,31 @@ function WorkspaceContent() {
         {/* Phase 1: Upload */}
         {showUpload && !fileReady && !fileLoadError && !(loading && urlFileId) && (
           <div className="min-h-[calc(100vh-56px)] animate-fade-in-up">
-            <div className="mx-auto max-w-4xl px-4 pt-12 sm:px-6">
+            <div className="mx-auto max-w-4xl space-y-5 px-4 pb-12 pt-12 sm:px-6">
+              {intentsLoaded && intents === null && (
+                <OnboardingIntent onDone={handleIntentsDone} />
+              )}
+              {justAnswered && intents && intents.length > 0 && (
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-primary/30 bg-primary/5 px-5 py-3.5">
+                  <p className="text-sm">
+                    <span className="font-medium">
+                      Set up for {intents.map((i) => INTENT_LABELS[i]).join(" + ")}.
+                    </span>{" "}
+                    <span className="text-muted-foreground">
+                      {matchedSampleIds.length > 0
+                        ? "Your samples and starter ideas below are ready — first cleaned file is about 2 minutes away."
+                        : "Starter ideas below now cover a bit of everything — first cleaned file is about 2 minutes away."}
+                    </span>
+                  </p>
+                  <button
+                    onClick={() => setJustAnswered(false)}
+                    className="text-xs text-muted-foreground underline-offset-2 hover:underline"
+                    aria-label="Dismiss confirmation"
+                  >
+                    Got it
+                  </button>
+                </div>
+              )}
               <div className="grid gap-5 md:grid-cols-2">
                 <div className="rounded-2xl border bg-card p-6 shadow-xs">
                   <h2 className="mb-4 text-lg font-semibold tracking-tight">Upload a spreadsheet</h2>
@@ -497,18 +533,9 @@ function WorkspaceContent() {
                         );
                       })}
                     </div>
-                    {matchedSampleIds.length > 0 && (
-                      <p className="mt-3 text-xs text-muted-foreground">
-                        Your first cleaned file is about 2 minutes away — and next
-                        month&apos;s takes one click.
-                      </p>
-                    )}
                   </div>
                 </div>
                 <div className="space-y-4">
-                  {intentsLoaded && intents === null && (
-                    <OnboardingIntent onDone={setIntents} />
-                  )}
                   <GettingStarted />
                   <div className="rounded-2xl border bg-card p-5 shadow-xs">
                     <div className="flex items-start gap-3">
@@ -525,18 +552,12 @@ function WorkspaceContent() {
                       </div>
                     </div>
                   </div>
-                  <FounderNote />
-                  <div className="rounded-2xl border bg-card p-5 shadow-xs">
-                    <h3 className="mb-2 text-sm font-medium">Keyboard shortcuts</h3>
-                    <ul className="space-y-1.5 text-sm text-muted-foreground">
-                      <li><kbd className="rounded border bg-muted px-1.5 py-0.5 font-mono text-xs">{modKey}+K</kbd> Command palette</li>
-                      <li><kbd className="rounded border bg-muted px-1.5 py-0.5 font-mono text-xs">{modKey}+Z</kbd> Undo last step</li>
-                      <li><kbd className="rounded border bg-muted px-1.5 py-0.5 font-mono text-xs">{modKey}+S</kbd> Download CSV</li>
-                      <li><kbd className="rounded border bg-muted px-1.5 py-0.5 font-mono text-xs">/</kbd> Focus Sage chat</li>
-                    </ul>
-                  </div>
+                  {/* Keyboard-shortcuts card lives in the transform view via the
+                      command palette — every shortcut it listed only works after
+                      a file is loaded, so it earned no place on this screen. */}
                 </div>
               </div>
+              <FounderNote />
             </div>
           </div>
         )}
