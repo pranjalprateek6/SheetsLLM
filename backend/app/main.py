@@ -14,7 +14,7 @@ from starlette.responses import JSONResponse
 
 from app.auth import PUBLIC_PATHS, verify_token
 from app import cache, jobs
-from app.config import ALLOW_ANONYMOUS, ALLOWED_ORIGINS
+from app.config import ALLOW_ANONYMOUS, ALLOWED_ORIGINS, IS_PRODUCTION
 from app.routes import register_routes
 
 # ── Logging ───────────────────────────────────────────────────────────
@@ -62,7 +62,16 @@ async def lifespan(app: FastAPI):
 
 
 # ── App ───────────────────────────────────────────────────────────────
-app = FastAPI(title="SheetsLLM", version="1.0.0", lifespan=lifespan)
+# API docs are a dev convenience; in production they just map the attack
+# surface for free. Gating openapi_url disables /docs and /redoc with it.
+app = FastAPI(
+    title="SheetsLLM",
+    version="1.0.0",
+    lifespan=lifespan,
+    docs_url=None if IS_PRODUCTION else "/docs",
+    redoc_url=None,
+    openapi_url=None if IS_PRODUCTION else "/openapi.json",
+)
 
 app.add_middleware(
     CORSMiddleware,

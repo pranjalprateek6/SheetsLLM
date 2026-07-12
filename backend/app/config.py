@@ -58,6 +58,12 @@ RAZORPAY_PLAN_ID: str = os.getenv("RAZORPAY_PLAN_ID", "")   # the Pro monthly pl
 # ~10 years, the customer can cancel any time).
 RAZORPAY_TOTAL_COUNT: int = int(os.getenv("RAZORPAY_TOTAL_COUNT", "120"))
 
+# ── Environment ──────────────────────────────────────────────────────
+# Render sets RENDER=true on every service; ENV=production works anywhere.
+IS_PRODUCTION: bool = bool(os.getenv("RENDER")) or (
+    os.getenv("ENV", "").strip().lower() == "production"
+)
+
 # ── Auth ─────────────────────────────────────────────────────────────
 # When true, requests that fail JWT verification proceed as user "anonymous"
 # (local dev convenience). Default false: unauthenticated requests get 401.
