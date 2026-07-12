@@ -2,7 +2,7 @@
 import { Suspense, useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import {
-  BarChart3, BookMarked, Download, FileSpreadsheet, History, Lightbulb, Undo2, Upload, X,
+  BarChart3, BookMarked, Download, FileSpreadsheet, History, Lightbulb, MessageSquare, Undo2, Upload, X,
 } from "lucide-react";
 import DropZone from "@/components/DropZone";
 import DataGrid from "@/components/DataGrid";
@@ -17,6 +17,7 @@ import GettingStarted, { markOnboardingStep } from "@/components/GettingStarted"
 import KeyboardShortcuts from "@/components/KeyboardShortcuts";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import AuthGuard from "@/components/AuthGuard";
+import { toast } from "sonner";
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
 import { SAMPLE_DATASETS } from "@/lib/samples";
 import { TextShimmer } from "@/components/ui/text-shimmer";
@@ -66,6 +67,7 @@ function WorkspaceContent() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [sampleSuggestions, setSampleSuggestions] = useState<string[] | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [fileLoadError, setFileLoadError] = useState(false);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -84,12 +86,19 @@ function WorkspaceContent() {
 
   const loadFileById = async (id: string) => {
     setLoading(true);
+    setFileLoadError(false);
     try {
       const res = await fetchWithAuth(`/api/files/${id}`);
-      if (!res.ok) return;
+      if (!res.ok) {
+        setFileLoadError(true);
+        return;
+      }
       const data = await res.json();
       const file = data.file;
-      if (!file) return;
+      if (!file) {
+        setFileLoadError(true);
+        return;
+      }
 
       setFileId(file.id);
       setFileName(file.name);
@@ -111,6 +120,7 @@ function WorkspaceContent() {
       }
     } catch (e) {
       console.error("Failed to load file:", e);
+      setFileLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -220,7 +230,15 @@ function WorkspaceContent() {
         setRows(data.preview?.rows ?? data.preview ?? []);
         setRowCount(data.preview?.total_rows ?? data.total_rows ?? rows.length);
         setColumnCount(data.preview?.total_columns ?? data.total_columns ?? columns.length);
+        toast.success("Last step undone");
+      } else if (data.code === "NOTHING_TO_UNDO") {
+        toast.info("Nothing to undo — you're at the original file.");
+      } else {
+        toast.error(data.message || "Undo failed. Please try again.");
       }
+    } catch (e) {
+      console.error("Undo failed:", e);
+      toast.error("Undo failed — check your connection.");
     } finally {
       setLoading(false);
     }
@@ -241,9 +259,13 @@ function WorkspaceContent() {
         setRows(data.preview?.rows ?? data.preview ?? []);
         setRowCount(data.preview?.total_rows ?? data.total_rows ?? 0);
         setColumnCount(data.preview?.total_columns ?? data.total_columns ?? 0);
+        toast.success("All steps reset — back to the original file");
+      } else {
+        toast.error(data.message || "Reset failed. Please try again.");
       }
     } catch (error) {
       console.error("Reset failed", error);
+      toast.error("Reset failed — check your connection.");
     } finally {
       setLoading(false);
     }
@@ -281,10 +303,14 @@ function WorkspaceContent() {
         setRows(data.preview.rows);
         setRowCount(data.preview.total_rows);
         setColumnCount(data.preview.total_columns);
+        toast.success(`Reverted to step ${stepNum}`);
+      } else {
+        toast.error(data.message || "Revert failed. Please try again.");
       }
       setHistoryOpen(false);
     } catch (e) {
       console.error("Revert failed:", e);
+      toast.error("Revert failed — check your connection.");
     } finally {
       setLoading(false);
     }
@@ -320,8 +346,29 @@ function WorkspaceContent() {
           </div>
         )}
 
+        {/* Bad ?file_id= — dead-end recovery */}
+        {fileLoadError && !fileReady && (
+          <div className="flex min-h-[calc(100vh-56px)] items-center justify-center px-4">
+            <div className="w-full max-w-md rounded-2xl border bg-card p-8 text-center shadow-sm">
+              <FileSpreadsheet className="mx-auto mb-3 h-8 w-8 text-muted-foreground/50" />
+              <h2 className="text-lg font-semibold tracking-tight">This file couldn&apos;t be loaded</h2>
+              <p className="mt-2 text-sm text-muted-foreground">
+                It may have been deleted, or the link is wrong. Your other files are safe.
+              </p>
+              <div className="mt-5 flex justify-center gap-2">
+                <Button variant="outline" onClick={() => { setFileLoadError(false); setShowUpload(true); }}>
+                  Upload a file
+                </Button>
+                <Button asChild>
+                  <a href="/dashboard">Go to Files</a>
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Phase 1: Upload */}
-        {showUpload && !fileReady && !(loading && urlFileId) && (
+        {showUpload && !fileReady && !fileLoadError && !(loading && urlFileId) && (
           <div className="min-h-[calc(100vh-56px)] animate-fade-in-up">
             <div className="mx-auto max-w-4xl px-4 pt-12 sm:px-6">
               <div className="grid gap-5 md:grid-cols-2">
@@ -445,6 +492,16 @@ function WorkspaceContent() {
                   </Badge>
                 </div>
                 <div className="flex items-center gap-0.5">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className={chatOpen ? "h-8 w-8 text-primary" : "h-8 w-8 text-muted-foreground"}
+                    onClick={() => setChatOpen((v) => !v)}
+                    title={chatOpen ? "Hide Sage" : "Show Sage"}
+                    aria-label={chatOpen ? "Hide Sage chat panel" : "Show Sage chat panel"}
+                  >
+                    <MessageSquare className="h-4 w-4" />
+                  </Button>
                   <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={handleUndo} title="Undo (Ctrl+Z)">
                     <Undo2 className="h-4 w-4" />
                   </Button>
@@ -472,18 +529,33 @@ function WorkspaceContent() {
               </div>
             </div>
 
-            {/* Sage sidebar */}
-            <div className="w-80 flex-shrink-0 xl:w-96">
-              <ChatPanel
-                fileId={fileId}
-                open={chatOpen}
-                onPreview={previewHandler}
-                fileName={fileName}
-                onUndo={handleUndo}
-                onReset={handleReset}
-                starterSuggestions={sampleSuggestions}
-              />
-            </div>
+            {/* Sage — desktop column (collapsible), mobile bottom sheet */}
+            {chatOpen && (
+              <div className="hidden w-80 flex-shrink-0 lg:block xl:w-96">
+                <ChatPanel
+                  fileId={fileId}
+                  open={chatOpen}
+                  onPreview={previewHandler}
+                  fileName={fileName}
+                  onUndo={handleUndo}
+                  onReset={handleReset}
+                  starterSuggestions={sampleSuggestions}
+                />
+              </div>
+            )}
+            {chatOpen && (
+              <div className="fixed inset-x-0 bottom-0 z-40 h-[65vh] overflow-hidden rounded-t-2xl border-t bg-card shadow-lg lg:hidden">
+                <ChatPanel
+                  fileId={fileId}
+                  open={chatOpen}
+                  onPreview={previewHandler}
+                  fileName={fileName}
+                  onUndo={handleUndo}
+                  onReset={handleReset}
+                  starterSuggestions={sampleSuggestions}
+                />
+              </div>
+            )}
           </div>
         )}
 

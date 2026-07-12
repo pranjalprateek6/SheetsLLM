@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -117,6 +118,13 @@ function AccountContent() {
       <section className="mt-8">
         <h2 className="mb-3 text-sm font-medium text-muted-foreground">Plan &amp; usage</h2>
         <div className="rounded-xl border bg-card p-5 shadow-xs">
+          {tier === null ? (
+            <div className="space-y-3">
+              <Skeleton className="h-5 w-32" />
+              <Skeleton className="h-4 w-64" />
+            </div>
+          ) : (
+          <>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <p className="text-sm font-medium">{isPro ? "Pro" : "Free"} plan</p>
@@ -139,6 +147,8 @@ function AccountContent() {
           </p>
           <Separator className="my-4" />
           <UsageCard embedded />
+          </>
+          )}
         </div>
       </section>
 
