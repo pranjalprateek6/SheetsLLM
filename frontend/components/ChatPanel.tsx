@@ -8,6 +8,9 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { TextShimmer } from "@/components/ui/text-shimmer";
 import { cn } from "@/lib/utils";
 
@@ -172,30 +175,46 @@ export default function ChatPanel({
             <Sparkles className="h-4 w-4 text-primary" />
             <h3 className="text-sm font-semibold">Sage</h3>
           </div>
-          <div className="flex items-center gap-0.5">
-            {messages.length > 0 && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7 text-muted-foreground"
-                onClick={() => setConfirmClear(true)}
-                title="Clear conversation"
-                aria-label="Clear conversation"
-              >
-                <Eraser className="h-3.5 w-3.5" />
-              </Button>
-            )}
-            {onUndo && (
-              <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={onUndo} title="Undo last step">
-                <Undo2 className="h-3.5 w-3.5" />
-              </Button>
-            )}
-            {onReset && (
-              <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={onReset} title="Reset all steps">
-                <RotateCcw className="h-3.5 w-3.5" />
-              </Button>
-            )}
-          </div>
+          <TooltipProvider>
+            <div className="flex items-center gap-0.5">
+              {messages.length > 0 && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-muted-foreground"
+                      onClick={() => setConfirmClear(true)}
+                      aria-label="Clear conversation"
+                    >
+                      <Eraser className="h-3.5 w-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Clear conversation</TooltipContent>
+                </Tooltip>
+              )}
+              {onUndo && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={onUndo} aria-label="Undo last step">
+                      <Undo2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Undo last step</TooltipContent>
+                </Tooltip>
+              )}
+              {onReset && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={onReset} aria-label="Reset all steps">
+                      <RotateCcw className="h-3.5 w-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Reset all steps</TooltipContent>
+                </Tooltip>
+              )}
+            </div>
+          </TooltipProvider>
         </div>
       </div>
 

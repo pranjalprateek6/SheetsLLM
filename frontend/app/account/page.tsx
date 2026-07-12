@@ -3,8 +3,10 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { LogOut, ShieldCheck } from "lucide-react";
+import { toast } from "sonner";
 import AuthGuard from "@/components/AuthGuard";
 import UsageCard from "@/components/UsageCard";
+import { ONBOARDING_DISMISSED_KEY } from "@/components/GettingStarted";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
 import { Button } from "@/components/ui/button";
@@ -27,6 +29,13 @@ function AccountContent() {
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirmCancel, setConfirmCancel] = useState(false);
+  const [checklistDismissed, setChecklistDismissed] = useState(false);
+
+  useEffect(() => {
+    try {
+      setChecklistDismissed(localStorage.getItem(ONBOARDING_DISMISSED_KEY) === "true");
+    } catch {}
+  }, []);
 
   useEffect(() => {
     fetchWithAuth("/api/billing/status")
@@ -78,6 +87,12 @@ function AccountContent() {
     } finally {
       setBusy(false);
     }
+  };
+
+  const restoreChecklist = () => {
+    try { localStorage.removeItem(ONBOARDING_DISMISSED_KEY); } catch {}
+    setChecklistDismissed(false);
+    toast.success("Checklist restored — you'll see it on the workspace upload screen.");
   };
 
   const handleSignOut = async () => {
@@ -176,6 +191,19 @@ function AccountContent() {
           </div>
         </div>
       </section>
+
+      {/* Preferences */}
+      {checklistDismissed && (
+        <section className="mt-8">
+          <h2 className="mb-3 text-sm font-medium text-muted-foreground">Preferences</h2>
+          <div className="flex items-center justify-between rounded-xl border bg-card p-5 shadow-xs">
+            <p className="text-sm text-muted-foreground">Getting-started checklist</p>
+            <Button variant="outline" size="sm" onClick={restoreChecklist}>
+              Show again
+            </Button>
+          </div>
+        </section>
+      )}
 
       {/* Session */}
       <section className="mt-8">

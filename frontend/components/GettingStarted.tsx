@@ -14,7 +14,7 @@ export const ONBOARDING_FLAGS = {
   recipe: "sllm_done_recipe",
 } as const;
 
-const DISMISSED_KEY = "sllm_onboarding_dismissed";
+export const ONBOARDING_DISMISSED_KEY = "sllm_onboarding_dismissed";
 
 export function markOnboardingStep(step: keyof typeof ONBOARDING_FLAGS) {
   try {
@@ -35,7 +35,7 @@ export default function GettingStarted() {
 
   useEffect(() => {
     try {
-      if (localStorage.getItem(DISMISSED_KEY) === "true") return;
+      if (localStorage.getItem(ONBOARDING_DISMISSED_KEY) === "true") return;
       const map: Record<string, boolean> = {};
       for (const item of ITEMS) map[item.key] = item.done();
       if (Object.values(map).every(Boolean)) return; // all done — nothing to show
@@ -50,7 +50,7 @@ export default function GettingStarted() {
   const pct = Math.round((doneCount / ITEMS.length) * 100);
 
   const dismiss = () => {
-    try { localStorage.setItem(DISMISSED_KEY, "true"); } catch {}
+    try { localStorage.setItem(ONBOARDING_DISMISSED_KEY, "true"); } catch {}
     setVisible(false);
   };
 

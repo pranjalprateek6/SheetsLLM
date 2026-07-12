@@ -32,6 +32,7 @@ export default function CleanTool() {
   const [done, setDone] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [dragging, setDragging] = useState(false);
 
   const onFile = async (f: File | undefined) => {
     if (!f) return;
@@ -94,7 +95,16 @@ export default function CleanTool() {
 
   return (
     <div>
-      <label className="group flex cursor-pointer items-center justify-center rounded-xl border-2 border-dashed border-border p-8 transition-colors hover:border-primary/50 hover:bg-primary/[0.03]">
+      <label
+        className={cn(
+          "group flex cursor-pointer items-center justify-center rounded-xl border-2 border-dashed border-border p-8 transition-colors hover:border-primary/50 hover:bg-primary/[0.03]",
+          dragging && "border-primary bg-primary/[0.05]"
+        )}
+        onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+        onDragEnter={(e) => { e.preventDefault(); setDragging(true); }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={(e) => { e.preventDefault(); setDragging(false); onFile(e.dataTransfer.files?.[0]); }}
+      >
         <input type="file" accept=".csv,.tsv,.txt" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} disabled={busy} />
         <div className="text-center">
           <Upload className="mx-auto mb-2 h-6 w-6 text-primary" />

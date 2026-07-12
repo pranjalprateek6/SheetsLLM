@@ -69,15 +69,15 @@ export default function LandingPage() {
       <section className="relative">
         <div
           aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[560px]"
+          className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[480px]"
           style={{
             background:
               "radial-gradient(60% 50% at 50% 0%, hsl(var(--primary) / 0.06), transparent 70%)",
           }}
         />
-        <div className="mx-auto max-w-5xl px-4 pb-20 pt-16 text-center sm:px-6 sm:pt-24">
+        <div className="mx-auto max-w-5xl px-4 pb-16 pt-8 text-center sm:px-6 sm:pt-12">
           <motion.div {...fadeUp}>
-            <Badge variant="secondary" className="mb-5 font-normal text-muted-foreground">
+            <Badge variant="secondary" className="mb-4 font-normal text-muted-foreground">
               For the messy export that lands every month
             </Badge>
           </motion.div>
@@ -91,7 +91,7 @@ export default function LandingPage() {
           <motion.p
             {...fadeUp}
             transition={{ ...fadeUp.transition, delay: 0.1 }}
-            className="mx-auto mt-5 max-w-xl text-balance text-lg text-muted-foreground"
+            className="mx-auto mt-4 max-w-xl text-balance text-lg text-muted-foreground"
           >
             Describe your cleanup in plain English, save it as a recipe, and re-run it on every
             new export in one click. Your data never goes to the AI.
@@ -99,7 +99,7 @@ export default function LandingPage() {
           <motion.div
             {...fadeUp}
             transition={{ ...fadeUp.transition, delay: 0.15 }}
-            className="mt-8 flex items-center justify-center gap-3"
+            className="mt-6 flex items-center justify-center gap-3"
           >
             <Button size="lg" asChild>
               <Link href="/auth?mode=signup">
@@ -113,12 +113,12 @@ export default function LandingPage() {
           <motion.p
             {...fadeUp}
             transition={{ ...fadeUp.transition, delay: 0.2 }}
-            className="mt-4 text-xs text-muted-foreground"
+            className="mt-3 text-xs text-muted-foreground"
           >
             Free plan · No credit card · First clean file in 2 minutes
           </motion.p>
 
-          <motion.div {...fadeUp} transition={{ ...fadeUp.transition, delay: 0.25 }} className="mt-14">
+          <motion.div {...fadeUp} transition={{ ...fadeUp.transition, delay: 0.25 }} className="mt-10">
             <HeroDemo />
           </motion.div>
         </div>

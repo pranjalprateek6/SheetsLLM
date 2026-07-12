@@ -1,6 +1,7 @@
 "use client";
 import { useState, useMemo, useRef, useCallback } from "react";
-import { BarChart3, LineChart, PieChart, X, Download } from "lucide-react";
+import { BarChart3, LineChart, PieChart, Download } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 type ChartType = "bar" | "line" | "pie";
 type AggMode = "sum" | "avg" | "count" | "min" | "max";
@@ -97,8 +98,6 @@ export default function ChartPanel({
     };
     img.src = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgData)));
   }, []);
-
-  if (!open) return null;
 
   const W = 760;
   const H = 400;
@@ -202,20 +201,17 @@ export default function ChartPanel({
   const selectClass = "rounded-lg border bg-background px-2.5 py-1.5 text-sm shadow-xs outline-none appearance-none cursor-pointer";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/20 backdrop-blur-sm" onClick={onClose}>
-      <div className="flex max-h-[90vh] w-[880px] max-w-[95vw] flex-col overflow-hidden rounded-2xl border bg-card shadow-lg" onClick={(e) => e.stopPropagation()}>
+    <Dialog open={open} onOpenChange={(nextOpen) => { if (!nextOpen) onClose(); }}>
+      <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden bg-card p-0 sm:max-w-[920px]">
         {/* Header */}
-        <div className="flex items-center justify-between border-b px-5 py-4">
-          <h3 className="text-lg font-semibold tracking-tight">Quick chart</h3>
-          <div className="flex items-center gap-2">
+        <DialogHeader className="flex-shrink-0 border-b px-5 py-4">
+          <div className="flex items-center justify-between pr-8">
+            <DialogTitle>Quick chart</DialogTitle>
             <button onClick={exportPng} className="inline-flex items-center gap-1.5 rounded-lg border bg-background px-3 py-1.5 text-sm font-medium shadow-xs transition-colors hover:bg-accent">
               <Download className="h-3.5 w-3.5" /> PNG
             </button>
-            <button onClick={onClose} className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground" aria-label="Close">
-              <X className="h-5 w-5" />
-            </button>
           </div>
-        </div>
+        </DialogHeader>
 
         {/* Controls */}
         <div className="flex flex-wrap items-center gap-3 border-b px-5 py-3">
@@ -287,7 +283,7 @@ export default function ChartPanel({
             </svg>
           )}
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }
