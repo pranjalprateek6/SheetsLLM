@@ -366,6 +366,18 @@ def get_recipe(recipe_id: str, user_id: str) -> dict | None:
     return resp.data[0] if resp.data else None
 
 
+def update_recipe(recipe_id: str, user_id: str, **updates: Any) -> dict | None:
+    resp = (
+        get_client()
+        .table("recipes")
+        .update(updates)
+        .eq("id", recipe_id)
+        .eq("user_id", user_id)
+        .execute()
+    )
+    return resp.data[0] if resp.data else None
+
+
 def delete_recipe(recipe_id: str, user_id: str) -> bool:
     resp = (
         get_client()

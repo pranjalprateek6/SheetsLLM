@@ -3,6 +3,7 @@
 POST   /recipes              save current chain of a file as a named recipe
 GET    /recipes              list the user's recipes
 GET    /recipes/{id}         recipe detail (steps included)
+PATCH  /recipes/{id}         rename / edit description
 DELETE /recipes/{id}         delete a recipe
 POST   /recipes/{id}/apply   append the recipe's steps to another file
 """
@@ -143,6 +144,55 @@ def get_recipe(request: Request, recipe_id: str):
     if not recipe:
         return _json_response(404, "RECIPE_NOT_FOUND", "Recipe not found")
     return {"recipe": recipe}
+
+
+@router.patch("/recipes/{recipe_id}")
+async def update_recipe(request: Request, recipe_id: str):
+    """Rename a recipe or edit its description — the steps are immutable
+    (a recipe is a snapshot; edit the chain and save a new one)."""
+    user_id = getattr(request.state, "user_id", "anonymous")
+
+    try:
+        body = await request.json()
+    except Exception:
+        return _json_response(400, "INVALID_JSON", "Request body must be JSON")
+
+    updates: dict = {}
+    if "name" in body:
+        name = (body.get("name") or "").strip()
+        if not name:
+            return _json_response(400, "MISSING_NAME", "name cannot be empty")
+        if len(name) > _MAX_NAME_LENGTH:
+            return _json_response(
+                400, "NAME_TOO_LONG", f"name exceeds {_MAX_NAME_LENGTH} characters"
+            )
+        updates["name"] = name
+    if "description" in body:
+        updates["description"] = (body.get("description") or "").strip() or None
+
+    if not updates:
+        return _json_response(
+            400, "NO_FIELDS", "Provide name and/or description to update"
+        )
+
+    updated = db.update_recipe(recipe_id, user_id, **updates)
+    if not updated:
+        return _json_response(404, "RECIPE_NOT_FOUND", "Recipe not found")
+
+    try:
+        db.create_audit_entry(
+            user_id=user_id, file_id=updated.get("source_file_id"),
+            action="recipe_update",
+            metadata={"recipe_id": recipe_id, "fields": sorted(updates)},
+        )
+    except Exception:
+        logger.warning("Audit entry failed for recipe_update %s", recipe_id)
+
+    return {
+        "recipe_id": recipe_id,
+        "name": updated["name"],
+        "description": updated.get("description"),
+    }
 
 
 @router.delete("/recipes/{recipe_id}")
