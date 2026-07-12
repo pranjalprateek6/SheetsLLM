@@ -8,6 +8,7 @@ Event names in use:
 - paywall_hit             {action, used, limit}   free user blocked by a cap
 - checkout_started        {}                      Razorpay checkout created
 - subscription_activated  {status}                webhook flipped tier to pro
+- feedback                {message, email, path}  in-product feedback widget
 """
 
 from __future__ import annotations

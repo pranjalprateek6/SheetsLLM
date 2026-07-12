@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ChevronDown, LogOut, Menu, Moon, ShieldCheck, Sun, User, X } from "lucide-react";
 import { useTheme } from "next-themes";
+import FeedbackWidget from "@/components/FeedbackWidget";
 
 const APP_LINKS = [
   { href: "/dashboard", label: "Files" },
@@ -128,6 +129,7 @@ export default function Header() {
 
         {/* Right side */}
         <div className="hidden items-center gap-2 md:flex">
+          <FeedbackWidget />
           <ThemeToggle />
           {loading ? null : user ? (
             <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
@@ -215,6 +217,9 @@ export default function Header() {
                 {l.label}
               </Link>
             ))}
+            <div className="px-1 pt-1">
+              <FeedbackWidget variant="outline" />
+            </div>
             {!loading && !user && (
               <div className="mt-2 flex gap-2 border-t border-border pt-3">
                 <Button variant="outline" size="sm" className="flex-1" asChild>
