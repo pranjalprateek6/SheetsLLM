@@ -83,6 +83,16 @@ def test_retry_error_trims_to_first_line_always():
     assert "jane@acme.com" in safe  # without privacy mode values may remain
 
 
+def test_redaction_happens_before_truncation():
+    # A value straddling the 500-char cut must not survive as a partial
+    # unquoted leak (regression for redact-after-slice ordering).
+    err = "Conversion Error: " + "x" * 480 + " value 'secret@leak.com' bad"
+    safe = sanitize_error_for_llm(err, privacy_mode=True)
+    assert "secret@leak.com" not in safe
+    assert "secret" not in safe
+    assert len(safe) <= 500
+
+
 def test_retry_message_carries_redacted_error_only():
     safe = sanitize_error_for_llm(DUCKDB_ERROR, privacy_mode=True)
     msg = build_retry_message("cast email to number", "SELECT 1", safe)

@@ -19,10 +19,15 @@ def sanitize_error_for_llm(error: str, *, privacy_mode: bool) -> str:
     is where DuckDB embeds offending cell values — those must never reach
     the model.
     """
-    first_line = error.strip().splitlines()[0][:500] if error.strip() else "execution failed"
+    if not error.strip():
+        return "execution failed"
+    first_line = error.strip().splitlines()[0]
+    # Redact BEFORE truncating: slicing first could cut a quoted value in
+    # half, losing its closing quote so the regex no longer matches and the
+    # partial value would leak.
     if privacy_mode:
-        return _SINGLE_QUOTED.sub("'<redacted>'", first_line)
-    return first_line
+        first_line = _SINGLE_QUOTED.sub("'<redacted>'", first_line)
+    return first_line[:500]
 
 SYSTEM_PROMPT = """You are a SQL query generator for DuckDB.
 
