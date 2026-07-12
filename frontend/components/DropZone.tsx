@@ -17,8 +17,8 @@ export default function DropZone({ disabled, onDropFile }: { disabled?: boolean;
         "group flex cursor-pointer items-center justify-center rounded-xl border-2 border-dashed border-border p-10 transition-colors hover:border-primary/50 hover:bg-primary/[0.03]",
         dragging && "border-primary bg-primary/[0.05]"
       )}
-      onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
-      onDragEnter={(e) => { e.preventDefault(); setDragging(true); }}
+      onDragOver={(e) => { e.preventDefault(); if (!disabled) setDragging(true); }}
+      onDragEnter={(e) => { e.preventDefault(); if (!disabled) setDragging(true); }}
       onDragLeave={() => setDragging(false)}
       onDrop={(e) => {
         e.preventDefault();
