@@ -136,7 +136,7 @@ def evict_expired() -> int:
                 to_evict.append(key)
         for key in to_evict:
             _evict_entry(key)
-    return len(to_evict)
+    return len(to_evict) + _evict_expired_pending()
 
 
 def file_cache_stats() -> dict:
@@ -144,3 +144,83 @@ def file_cache_stats() -> dict:
         now = time.monotonic()
         live = sum(1 for _, (_, exp) in _file_cache.items() if exp > now)
         return {"total_entries": len(_file_cache), "live_entries": live}
+
+
+# ── Pending multi-sheet uploads ───────────────────────────────────────
+# A multi-sheet XLSX upload pauses for sheet selection. The raw bytes are
+# stashed on disk for a few minutes so picking a sheet doesn't force the
+# client to re-POST the entire file (painful exactly for the big files
+# where multi-sheet workbooks are common).
+
+# upload_id → (path, filename, user_id, expires_at)
+_pending_uploads: dict[str, tuple[str, str, str, float]] = {}
+_PENDING_TTL = 600  # 10 minutes — plenty for a sheet-picker dialog
+_MAX_PENDING = 20
+_pending_lock = threading.Lock()
+
+
+def stash_pending_upload(
+    upload_id: str, user_id: str, filename: str, data: bytes
+) -> None:
+    """Spool upload bytes to disk, keyed by the upload's provisional id."""
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".upload")
+    tmp.write(data)
+    tmp.close()
+    stale_paths: list[str] = []
+    with _pending_lock:
+        if upload_id in _pending_uploads:
+            stale_paths.append(_pending_uploads.pop(upload_id)[0])
+        while len(_pending_uploads) >= _MAX_PENDING:
+            oldest = min(_pending_uploads, key=lambda k: _pending_uploads[k][3])
+            stale_paths.append(_pending_uploads.pop(oldest)[0])
+        _pending_uploads[upload_id] = (
+            tmp.name, filename, user_id, time.monotonic() + _PENDING_TTL,
+        )
+    for path in stale_paths:
+        Path(path).unlink(missing_ok=True)
+    logger.info("Pending upload stashed: %s (%d bytes)", upload_id, len(data))
+
+
+def get_pending_upload(upload_id: str, user_id: str) -> tuple[bytes, str] | None:
+    """Return (bytes, filename) for a stashed upload, or None if it's
+    missing, expired, or owned by someone else."""
+    with _pending_lock:
+        entry = _pending_uploads.get(upload_id)
+        if entry is None:
+            return None
+        path, filename, owner, expires_at = entry
+        if owner != user_id:
+            return None
+        if time.monotonic() > expires_at:
+            _pending_uploads.pop(upload_id, None)
+            Path(path).unlink(missing_ok=True)
+            return None
+    try:
+        data = Path(path).read_bytes()
+    except OSError:
+        with _pending_lock:
+            _pending_uploads.pop(upload_id, None)
+        return None
+    return data, filename
+
+
+def discard_pending_upload(upload_id: str) -> None:
+    """Drop a stashed upload (after it has been fully processed)."""
+    with _pending_lock:
+        entry = _pending_uploads.pop(upload_id, None)
+    if entry:
+        Path(entry[0]).unlink(missing_ok=True)
+
+
+def _evict_expired_pending() -> int:
+    now = time.monotonic()
+    stale: list[tuple[str, str]] = []
+    with _pending_lock:
+        for key, (path, _, _, expires_at) in _pending_uploads.items():
+            if expires_at < now:
+                stale.append((key, path))
+        for key, _ in stale:
+            _pending_uploads.pop(key, None)
+    for _, path in stale:
+        Path(path).unlink(missing_ok=True)
+    return len(stale)
