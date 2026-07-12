@@ -38,16 +38,20 @@ export default function HistoryDrawer({
   const [steps, setSteps] = useState<TransformStep[]>([]);
   const [loading, setLoading] = useState(false);
   const [expandedSql, setExpandedSql] = useState<number | null>(null);
+  const [loadError, setLoadError] = useState(false);
 
   const fetchHistory = useCallback(async () => {
     if (!fileId) return;
     setLoading(true);
+    setLoadError(false);
     try {
       const res = await fetchWithAuth(`/api/files/${fileId}/history`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setSteps(data.steps || []);
     } catch (e) {
       console.error("Failed to fetch history:", e);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -79,7 +83,16 @@ export default function HistoryDrawer({
             </div>
           )}
 
-          {!loading && steps.length === 0 && (
+          {!loading && loadError && (
+            <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-center text-sm">
+              <p className="text-destructive">Couldn&apos;t load history.</p>
+              <button onClick={fetchHistory} className="mt-2 font-medium text-primary hover:underline">
+                Retry
+              </button>
+            </div>
+          )}
+
+          {!loading && !loadError && steps.length === 0 && (
             <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
               No transformations yet.
             </div>

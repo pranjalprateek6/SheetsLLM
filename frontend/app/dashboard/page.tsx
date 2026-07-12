@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import AuthGuard from "@/components/AuthGuard";
 import UsageCard from "@/components/UsageCard";
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
@@ -56,16 +57,20 @@ export default function DashboardPage() {
   const [renameValue, setRenameValue] = useState("");
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<FileItem | null>(null);
+  const [loadError, setLoadError] = useState(false);
 
   const fetchFiles = useCallback(async () => {
     setLoading(true);
+    setLoadError(false);
     try {
       const res = await fetchWithAuth("/api/files?page=1&page_size=50");
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setFiles(data.files || []);
       setTotal(data.total || 0);
     } catch (e) {
       console.error("Failed to load files:", e);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -85,32 +90,47 @@ export default function DashboardPage() {
 
   const handleDuplicate = async (fileId: string) => {
     setActionLoading(fileId);
-    try { await fetchWithAuth(`/api/files/${fileId}/duplicate`, { method: "POST" }); fetchFiles(); }
-    catch (e) { console.error("Duplicate failed:", e); }
-    finally { setActionLoading(null); }
+    try {
+      const r = await fetchWithAuth(`/api/files/${fileId}/duplicate`, { method: "POST" });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      toast.success("File duplicated");
+      fetchFiles();
+    } catch (e) {
+      console.error("Duplicate failed:", e);
+      toast.error("Couldn't duplicate the file. Please try again.");
+    } finally { setActionLoading(null); }
   };
 
   const confirmDelete = async () => {
     if (!deleteTarget) return;
     const fileId = deleteTarget.id;
+    const name = deleteTarget.name;
     setDeleteTarget(null);
     setActionLoading(fileId);
     try {
-      await fetchWithAuth(`/api/files/${fileId}`, { method: "DELETE" });
+      const r = await fetchWithAuth(`/api/files/${fileId}`, { method: "DELETE" });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
       setFiles((prev) => prev.filter((f) => f.id !== fileId));
       setTotal((t) => Math.max(0, t - 1));
-    } catch (e) { console.error("Delete failed:", e); }
-    finally { setActionLoading(null); }
+      toast.success(`Deleted "${name}"`);
+    } catch (e) {
+      console.error("Delete failed:", e);
+      toast.error(`Couldn't delete "${name}" — the file is untouched.`);
+    } finally { setActionLoading(null); }
   };
 
   const handleRename = async (fileId: string) => {
     if (!renameValue.trim()) { setRenamingId(null); return; }
     setActionLoading(fileId);
     try {
-      await fetchWithAuth(`/api/files/${fileId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: renameValue.trim() }) });
+      const r = await fetchWithAuth(`/api/files/${fileId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: renameValue.trim() }) });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
       setFiles((prev) => prev.map((f) => (f.id === fileId ? { ...f, name: renameValue.trim() } : f)));
       setRenamingId(null);
-    } catch (e) { console.error("Rename failed:", e); }
+    } catch (e) {
+      console.error("Rename failed:", e);
+      toast.error("Couldn't rename the file. Please try again.");
+    }
     finally { setActionLoading(null); }
   };
 
@@ -126,7 +146,10 @@ export default function DashboardPage() {
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
-    } catch (e) { console.error("Download failed:", e); }
+    } catch (e) {
+      console.error("Download failed:", e);
+      toast.error("Download failed. Please try again.");
+    }
   };
 
   const rowActions = (file: FileItem) => (
@@ -235,7 +258,17 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {!loading && filtered.length === 0 && (
+        {!loading && loadError && (
+          <div className="rounded-xl border border-destructive/30 bg-destructive/5 py-12 text-center">
+            <p className="font-medium text-destructive">Couldn&apos;t load your files</p>
+            <p className="mt-1 text-sm text-muted-foreground">Check your connection and try again.</p>
+            <Button variant="outline" className="mt-4" onClick={fetchFiles}>
+              Retry
+            </Button>
+          </div>
+        )}
+
+        {!loading && !loadError && filtered.length === 0 && (
           <div className="rounded-xl border border-dashed py-16 text-center">
             <FileSpreadsheet className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
             <p className="font-medium">{search ? "No files match your search" : "No files yet"}</p>
@@ -252,7 +285,7 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {!loading && filtered.length > 0 && view === "list" && (
+        {!loading && !loadError && filtered.length > 0 && view === "list" && (
           <div className="overflow-hidden rounded-xl border bg-card shadow-xs">
             <Table>
               <TableHeader>
@@ -293,7 +326,7 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {!loading && filtered.length > 0 && view === "grid" && (
+        {!loading && !loadError && filtered.length > 0 && view === "grid" && (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
             {filtered.map((file) => (
               <div

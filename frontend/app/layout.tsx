@@ -2,6 +2,7 @@ import "@/styles/globals.css";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { AuthProvider } from "@/contexts/AuthContext";
 import Header from "@/components/Header";
+import { Toaster } from "@/components/ui/sonner";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -29,6 +30,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <AuthProvider>
           <Header />
           <main>{children}</main>
+          <Toaster position="bottom-right" />
         </AuthProvider>
       </body>
     </html>

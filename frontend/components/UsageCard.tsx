@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { Gauge, Zap } from "lucide-react";
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -47,15 +48,42 @@ function barColor(pct: number) {
 export default function UsageCard({ embedded = false }: { embedded?: boolean }) {
   const router = useRouter();
   const [usage, setUsage] = useState<UsageSummary | null>(null);
+  const [state, setState] = useState<"loading" | "ready" | "error">("loading");
 
   useEffect(() => {
     fetchWithAuth("/api/usage")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => { if (d?.used && d?.limits) setUsage(d); })
-      .catch(() => {});
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error("bad status"))))
+      .then((d) => {
+        if (d?.used && d?.limits) {
+          setUsage(d);
+          setState("ready");
+        } else setState("error");
+      })
+      .catch(() => setState("error"));
   }, []);
 
-  if (!usage) return null;
+  if (state === "loading") {
+    return (
+      <div className={cn(!embedded && "mb-6 rounded-xl border bg-card p-5 shadow-xs")}>
+        <Skeleton className="mb-4 h-4 w-40" />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <Skeleton className="h-8" />
+          <Skeleton className="h-8" />
+          <Skeleton className="h-8" />
+        </div>
+      </div>
+    );
+  }
+
+  if (state === "error" || !usage) {
+    return (
+      <div className={cn(!embedded && "mb-6 rounded-xl border bg-card p-5 shadow-xs")}>
+        <p className="text-sm text-muted-foreground">
+          Usage information couldn&apos;t be loaded right now.
+        </p>
+      </div>
+    );
+  }
 
   const meters = METERS.map(({ key, label }) => {
     const used = usage.used[key] ?? 0;
