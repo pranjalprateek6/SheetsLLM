@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { BookMarked, Play, Trash2, Plus } from "lucide-react";
+import { BookMarked, Pencil, Play, Trash2, Plus } from "lucide-react";
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
 import { markOnboardingStep } from "@/components/GettingStarted";
 import { Button } from "@/components/ui/button";
@@ -57,6 +57,9 @@ export default function RecipesDrawer({
   const [upgradeWall, setUpgradeWall] = useState<string | null>(null);
   const [showSave, setShowSave] = useState(false);
   const [name, setName] = useState("");
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [renameSaving, setRenameSaving] = useState(false);
 
   const fetchRecipes = useCallback(async () => {
     setLoading(true);
@@ -154,6 +157,36 @@ export default function RecipesDrawer({
       setError("Failed to apply recipe.");
     } finally {
       setApplying(null);
+    }
+  };
+
+  const renameRecipe = async (recipe: Recipe) => {
+    const newName = renameValue.trim();
+    if (!newName || newName === recipe.name) {
+      setRenamingId(null);
+      return;
+    }
+    setRenameSaving(true);
+    setError(null);
+    try {
+      const res = await fetchWithAuth(`/api/recipes/${recipe.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newName }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.message || "Failed to rename recipe.");
+      } else {
+        setRenamingId(null);
+        setNotice(`Renamed to "${data.name}".`);
+        fetchRecipes();
+      }
+    } catch (e) {
+      console.error("Failed to rename recipe:", e);
+      setError("Failed to rename recipe.");
+    } finally {
+      setRenameSaving(false);
     }
   };
 
@@ -284,9 +317,26 @@ export default function RecipesDrawer({
               className="rounded-lg border p-3 transition-colors hover:bg-accent/50"
             >
               <div className="flex items-start justify-between gap-2">
-                <p className="min-w-0 flex-1 break-words text-sm font-medium text-foreground">
-                  {recipe.name}
-                </p>
+                {renamingId === recipe.id ? (
+                  <Input
+                    autoFocus
+                    value={renameValue}
+                    onChange={(e) => setRenameValue(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") renameRecipe(recipe);
+                      if (e.key === "Escape") setRenamingId(null);
+                    }}
+                    onBlur={() => !renameSaving && renameRecipe(recipe)}
+                    maxLength={120}
+                    disabled={renameSaving}
+                    aria-label="Recipe name"
+                    className="h-8 flex-1 text-sm"
+                  />
+                ) : (
+                  <p className="min-w-0 flex-1 break-words text-sm font-medium text-foreground">
+                    {recipe.name}
+                  </p>
+                )}
                 <Badge variant="secondary" className="shrink-0 tabular-nums">
                   {recipe.steps} step{recipe.steps !== 1 ? "s" : ""}
                 </Badge>
@@ -311,8 +361,22 @@ export default function RecipesDrawer({
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="ml-auto h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
+                  className="ml-auto h-7 px-2 text-xs text-muted-foreground"
+                  onClick={() => {
+                    setRenamingId(recipe.id);
+                    setRenameValue(recipe.name);
+                  }}
+                  aria-label={`Rename ${recipe.name}`}
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                  Rename
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
                   onClick={() => deleteRecipe(recipe)}
+                  aria-label={`Delete ${recipe.name}`}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                   Delete

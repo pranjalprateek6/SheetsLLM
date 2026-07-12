@@ -149,3 +149,121 @@ def test_recipe_incompatible_schema_fails_explain(source_and_target):
             "sql_query": "SELECT * FROM data WHERE revenue > 100"}]  # no such column
     with pytest.raises(Exception):
         replay_transformations_local(tgt, bad)
+
+# ── PATCH /recipes/{id} (rename / description) ───────────────────────
+
+import asyncio
+import json as _json
+import types as _types
+
+from app.routes import recipes as recipes_route
+
+
+def _patch_request(body: dict | str, user_id: str = "u1"):
+    async def _json_body():
+        if isinstance(body, str):
+            raise ValueError("not json")
+        return body
+    return _types.SimpleNamespace(
+        state=_types.SimpleNamespace(user_id=user_id),
+        json=_json_body,
+    )
+
+
+def _run_patch(body, monkeypatch_db_result, recipe_id="r1"):
+    return asyncio.run(recipes_route.update_recipe(_patch_request(body), recipe_id))
+
+
+def test_patch_renames_recipe(monkeypatch):
+    captured = {}
+
+    def _update(recipe_id, user_id, **updates):
+        captured.update(recipe=recipe_id, user=user_id, **updates)
+        return {"id": recipe_id, "name": updates.get("name", "old"),
+                "description": updates.get("description"), "source_file_id": "f1"}
+
+    monkeypatch.setattr(recipes_route.db, "update_recipe", _update)
+    monkeypatch.setattr(recipes_route.db, "create_audit_entry", lambda **kw: {})
+
+    resp = asyncio.run(
+        recipes_route.update_recipe(_patch_request({"name": "  Better name  "}), "r1")
+    )
+    assert resp["name"] == "Better name"
+    assert captured["name"] == "Better name"
+    assert captured["user"] == "u1"
+
+
+def test_patch_updates_description_only(monkeypatch):
+    captured = {}
+
+    def _update(recipe_id, user_id, **updates):
+        captured.update(updates)
+        return {"id": recipe_id, "name": "kept", "description": updates["description"]}
+
+    monkeypatch.setattr(recipes_route.db, "update_recipe", _update)
+    monkeypatch.setattr(recipes_route.db, "create_audit_entry", lambda **kw: {})
+
+    resp = asyncio.run(
+        recipes_route.update_recipe(_patch_request({"description": "monthly run"}), "r1")
+    )
+    assert resp["description"] == "monthly run"
+    assert "name" not in captured
+
+
+def test_patch_empty_name_rejected(monkeypatch):
+    monkeypatch.setattr(
+        recipes_route.db, "update_recipe",
+        lambda *a, **kw: pytest.fail("db should not be touched"),
+    )
+    resp = asyncio.run(
+        recipes_route.update_recipe(_patch_request({"name": "   "}), "r1")
+    )
+    assert resp.status_code == 400
+    assert _json.loads(resp.body)["code"] == "MISSING_NAME"
+
+
+def test_patch_name_too_long_rejected(monkeypatch):
+    monkeypatch.setattr(
+        recipes_route.db, "update_recipe",
+        lambda *a, **kw: pytest.fail("db should not be touched"),
+    )
+    resp = asyncio.run(
+        recipes_route.update_recipe(_patch_request({"name": "x" * 121}), "r1")
+    )
+    assert resp.status_code == 400
+    assert _json.loads(resp.body)["code"] == "NAME_TOO_LONG"
+
+
+def test_patch_no_fields_rejected(monkeypatch):
+    monkeypatch.setattr(
+        recipes_route.db, "update_recipe",
+        lambda *a, **kw: pytest.fail("db should not be touched"),
+    )
+    resp = asyncio.run(recipes_route.update_recipe(_patch_request({}), "r1"))
+    assert resp.status_code == 400
+    assert _json.loads(resp.body)["code"] == "NO_FIELDS"
+
+
+def test_patch_unknown_recipe_404(monkeypatch):
+    monkeypatch.setattr(recipes_route.db, "update_recipe", lambda *a, **kw: None)
+    resp = asyncio.run(
+        recipes_route.update_recipe(_patch_request({"name": "n"}), "ghost")
+    )
+    assert resp.status_code == 404
+    assert _json.loads(resp.body)["code"] == "RECIPE_NOT_FOUND"
+
+
+def test_patch_blank_description_clears_it(monkeypatch):
+    captured = {}
+
+    def _update(recipe_id, user_id, **updates):
+        captured.update(updates)
+        return {"id": recipe_id, "name": "kept", "description": None}
+
+    monkeypatch.setattr(recipes_route.db, "update_recipe", _update)
+    monkeypatch.setattr(recipes_route.db, "create_audit_entry", lambda **kw: {})
+
+    asyncio.run(
+        recipes_route.update_recipe(_patch_request({"description": "  "}), "r1")
+    )
+    assert captured["description"] is None
