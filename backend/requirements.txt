@@ -13,3 +13,4 @@ google-genai>=1.56.0
 pandas>=2.2.0
 openpyxl>=3.1.0
 razorpay>=1.4.0
+PyJWT[crypto]>=2.9.0
