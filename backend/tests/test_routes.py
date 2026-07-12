@@ -364,3 +364,49 @@ class TestUpload:
         )
         assert resp.status_code == 400
         assert resp.json()["code"] == "EMPTY_FILE"
+
+
+# ── /feedback ─────────────────────────────────────────────────────────
+
+
+class TestFeedback:
+    def test_feedback_recorded_as_event(self, client, monkeypatch):
+        from app import events
+
+        captured = {}
+
+        def _record(user_id, event, **props):
+            captured.update(user=user_id, event=event, **props)
+
+        monkeypatch.setattr(events, "record", _record)
+        resp = client.post("/feedback", json={
+            "message": "  Love the recipes feature!  ",
+            "email": "fan@example.com",
+            "path": "/workspace",
+        })
+        assert resp.status_code == 200
+        assert resp.json() == {"received": True}
+        assert captured["event"] == "feedback"
+        assert captured["message"] == "Love the recipes feature!"
+        assert captured["email"] == "fan@example.com"
+        assert captured["path"] == "/workspace"
+
+    def test_empty_message_400(self, client):
+        resp = client.post("/feedback", json={"message": "   "})
+        assert resp.status_code == 400
+        assert resp.json()["code"] == "MISSING_MESSAGE"
+
+    def test_too_long_message_400(self, client):
+        resp = client.post("/feedback", json={"message": "x" * 2001})
+        assert resp.status_code == 400
+        assert resp.json()["code"] == "MESSAGE_TOO_LONG"
+
+    def test_feedback_rate_limited(self, client, monkeypatch):
+        from app import events
+        from app.routes import feedback as feedback_module
+
+        monkeypatch.setattr(events, "record", lambda *a, **kw: None)
+        for _ in range(feedback_module._FEEDBACK_RATE_MAX):
+            assert client.post("/feedback", json={"message": "hi"}).status_code == 200
+        resp = client.post("/feedback", json={"message": "hi again"})
+        assert resp.status_code == 429
