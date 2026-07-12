@@ -43,7 +43,7 @@ function Toolbar() {
 
 function Grid() {
   return (
-    <div className="min-w-0 flex-1 overflow-hidden">
+    <div className="min-w-0 flex-1 overflow-x-auto">
       <table className="w-full border-collapse font-mono text-[10px] leading-none sm:text-[11px]">
         <thead>
           <tr className="border-b bg-muted/50 text-left text-muted-foreground">
