@@ -14,7 +14,9 @@ import ChatPanel from "@/components/ChatPanel";
 import SchemaPanel, { type SchemaColumn } from "@/components/SchemaPanel";
 import ChartPanel from "@/components/ChartPanel";
 import CommandPalette from "@/components/CommandPalette";
-import GettingStarted, { markOnboardingStep } from "@/components/GettingStarted";
+import FounderNote from "@/components/FounderNote";
+import GettingStarted, { markOnboardingStep, ONBOARDING_FLAGS } from "@/components/GettingStarted";
+import OnboardingIntent, { loadIntents, type Intent } from "@/components/OnboardingIntent";
 import KeyboardShortcuts from "@/components/KeyboardShortcuts";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import AuthGuard from "@/components/AuthGuard";
@@ -49,6 +51,13 @@ const EXAMPLE_PROMPTS = [
   "Add column Profit = Revenue - Cost",
 ];
 
+// Intent → the sample dataset that matches it (ids from SAMPLE_DATASETS)
+const INTENT_TO_SAMPLE: Partial<Record<Intent, string>> = {
+  sales: "sales",
+  hr: "employees",
+  survey: "survey",
+};
+
 function WorkspaceContent() {
   const searchParams = useSearchParams();
   const urlFileId = searchParams.get("file_id");
@@ -79,6 +88,33 @@ function WorkspaceContent() {
   const [sampleSuggestions, setSampleSuggestions] = useState<string[] | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [fileLoadError, setFileLoadError] = useState(false);
+  // null = question not yet answered; [] = skipped
+  const [intents, setIntents] = useState<Intent[] | null>(null);
+  const [intentsLoaded, setIntentsLoaded] = useState(false);
+
+  useEffect(() => {
+    setIntents(loadIntents());
+    setIntentsLoaded(true);
+  }, []);
+
+  // Answers unlock something visible: matching samples float to the top
+  // and the starter prompts speak the user's domain.
+  const matchedSampleIds = (intents ?? [])
+    .map((i) => INTENT_TO_SAMPLE[i])
+    .filter((id): id is string => !!id);
+  const orderedSamples = [
+    ...SAMPLE_DATASETS.filter((s) => matchedSampleIds.includes(s.id)),
+    ...SAMPLE_DATASETS.filter((s) => !matchedSampleIds.includes(s.id)),
+  ];
+  const personalizedPrompts =
+    matchedSampleIds.length > 0
+      ? Array.from(
+          new Set(
+            SAMPLE_DATASETS.filter((s) => matchedSampleIds.includes(s.id))
+              .flatMap((s) => s.suggestions)
+          )
+        ).slice(0, 4)
+      : EXAMPLE_PROMPTS;
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -353,7 +389,24 @@ function WorkspaceContent() {
     setRows(p.rows);
     if (typeof p.totalRows === "number") setRowCount(p.totalRows);
     if (typeof p.totalColumns === "number") setColumnCount(p.totalColumns);
+    // Celebrate the aha moment once — and point at the step that makes
+    // this product different (the recipe), while the win is fresh.
+    let firstTransform = false;
+    try {
+      firstTransform = localStorage.getItem(ONBOARDING_FLAGS.transform) !== "true";
+    } catch {}
     markOnboardingStep("transform");
+    if (firstTransform) {
+      toast.success("That was your first transform — saved as step 1, undo anytime.", {
+        description:
+          "When your cleanup is done, save the chain as a recipe: next month's file becomes one click.",
+        duration: 9000,
+        action: {
+          label: "See recipes",
+          onClick: () => setRecipesOpen(true),
+        },
+      });
+    }
   }, []);
 
   return (
@@ -417,22 +470,45 @@ function WorkspaceContent() {
                     <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       No file handy? Try a sample
                     </p>
+                    {/* One-frame gate: render the list only after saved intents
+                        are read, so returning users never see it reorder */}
                     <div className="space-y-1.5">
-                      {SAMPLE_DATASETS.map((sample) => (
-                        <button
-                          key={sample.id}
-                          onClick={() => loadSample(sample.id)}
-                          disabled={loading}
-                          className="w-full rounded-lg border bg-background px-3 py-2 text-left shadow-xs transition-colors hover:border-primary/40 hover:bg-primary/[0.03] disabled:opacity-50"
-                        >
-                          <span className="text-sm font-medium">{sample.name}</span>
-                          <span className="mt-0.5 block text-xs text-muted-foreground">{sample.description}</span>
-                        </button>
-                      ))}
+                      {intentsLoaded && orderedSamples.map((sample) => {
+                        const picked = matchedSampleIds.includes(sample.id);
+                        return (
+                          <button
+                            key={sample.id}
+                            onClick={() => loadSample(sample.id)}
+                            disabled={loading}
+                            className={`w-full rounded-lg border px-3 py-2 text-left shadow-xs transition-colors hover:border-primary/40 hover:bg-primary/[0.03] disabled:opacity-50 ${
+                              picked ? "border-primary/40 bg-primary/[0.04]" : "bg-background"
+                            }`}
+                          >
+                            <span className="flex items-center gap-2 text-sm font-medium">
+                              {sample.name}
+                              {picked && (
+                                <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                                  Picked for you
+                                </span>
+                              )}
+                            </span>
+                            <span className="mt-0.5 block text-xs text-muted-foreground">{sample.description}</span>
+                          </button>
+                        );
+                      })}
                     </div>
+                    {matchedSampleIds.length > 0 && (
+                      <p className="mt-3 text-xs text-muted-foreground">
+                        Your first cleaned file is about 2 minutes away — and next
+                        month&apos;s takes one click.
+                      </p>
+                    )}
                   </div>
                 </div>
                 <div className="space-y-4">
+                  {intentsLoaded && intents === null && (
+                    <OnboardingIntent onDone={setIntents} />
+                  )}
                   <GettingStarted />
                   <div className="rounded-2xl border bg-card p-5 shadow-xs">
                     <div className="flex items-start gap-3">
@@ -442,13 +518,14 @@ function WorkspaceContent() {
                       <div>
                         <h3 className="mb-2 text-sm font-medium">Things you can say</h3>
                         <ul className="space-y-1.5 text-sm text-muted-foreground">
-                          {EXAMPLE_PROMPTS.map((p) => (
+                          {personalizedPrompts.map((p) => (
                             <li key={p}>&ldquo;{p}&rdquo;</li>
                           ))}
                         </ul>
                       </div>
                     </div>
                   </div>
+                  <FounderNote />
                   <div className="rounded-2xl border bg-card p-5 shadow-xs">
                     <h3 className="mb-2 text-sm font-medium">Keyboard shortcuts</h3>
                     <ul className="space-y-1.5 text-sm text-muted-foreground">

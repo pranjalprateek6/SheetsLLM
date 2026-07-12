@@ -30,29 +30,49 @@ const ITEMS = [
 ];
 
 export default function GettingStarted() {
-  const [visible, setVisible] = useState(false);
+  const [state, setState] = useState<"hidden" | "open" | "collapsed">("hidden");
   const [doneMap, setDoneMap] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     try {
-      if (localStorage.getItem(ONBOARDING_DISMISSED_KEY) === "true") return;
       const map: Record<string, boolean> = {};
       for (const item of ITEMS) map[item.key] = item.done();
       if (Object.values(map).every(Boolean)) return; // all done — nothing to show
       setDoneMap(map);
-      setVisible(true);
+      // Dismissed collapses to a pill instead of vanishing — checklists
+      // that stick around keep pulling users back to the milestones.
+      setState(localStorage.getItem(ONBOARDING_DISMISSED_KEY) === "true" ? "collapsed" : "open");
     } catch {}
   }, []);
 
-  if (!visible) return null;
+  if (state === "hidden") return null;
 
   const doneCount = Object.values(doneMap).filter(Boolean).length;
   const pct = Math.round((doneCount / ITEMS.length) * 100);
 
   const dismiss = () => {
     try { localStorage.setItem(ONBOARDING_DISMISSED_KEY, "true"); } catch {}
-    setVisible(false);
+    setState("collapsed");
   };
+
+  const reopen = () => {
+    try { localStorage.removeItem(ONBOARDING_DISMISSED_KEY); } catch {}
+    setState("open");
+  };
+
+  if (state === "collapsed") {
+    return (
+      <button
+        onClick={reopen}
+        className="inline-flex items-center gap-2 rounded-full border bg-card px-3 py-1.5 text-xs text-muted-foreground shadow-xs transition-colors hover:border-primary/40 hover:text-foreground"
+      >
+        <span className="flex h-4 w-4 items-center justify-center rounded-full bg-primary/10">
+          <Check className="h-2.5 w-2.5 text-primary" />
+        </span>
+        Getting started · {doneCount}/{ITEMS.length}
+      </button>
+    );
+  }
 
   return (
     <div className="rounded-2xl border bg-card p-5 shadow-xs">
