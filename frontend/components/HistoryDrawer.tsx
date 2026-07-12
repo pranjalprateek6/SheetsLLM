@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { History as HistoryIcon, RotateCcw, ChevronRight, Code } from "lucide-react";
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
+import EmptyState from "@/components/EmptyState";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -93,8 +94,13 @@ export default function HistoryDrawer({
           )}
 
           {!loading && !loadError && steps.length === 0 && (
-            <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-              No transformations yet.
+            <div className="rounded-lg border border-dashed">
+              <EmptyState
+                compact
+                variant="history"
+                title="No transformations yet"
+                description="Every step you apply shows up here — with one-click revert to any point."
+              />
             </div>
           )}
 
