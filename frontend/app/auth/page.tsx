@@ -48,7 +48,7 @@ function AuthContent() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(
-    searchParams.get("expired") ? "Your session expired — please sign in again." : null
+    searchParams.get("expired") ? "Your session expired. Please sign in again." : null
   );
   const [success, setSuccess] = useState<string | null>(null);
   const [confirmationSent, setConfirmationSent] = useState(false);
@@ -64,7 +64,7 @@ function AuthContent() {
     if (desc) {
       setError(
         /provider is not enabled/i.test(desc)
-          ? "Google sign-in isn't available yet — use email and password for now."
+          ? "Google sign-in isn't available yet. Use email and password for now."
           : desc.replace(/\+/g, " ")
       );
     }
@@ -92,7 +92,7 @@ function AuthContent() {
     if (err) {
       setError(
         /provider is not enabled/i.test(err)
-          ? "Google sign-in isn't available yet — use email and password for now."
+          ? "Google sign-in isn't available yet. Use email and password for now."
           : err
       );
       setLoading(false);
@@ -123,7 +123,7 @@ function AuthContent() {
       if (mode === "forgot") {
         const { error: err } = await resetPassword(email);
         if (err) setError(err);
-        else setSuccess("Reset link sent — check your email (and spam folder).");
+        else setSuccess("Reset link sent. Check your email (and spam folder).");
       } else if (mode === "signup") {
         const { error: err, needsConfirmation } = await signUp(email, password);
         if (err) setError(err);
@@ -138,7 +138,7 @@ function AuthContent() {
         if (err) {
           setError(
             /confirm/i.test(err)
-              ? "Your email isn't confirmed yet — click the link in the confirmation email first."
+              ? "Your email isn't confirmed yet. Click the link in the confirmation email first."
               : err
           );
         }

@@ -41,11 +41,13 @@ export default function RecipesDrawer({
   open,
   onClose,
   fileId,
+  fileName,
   onApplied,
 }: {
   open: boolean;
   onClose: () => void;
   fileId?: string;
+  fileName?: string;
   onApplied: (result: RecipeApplyResult) => void;
 }) {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
@@ -93,10 +95,14 @@ export default function RecipesDrawer({
       setError(null);
       setNotice(null);
       setUpgradeWall(null);
+      // Reset the save form so a stale name from a previous file can't
+      // block the smart default on the next open.
+      setShowSave(false);
+      setName("");
       fetchRecipes();
       fetchStepCount();
     }
-  }, [open, fetchRecipes, fetchStepCount]);
+  }, [open, fileId, fetchRecipes, fetchStepCount]);
 
   const saveRecipe = async () => {
     if (!fileId || !name.trim()) return;
@@ -149,7 +155,7 @@ export default function RecipesDrawer({
       if (!res.ok) {
         setError(data.message || "Failed to apply recipe.");
       } else {
-        setNotice(`Applied "${recipe.name}" — ${data.steps_added} steps added.`);
+        setNotice(`Applied "${recipe.name}": ${data.steps_added} steps added.`);
         onApplied(data as RecipeApplyResult);
         fetchStepCount();
       }
@@ -230,7 +236,14 @@ export default function RecipesDrawer({
                   variant="outline"
                   size="sm"
                   className="w-full"
-                  onClick={() => setShowSave(true)}
+                  onClick={() => {
+                    setShowSave(true);
+                    // Smart default: scanning and adjusting a suggested name
+                    // is easier than composing one from a blank field.
+                    if (!name.trim() && fileName) {
+                      setName(`${fileName.replace(/\.[^/.]+$/, "")} cleanup`);
+                    }
+                  }}
                   disabled={stepCount === 0}
                 >
                   <Plus className="h-4 w-4" />
@@ -311,7 +324,7 @@ export default function RecipesDrawer({
                 compact
                 variant="recipes"
                 title="No recipes yet"
-                description="Transform a file, then save the chain here to re-apply it to future uploads — no AI call needed."
+                description="Transform a file, then save the chain here to re-apply it to future uploads. No AI call needed."
               />
             </div>
           )}

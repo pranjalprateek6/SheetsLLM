@@ -95,7 +95,7 @@ function SagePanel() {
           Remove duplicate orders and standardize the dates
         </div>
         <div className="mr-3 rounded-lg rounded-bl-sm border bg-background px-2.5 py-1.5">
-          <p>Done — 12 duplicates removed, dates now ISO format.</p>
+          <p>Done. 12 duplicates removed, dates now ISO format.</p>
           <p className="mt-1 rounded bg-muted/70 px-1.5 py-1 font-mono text-[9px] text-muted-foreground">
             SELECT DISTINCT * REPLACE(strptime(order_date, &apos;%d/%m/%Y&apos;)::DATE AS order_date) FROM data
           </p>

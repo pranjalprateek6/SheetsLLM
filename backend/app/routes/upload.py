@@ -65,7 +65,7 @@ async def upload(
         if pending is None:
             return _json_response(
                 410, "PENDING_UPLOAD_EXPIRED",
-                "The uploaded file is no longer cached — please upload it again.",
+                "The uploaded file is no longer cached. Please upload it again.",
             )
         file_bytes, filename = pending
         # Reuse the provisional id: no record was created under it, the

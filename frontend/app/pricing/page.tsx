@@ -3,7 +3,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
-  ArrowRight, Check, Loader2, Minus, ShieldCheck, Sparkles, Undo2, Zap,
+  ArrowRight, Check, Loader2, ShieldCheck, Sparkles, Undo2, Zap,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
@@ -26,7 +26,7 @@ const FREE_FEATURES = [
 ];
 
 const PRO_FEATURES = [
-  "Unlimited saved recipes — automate every recurring export",
+  "Unlimited saved recipes to automate every recurring export",
   "1,000 uploads / month",
   "5,000 AI transforms / month",
   "Priority email support",
@@ -51,30 +51,30 @@ const COMPARISON: { label: string; free: string; pro: string }[] = [
 const REASONS: Record<string, { headline: string; sub: string }> = {
   transforms: {
     headline: "You've used this month's 200 AI transforms",
-    sub: "Pro lifts the cap to 5,000 — upgrade and pick up right where you stopped.",
+    sub: "Pro lifts the cap to 5,000. Upgrade and pick up right where you stopped.",
   },
   uploads: {
     headline: "You've used this month's 50 uploads",
-    sub: "Pro lifts the cap to 1,000 — upgrade and keep the files coming.",
+    sub: "Pro lifts the cap to 1,000. Upgrade and keep the files coming.",
   },
   chat_requests: {
     headline: "You've used this month's 200 chat messages",
-    sub: "Pro lifts the cap to 5,000 — upgrade and keep the conversation going.",
+    sub: "Pro lifts the cap to 5,000. Upgrade and keep the conversation going.",
   },
   recipes: {
     headline: "The Free plan holds one saved recipe",
-    sub: "Pro is unlimited — save a recipe for every export that keeps coming back.",
+    sub: "Pro is unlimited. Save a recipe for every export that keeps coming back.",
   },
 };
 
 const FAQ = [
   {
     q: "What is a recipe?",
-    a: "A recipe is a saved cleanup pipeline. Describe your transformation once in plain English, save the steps, and re-apply them to next month's export in one click — no AI call, same result every time.",
+    a: "A recipe is a saved cleanup pipeline. Describe your transformation once in plain English, save the steps, and re-apply them to next month's export in one click. No AI call, same result every time.",
   },
   {
     q: "Does my data get sent to the AI?",
-    a: "Only a small schema summary (column names, types, and a few sample values) is sent to generate SQL — never your full dataset. Turn on strict privacy mode and the AI sees column names and types only.",
+    a: "Only a small schema summary (column names, types, and a few sample values) is sent to generate SQL, never your full dataset. Turn on strict privacy mode and the AI sees column names and types only.",
   },
   {
     q: "What happens when I hit a Free limit?",
@@ -82,11 +82,11 @@ const FAQ = [
   },
   {
     q: "Do I lose my recipes if I move back to Free?",
-    a: "No. Every recipe you saved on Pro keeps working — you can apply them to new files as usual. The Free cap only limits saving new recipes.",
+    a: "No. Every recipe you saved on Pro keeps working. You can apply them to new files as usual. The Free cap only limits saving new recipes.",
   },
   {
     q: "Can I cancel anytime?",
-    a: "Yes. Cancel with one click — you keep Pro access until the end of the paid period, then move back to Free without losing any data.",
+    a: "Yes. Cancel with one click. You keep Pro access until the end of the paid period, then move back to Free without losing any data.",
   },
 ];
 
@@ -96,7 +96,7 @@ const UPGRADE_TIMELINE = [
   {
     icon: Zap,
     title: "Instantly",
-    body: "Your limits lift the moment payment goes through — mid-session, no restart.",
+    body: "Your limits lift the moment payment goes through, mid-session, no restart.",
   },
   {
     icon: Undo2,
@@ -171,7 +171,7 @@ function PricingContent() {
         if (d.tier === "pro") {
           stopPolling();
           setTier("pro");
-          setNotice("Payment received — welcome to Pro! Your new limits are active.");
+          setNotice("Payment received. Welcome to Pro! Your new limits are active.");
         }
       } catch {
         /* keep polling */
@@ -238,7 +238,7 @@ function PricingContent() {
         </h1>
         <p className="mx-auto mt-3 max-w-xl text-balance text-muted-foreground">
           A saved recipe turns a 30-minute monthly cleanup into one click.
-          Start free — upgrade when the cleanups become a routine.
+          Start free. Upgrade when the cleanups become a routine.
         </p>
         {tier && (
           <Badge variant="secondary" className="mt-4 capitalize">
@@ -269,7 +269,7 @@ function PricingContent() {
         <div className="mb-6 flex flex-wrap items-center justify-center gap-3 rounded-lg border bg-card p-3 text-sm shadow-xs">
           <Loader2 className="h-4 w-4 animate-spin text-primary" />
           <span>
-            Complete the payment in the Razorpay tab — this page updates automatically once
+            Complete the payment in the Razorpay tab. This page updates automatically once
             it goes through.
           </span>
           {checkoutUrl && (
@@ -334,7 +334,7 @@ function PricingContent() {
             ₹499<span className="text-base font-normal text-muted-foreground">/mo</span>
           </p>
           <p className="mt-1.5 text-sm text-muted-foreground">
-            About ₹17 a day — for the export that lands every week.
+            About ₹17 a day, less than the manual cleanup it replaces.
           </p>
           <ul className="mt-6 flex-1 space-y-2.5">
             {PRO_FEATURES.map((f) => (
@@ -371,7 +371,7 @@ function PricingContent() {
             )}
             {!isPro && (
               <p className="mt-2 text-center text-xs text-muted-foreground">
-                No commitment — cancel anytime in one click.
+                No commitment. Cancel anytime in one click.
               </p>
             )}
           </div>
@@ -430,8 +430,7 @@ function PricingContent() {
                     {row.label}
                   </th>
                   <td className="px-3 py-2.5 text-center tabular-nums text-muted-foreground">
-                    {row.free === "✓" ? <Check className="mx-auto h-4 w-4 text-foreground/40" /> :
-                      row.free === "—" ? <Minus className="mx-auto h-4 w-4 text-muted-foreground/40" /> : row.free}
+                    {row.free === "✓" ? <Check className="mx-auto h-4 w-4 text-foreground/40" /> : row.free}
                   </td>
                   <td className="px-3 py-2.5 text-center font-medium tabular-nums">
                     {row.pro === "✓" ? <Check className="mx-auto h-4 w-4 text-primary" /> : row.pro}

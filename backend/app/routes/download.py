@@ -120,7 +120,7 @@ def download(
         if row_count > _XLSX_MAX_ROWS:
             return _json_response(
                 400, "TOO_MANY_ROWS_FOR_XLSX",
-                f"This file has {row_count:,} rows — Excel export supports up "
+                f"This file has {row_count:,} rows. Excel export supports up "
                 f"to {_XLSX_MAX_ROWS:,}. Download as CSV or Parquet instead.",
             )
         try:

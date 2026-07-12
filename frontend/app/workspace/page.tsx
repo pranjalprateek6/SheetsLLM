@@ -238,12 +238,12 @@ function WorkspaceContent() {
         markOnboardingStep("upload");
         const nRows = data.preview.total_rows ?? data.preview.rows?.length ?? 0;
         const nCols = data.preview.total_columns ?? data.preview.columns?.length ?? 0;
-        toast.success(`Uploaded — ${nRows.toLocaleString()} rows × ${nCols.toLocaleString()} columns detected`);
+        toast.success(`Uploaded: ${nRows.toLocaleString()} rows × ${nCols.toLocaleString()} columns detected`);
         return true;
       }
     } catch (error) {
       console.error("Upload error:", error);
-      setUploadError("Upload failed — check your connection and try again.");
+      setUploadError("Upload failed. Check your connection and try again.");
     } finally {
       setLoading(false);
     }
@@ -312,13 +312,13 @@ function WorkspaceContent() {
         setColumnCount(data.preview?.total_columns ?? data.total_columns ?? columns.length);
         toast.success("Last step undone");
       } else if (data.code === "NOTHING_TO_UNDO") {
-        toast.info("Nothing to undo — you're at the original file.");
+        toast.info("Nothing to undo. You're at the original file.");
       } else {
         toast.error(data.message || "Undo failed. Please try again.");
       }
     } catch (e) {
       console.error("Undo failed:", e);
-      toast.error("Undo failed — check your connection.");
+      toast.error("Undo failed. Check your connection.");
     } finally {
       setLoading(false);
     }
@@ -339,13 +339,13 @@ function WorkspaceContent() {
         setRows(data.preview?.rows ?? data.preview ?? []);
         setRowCount(data.preview?.total_rows ?? data.total_rows ?? 0);
         setColumnCount(data.preview?.total_columns ?? data.total_columns ?? 0);
-        toast.success("All steps reset — back to the original file");
+        toast.success("All steps reset. You're back to the original file");
       } else {
         toast.error(data.message || "Reset failed. Please try again.");
       }
     } catch (error) {
       console.error("Reset failed", error);
-      toast.error("Reset failed — check your connection.");
+      toast.error("Reset failed. Check your connection.");
     } finally {
       setLoading(false);
     }
@@ -390,7 +390,7 @@ function WorkspaceContent() {
       setHistoryOpen(false);
     } catch (e) {
       console.error("Revert failed:", e);
-      toast.error("Revert failed — check your connection.");
+      toast.error("Revert failed. Check your connection.");
     } finally {
       setLoading(false);
     }
@@ -409,7 +409,7 @@ function WorkspaceContent() {
     } catch {}
     markOnboardingStep("transform");
     if (firstTransform) {
-      toast.success("That was your first transform — saved as step 1, undo anytime.", {
+      toast.success("That was your first transform. It's saved as step 1, undo anytime.", {
         description:
           "When your cleanup is done, save the chain as a recipe: next month's file becomes one click.",
         duration: 9000,
@@ -480,8 +480,8 @@ function WorkspaceContent() {
                     </span>{" "}
                     <span className="text-muted-foreground">
                       {matchedSampleIds.length > 0
-                        ? "Your samples and starter ideas below are ready — first cleaned file is about 2 minutes away."
-                        : "Starter ideas below now cover a bit of everything — first cleaned file is about 2 minutes away."}
+                        ? "Your samples and starter ideas below are ready. Your first cleaned file is about 2 minutes away."
+                        : "Starter ideas below now cover a bit of everything. Your first cleaned file is about 2 minutes away."}
                     </span>
                   </p>
                   <button
@@ -705,6 +705,7 @@ function WorkspaceContent() {
           open={recipesOpen}
           onClose={() => setRecipesOpen(false)}
           fileId={fileId}
+          fileName={fileName}
           onApplied={(result: RecipeApplyResult) => {
             setColumns(result.preview.columns);
             setRows(result.preview.rows);

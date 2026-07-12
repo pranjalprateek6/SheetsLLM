@@ -156,3 +156,17 @@
 ::-webkit-scrollbar-thumb:hover {
   background: hsl(220 10% 72%);
 }
+
+/* Honor the OS reduce-motion preference: collapse CSS animations and
+   transitions to imperceptible durations (framer-motion is handled by
+   MotionConfig in the provider tree). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

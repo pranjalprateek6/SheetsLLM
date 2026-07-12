@@ -4,7 +4,7 @@ import { ArrowRight, Copy, FileJson, Scissors, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export const metadata: Metadata = {
-  title: "Free CSV & JSON Tools — Private, In-Browser, No Signup",
+  title: "Free CSV & JSON Tools: Private, In-Browser, No Signup",
   description:
     "Free online tools for spreadsheet files: CSV duplicate remover, JSON to CSV converter, CSV splitter for Excel's row limit, and CSV cleaner. Everything runs in your browser.",
   alternates: { canonical: "/tools" },
@@ -15,7 +15,7 @@ const TOOLS = [
     href: "/tools/csv-deduplicate",
     icon: Copy,
     name: "CSV duplicate remover",
-    desc: "Delete duplicate rows — match on the whole row or specific columns.",
+    desc: "Delete duplicate rows, matching on the whole row or specific columns.",
   },
   {
     href: "/tools/json-to-csv",
@@ -43,8 +43,8 @@ export default function ToolsIndex() {
       <div className="mb-10 text-center">
         <h1 className="text-3xl font-semibold tracking-tight">Free CSV &amp; JSON tools</h1>
         <p className="mx-auto mt-3 max-w-xl text-muted-foreground">
-          Quick fixes for messy data files. Every tool runs entirely in your browser —
-          no upload, no signup, no data collection.
+          Quick fixes for messy data files. Every tool runs entirely in your browser.
+          No upload, no signup, no data collection.
         </p>
       </div>
 
@@ -70,7 +70,7 @@ export default function ToolsIndex() {
           Same cleanup every week? Stop doing it by hand.
         </h2>
         <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-          SheetsLLM turns any cleanup into a saved recipe you re-run on every new export —
+          SheetsLLM turns any cleanup into a saved recipe you re-run on every new export,
           described in plain English, with your data never sent to the AI.
         </p>
         <Button className="mt-5" asChild>

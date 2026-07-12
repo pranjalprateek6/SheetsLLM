@@ -149,9 +149,18 @@ def summary(user_id: str) -> dict:
     except Exception as exc:
         logger.error("usage summary failed for %s: %s", user_id, exc)
         row = dict(_ZERO)
+    # Recipe applies this month: each one is a cleanup nobody did by hand.
+    # Best-effort; the summary must work even if the count query fails.
+    try:
+        recipe_applies = db.count_audit_actions(
+            user_id, "recipe_apply", f"{month_key()}T00:00:00Z"
+        )
+    except Exception:
+        recipe_applies = 0
     return {
         "tier": tier,
         "month": month_key(),
         "used": {k: int(row.get(k, 0)) for k in ("uploads", "transforms", "chat_requests", "rows_processed")},
+        "recipe_applies": recipe_applies,
         "limits": limits,
     }

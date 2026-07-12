@@ -99,7 +99,7 @@ export default function HistoryDrawer({
                 compact
                 variant="history"
                 title="No transformations yet"
-                description="Every step you apply shows up here — with one-click revert to any point."
+                description="Every step you apply shows up here, with one-click revert to any point."
               />
             </div>
           )}
