@@ -40,12 +40,19 @@ _DEFAULT_TIMEOUT = 10
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Run periodic cache/job cleanup while the app is alive."""
+    # Any persisted job still "processing" belonged to the previous
+    # (dead) process — fail it so pollers stop waiting.
+    try:
+        await asyncio.to_thread(jobs.sweep_orphaned)
+    except Exception:
+        pass
+
     async def _eviction_loop():
         while True:
             await asyncio.sleep(300)
             try:
-                cache.evict_expired()
-                jobs.evict_expired()
+                await asyncio.to_thread(cache.evict_expired)
+                await asyncio.to_thread(jobs.evict_expired)
             except Exception:
                 pass
 
