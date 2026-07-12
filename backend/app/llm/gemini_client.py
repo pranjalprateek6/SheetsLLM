@@ -4,7 +4,7 @@ from google import genai
 from google.genai import types
 
 from app.config import GEMINI_API_KEY, GEMINI_MODEL, LLM_PROVIDER
-from .adapter import LlmClient, LlmError
+from .adapter import LlmClient, LlmError, call_with_retry
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +35,7 @@ class GeminiClient(LlmClient):
         self.model_name = GEMINI_MODEL
 
     def generate_sql(self, system_prompt: str, user_message: str) -> str:
-        try:
+        def _call() -> str:
             result = self.client.models.generate_content(
                 model=self.model_name,
                 contents=[user_message],
@@ -44,7 +44,9 @@ class GeminiClient(LlmClient):
                     temperature=0,
                 ),
             )
-            content = result.text or ""
-            return content.strip()
+            return (result.text or "").strip()
+
+        try:
+            return call_with_retry(_call)
         except Exception as exc:
             raise LlmError(f"Gemini request failed: {exc}") from exc

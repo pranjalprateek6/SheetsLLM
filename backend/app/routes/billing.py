@@ -1,8 +1,8 @@
-"""Billing — Stripe checkout, customer portal, and webhook.
+"""Billing — Razorpay subscription checkout, cancel, and webhook.
 
-POST /billing/checkout   create a Checkout session, return its URL
-POST /billing/portal     create a Customer Portal session, return its URL
-POST /billing/webhook    Stripe webhook (signature-verified; public path)
+POST /billing/checkout   create a subscription, return its hosted payment URL
+POST /billing/cancel     cancel the caller's subscription (no hosted portal)
+POST /billing/webhook    Razorpay webhook (HMAC-verified; public path)
 GET  /billing/status     current tier + whether billing is configured
 """
 
@@ -90,7 +90,7 @@ async def webhook(request: Request):
     try:
         billing.handle_event(event)
     except Exception as exc:
-        # Return 500 so Stripe retries; the event was validly signed.
+        # Return 500 so Razorpay retries; the event was validly signed.
         logger.error("webhook handling failed for %s: %s", event.get("type"), exc)
         return _json_response(500, "WEBHOOK_HANDLING_FAILED", "Retry later")
 

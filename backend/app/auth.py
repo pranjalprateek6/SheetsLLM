@@ -63,8 +63,9 @@ async def verify_token(request: Request) -> dict:
         ) from exc
 
 
-# Public routes that skip auth. The Stripe webhook authenticates via its own
-# signature header, not a JWT.
+# Public routes that skip auth. The Razorpay webhook authenticates via its
+# own HMAC signature header, not a JWT. /docs and /openapi.json only exist
+# outside production (gated in main.py).
 PUBLIC_PATHS = frozenset(
-    {"/health", "/auth/callback", "/docs", "/openapi.json", "/billing/webhook"}
+    {"/health", "/docs", "/openapi.json", "/billing/webhook"}
 )

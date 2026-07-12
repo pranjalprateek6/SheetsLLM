@@ -3,7 +3,7 @@ import logging
 import httpx
 
 from app.config import OPENAI_API_KEY, OPENAI_MODEL
-from .adapter import LlmClient, LlmError
+from .adapter import LlmClient, LlmError, call_with_retry
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +26,7 @@ class OpenAIClient(LlmClient):
             "temperature": 0.0,
         }
 
-        try:
+        def _call() -> dict:
             with httpx.Client(timeout=60) as client:
                 response = client.post(
                     "https://api.openai.com/v1/chat/completions",
@@ -34,7 +34,10 @@ class OpenAIClient(LlmClient):
                     json=payload,
                 )
                 response.raise_for_status()
-                data = response.json()
+                return response.json()
+
+        try:
+            data = call_with_retry(_call)
         except httpx.HTTPStatusError as exc:
             raise LlmError(
                 f"OpenAI request failed: {exc.response.status_code} {exc.response.text}"
