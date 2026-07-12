@@ -9,7 +9,11 @@ import { Button } from "@/components/ui/button";
    choice visibly unlocks something instead of feeding a database.
    Multi-select on purpose: people rarely have exactly one kind of messy
    export. Skippable in one click — the fastest path to value is still
-   just uploading a file. */
+   just uploading a file.
+
+   Rendered as a full-width strip above the upload grid: it reads as the
+   flow's natural first step and sits directly above the samples it
+   personalizes. */
 
 export const INTENTS_KEY = "sllm_intents";
 
@@ -61,41 +65,45 @@ export default function OnboardingIntent({
 
   return (
     <div className="rounded-2xl border bg-card p-5 shadow-xs">
-      <h3 className="text-sm font-medium">What kind of files land on your desk?</h3>
-      <p className="mt-1 text-xs text-muted-foreground">
-        Pick any that fit — we&apos;ll line up the right sample and starter ideas.
-      </p>
-      <div className="mt-3 flex flex-wrap gap-2">
-        {OPTIONS.map((opt) => {
-          const active = selected.includes(opt.key);
-          return (
-            <button
-              key={opt.key}
-              onClick={() => toggle(opt.key)}
-              aria-pressed={active}
-              className={cn(
-                "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
-                active
-                  ? "border-primary bg-primary/10 text-primary"
-                  : "bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground"
-              )}
-            >
-              <opt.icon className="h-3.5 w-3.5" />
-              {opt.label}
-            </button>
-          );
-        })}
-      </div>
-      <div className="mt-4 flex items-center gap-3">
-        <Button size="sm" onClick={confirm} disabled={selected.length === 0}>
-          Set me up
-        </Button>
-        <button
-          onClick={skip}
-          className="text-xs text-muted-foreground underline-offset-2 hover:underline"
-        >
-          Skip — I&apos;ll just upload
-        </button>
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+        <div className="min-w-[220px]">
+          <h3 className="text-sm font-medium">What kind of files land on your desk?</h3>
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            Pick any that fit — we&apos;ll line up the right sample and starter ideas.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {OPTIONS.map((opt) => {
+            const active = selected.includes(opt.key);
+            return (
+              <button
+                key={opt.key}
+                onClick={() => toggle(opt.key)}
+                aria-pressed={active}
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors",
+                  active
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                )}
+              >
+                <opt.icon className="h-3.5 w-3.5" />
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+        <div className="ml-auto flex items-center gap-3">
+          <Button size="sm" onClick={confirm} disabled={selected.length === 0}>
+            Set me up
+          </Button>
+          <button
+            onClick={skip}
+            className="whitespace-nowrap text-xs text-muted-foreground underline-offset-2 hover:underline"
+          >
+            Skip — I&apos;ll just upload
+          </button>
+        </div>
       </div>
     </div>
   );

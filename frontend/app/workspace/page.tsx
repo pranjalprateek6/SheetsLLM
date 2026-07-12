@@ -456,7 +456,10 @@ function WorkspaceContent() {
         {/* Phase 1: Upload */}
         {showUpload && !fileReady && !fileLoadError && !(loading && urlFileId) && (
           <div className="min-h-[calc(100vh-56px)] animate-fade-in-up">
-            <div className="mx-auto max-w-4xl px-4 pt-12 sm:px-6">
+            <div className="mx-auto max-w-4xl space-y-5 px-4 pb-12 pt-12 sm:px-6">
+              {intentsLoaded && intents === null && (
+                <OnboardingIntent onDone={setIntents} />
+              )}
               <div className="grid gap-5 md:grid-cols-2">
                 <div className="rounded-2xl border bg-card p-6 shadow-xs">
                   <h2 className="mb-4 text-lg font-semibold tracking-tight">Upload a spreadsheet</h2>
@@ -506,9 +509,6 @@ function WorkspaceContent() {
                   </div>
                 </div>
                 <div className="space-y-4">
-                  {intentsLoaded && intents === null && (
-                    <OnboardingIntent onDone={setIntents} />
-                  )}
                   <GettingStarted />
                   <div className="rounded-2xl border bg-card p-5 shadow-xs">
                     <div className="flex items-start gap-3">
@@ -525,18 +525,12 @@ function WorkspaceContent() {
                       </div>
                     </div>
                   </div>
-                  <FounderNote />
-                  <div className="rounded-2xl border bg-card p-5 shadow-xs">
-                    <h3 className="mb-2 text-sm font-medium">Keyboard shortcuts</h3>
-                    <ul className="space-y-1.5 text-sm text-muted-foreground">
-                      <li><kbd className="rounded border bg-muted px-1.5 py-0.5 font-mono text-xs">{modKey}+K</kbd> Command palette</li>
-                      <li><kbd className="rounded border bg-muted px-1.5 py-0.5 font-mono text-xs">{modKey}+Z</kbd> Undo last step</li>
-                      <li><kbd className="rounded border bg-muted px-1.5 py-0.5 font-mono text-xs">{modKey}+S</kbd> Download CSV</li>
-                      <li><kbd className="rounded border bg-muted px-1.5 py-0.5 font-mono text-xs">/</kbd> Focus Sage chat</li>
-                    </ul>
-                  </div>
+                  {/* Keyboard-shortcuts card lives in the transform view via the
+                      command palette — every shortcut it listed only works after
+                      a file is loaded, so it earned no place on this screen. */}
                 </div>
               </div>
+              <FounderNote />
             </div>
           </div>
         )}
