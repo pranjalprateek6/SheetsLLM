@@ -37,8 +37,11 @@ router = APIRouter()
 _DOWNLOAD_RATE_MAX = 10
 _DOWNLOAD_RATE_WINDOW = 60
 
-# Excel's hard sheet limit is 1,048,576 rows including the header.
-_XLSX_MAX_ROWS = 1_048_575
+# XLSX is the one format that still materializes in Python (pandas +
+# openpyxl — there's no COPY writer). openpyxl writes ~10k rows/s, so
+# anything near Excel's 1,048,576-row sheet limit would blow both the
+# 60s route timeout and instance memory. Cap where it reliably works.
+_XLSX_MAX_ROWS = 250_000
 
 _STREAMED_FORMATS = {
     "csv": ("text/csv", "csv"),
@@ -117,8 +120,8 @@ def download(
         if row_count > _XLSX_MAX_ROWS:
             return _json_response(
                 400, "TOO_MANY_ROWS_FOR_XLSX",
-                f"This file has {row_count:,} rows — Excel supports at most "
-                f"{_XLSX_MAX_ROWS:,}. Download as CSV or Parquet instead.",
+                f"This file has {row_count:,} rows — Excel export supports up "
+                f"to {_XLSX_MAX_ROWS:,}. Download as CSV or Parquet instead.",
             )
         try:
             local_path = get_local_parquet(r2_key)
