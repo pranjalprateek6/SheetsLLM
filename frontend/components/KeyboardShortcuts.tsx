@@ -43,8 +43,9 @@ export default function KeyboardShortcuts({
         return;
       }
 
-      // Ctrl+K — Focus instruction input
-      if (ctrl && e.key === "k") {
+      // "/" — Focus the Sage input (only when not already typing in a field;
+      // Ctrl+K is reserved for the command palette in the workspace)
+      if (e.key === "/" && !ctrl && !isInput) {
         e.preventDefault();
         onFocusInput?.();
         return;

@@ -20,6 +20,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+import { useModKey } from "@/lib/platform";
 
 export default function CommandPalette({
   open,
@@ -43,6 +44,7 @@ export default function CommandPalette({
   fileId?: string;
 }) {
   const router = useRouter();
+  const modKey = useModKey();
 
   const runCommand = (action: () => void) => {
     onClose();
@@ -131,7 +133,11 @@ export default function CommandPalette({
       </CommandList>
       <div className="flex items-center gap-4 border-t px-4 py-2 text-xs text-muted-foreground">
         <span className="inline-flex items-center gap-1">
-          <CommandIcon className="h-3 w-3" />K to toggle
+          {modKey === "⌘" ? (
+            <><CommandIcon className="h-3 w-3" />K to toggle</>
+          ) : (
+            <>Ctrl+K to toggle</>
+          )}
         </span>
         <span>&uarr;&darr; navigate</span>
         <span>enter to select</span>

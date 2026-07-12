@@ -99,7 +99,7 @@ export default function Header() {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-card/85 backdrop-blur-md">
-      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:px-6">
+      <div className="relative mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:px-6">
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2">
           {/* eslint-disable-next-line @next/next/no-img-element -- static SVG, no optimizer needed */}
@@ -107,8 +107,9 @@ export default function Header() {
           <span className="text-[15px] font-semibold tracking-tight">SheetsLLM</span>
         </Link>
 
-        {/* Desktop nav */}
-        <nav className="hidden items-center gap-1 md:flex">
+        {/* Desktop nav — absolutely centered so it aligns with the page's
+            center axis regardless of the logo/menu widths on either side */}
+        <nav className="absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 items-center gap-1 md:flex">
           {links.map((l) => (
             <Link
               key={l.href}

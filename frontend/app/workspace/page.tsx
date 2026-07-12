@@ -2,7 +2,7 @@
 import { Suspense, useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import {
-  BarChart3, BookMarked, Download, FileSpreadsheet, History, Lightbulb, MessageSquare, Undo2, Upload, X,
+  BarChart3, BookMarked, Columns3, Download, FileSpreadsheet, History, Lightbulb, MessageSquare, Undo2, Upload,
 } from "lucide-react";
 import DropZone from "@/components/DropZone";
 import DataGrid from "@/components/DataGrid";
@@ -11,6 +11,7 @@ import SheetSelector from "@/components/SheetSelector";
 import HistoryDrawer from "@/components/HistoryDrawer";
 import RecipesDrawer, { type RecipeApplyResult } from "@/components/RecipesDrawer";
 import ChatPanel from "@/components/ChatPanel";
+import SchemaPanel, { type SchemaColumn } from "@/components/SchemaPanel";
 import ChartPanel from "@/components/ChartPanel";
 import CommandPalette from "@/components/CommandPalette";
 import GettingStarted, { markOnboardingStep } from "@/components/GettingStarted";
@@ -19,6 +20,7 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import AuthGuard from "@/components/AuthGuard";
 import { toast } from "sonner";
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
+import { useModKey } from "@/lib/platform";
 import { SAMPLE_DATASETS } from "@/lib/samples";
 import { TextShimmer } from "@/components/ui/text-shimmer";
 import { Button } from "@/components/ui/button";
@@ -26,6 +28,9 @@ import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 export default function Workspace() {
   return (
@@ -47,6 +52,7 @@ const EXAMPLE_PROMPTS = [
 function WorkspaceContent() {
   const searchParams = useSearchParams();
   const urlFileId = searchParams.get("file_id");
+  const modKey = useModKey();
 
   const [fileReady, setFileReady] = useState(false);
   const [showTransform, setShowTransform] = useState(false);
@@ -57,7 +63,7 @@ function WorkspaceContent() {
   const [columnCount, setColumnCount] = useState(0);
   const [fileId, setFileId] = useState<string | undefined>(undefined);
   const [fileName, setFileName] = useState("");
-  const [schema, setSchema] = useState<{ columns?: { name: string; dtype: string }[] } | undefined>(undefined);
+  const [schema, setSchema] = useState<{ columns?: SchemaColumn[] } | undefined>(undefined);
   const [showUpload, setShowUpload] = useState(true);
   const [showResetDialog, setShowResetDialog] = useState(false);
   const [showSheetSelector, setShowSheetSelector] = useState(false);
@@ -67,6 +73,7 @@ function WorkspaceContent() {
   const [recipesOpen, setRecipesOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(true);
   const [chartOpen, setChartOpen] = useState(false);
+  const [schemaOpen, setSchemaOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [sampleSuggestions, setSampleSuggestions] = useState<string[] | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -111,7 +118,7 @@ function WorkspaceContent() {
       setFileReady(true);
       setShowUpload(false);
 
-      if (data.step_count > 0) setShowTransform(true);
+      setShowTransform(true); // the grid is the file view — no interstitial
 
       const previewRes = await fetchWithAuth(`/api/download?file_id=${id}&format=json`);
       if (previewRes.ok) {
@@ -162,7 +169,11 @@ function WorkspaceContent() {
         setSchema(data.schema);
         setFileReady(true);
         setShowUpload(false);
+        setShowTransform(true); // land in the grid, not an interstitial
         markOnboardingStep("upload");
+        const nRows = data.preview.total_rows ?? data.preview.rows?.length ?? 0;
+        const nCols = data.preview.total_columns ?? data.preview.columns?.length ?? 0;
+        toast.success(`Uploaded — ${nRows.toLocaleString()} rows × ${nCols.toLocaleString()} columns detected`);
         return true;
       }
     } catch (error) {
@@ -190,9 +201,7 @@ function WorkspaceContent() {
       if (!res.ok) return;
       const blob = await res.blob();
       const file = new File([blob], sample.uploadName, { type: "text/csv" });
-      const ok = await onUpload(file, undefined, sample.suggestions);
-      // skip the intermediate preview screen: sample users go straight to Sage
-      if (ok) setShowTransform(true);
+      await onUpload(file, undefined, sample.suggestions);
     } catch (e) {
       console.error("Failed to load sample dataset:", e);
     } finally {
@@ -355,7 +364,8 @@ function WorkspaceContent() {
         {fileLoadError && !fileReady && (
           <div className="flex min-h-[calc(100vh-56px)] items-center justify-center px-4">
             <div className="w-full max-w-md rounded-2xl border bg-card p-8 text-center shadow-sm">
-              <FileSpreadsheet className="mx-auto mb-3 h-8 w-8 text-muted-foreground/50" />
+              {/* eslint-disable-next-line @next/next/no-img-element -- static SVG */}
+              <img src="/logo.svg" className="mx-auto mb-3 h-10 w-10 opacity-50" alt="" />
               <h2 className="text-lg font-semibold tracking-tight">This file couldn&apos;t be loaded</h2>
               <p className="mt-2 text-sm text-muted-foreground">
                 It may have been deleted, or the link is wrong. Your other files are safe.
@@ -424,57 +434,11 @@ function WorkspaceContent() {
                   <div className="rounded-2xl border bg-card p-5 shadow-xs">
                     <h3 className="mb-2 text-sm font-medium">Keyboard shortcuts</h3>
                     <ul className="space-y-1.5 text-sm text-muted-foreground">
-                      <li><kbd className="rounded border bg-muted px-1.5 py-0.5 font-mono text-xs">Ctrl+K</kbd> Command palette</li>
-                      <li><kbd className="rounded border bg-muted px-1.5 py-0.5 font-mono text-xs">Ctrl+Z</kbd> Undo last step</li>
-                      <li><kbd className="rounded border bg-muted px-1.5 py-0.5 font-mono text-xs">Ctrl+S</kbd> Download CSV</li>
+                      <li><kbd className="rounded border bg-muted px-1.5 py-0.5 font-mono text-xs">{modKey}+K</kbd> Command palette</li>
+                      <li><kbd className="rounded border bg-muted px-1.5 py-0.5 font-mono text-xs">{modKey}+Z</kbd> Undo last step</li>
+                      <li><kbd className="rounded border bg-muted px-1.5 py-0.5 font-mono text-xs">{modKey}+S</kbd> Download CSV</li>
+                      <li><kbd className="rounded border bg-muted px-1.5 py-0.5 font-mono text-xs">/</kbd> Focus Sage chat</li>
                     </ul>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Phase 2: File preview */}
-        {fileReady && !showTransform && (
-          <div className="min-h-[calc(100vh-56px)] animate-fade-in-up">
-            <div className="mx-auto max-w-5xl px-4 pt-8 sm:px-6">
-              <div className="rounded-2xl border bg-card p-6 shadow-xs">
-                <div className="mb-4 flex items-center justify-between">
-                  <h2 className="text-lg font-semibold tracking-tight">File uploaded</h2>
-                  <Button variant="ghost" size="icon" onClick={handleResetClick} title="Upload a different file">
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-                <div className="space-y-3">
-                  <div className="rounded-xl border bg-muted/40 p-4">
-                    <h3 className="mb-2 text-sm font-medium">File details</h3>
-                    <div className="space-y-1 text-sm text-muted-foreground">
-                      <p><span className="font-medium text-foreground">Name:</span> {fileName}</p>
-                      <p><span className="font-medium text-foreground">Rows:</span> <span className="tabular-nums">{rowCount.toLocaleString()}</span></p>
-                      <p><span className="font-medium text-foreground">Columns:</span> <span className="tabular-nums">{columnCount.toLocaleString()}</span></p>
-                    </div>
-                  </div>
-                  {schema?.columns && (
-                    <div className="rounded-xl border bg-muted/40 p-4">
-                      <h3 className="mb-2 text-sm font-medium">Schema</h3>
-                      <div className="flex flex-wrap gap-2">
-                        {schema.columns.map((col, idx) => (
-                          <span key={idx} className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border bg-background px-2.5 py-1 font-mono text-xs shadow-xs">
-                            {col.name} <span className="text-muted-foreground">{col.dtype}</span>
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  <div className="rounded-xl border bg-muted/40 p-4">
-                    <h3 className="mb-2 text-sm font-medium">Preview (first 5 rows)</h3>
-                    <DataGrid columns={columns} rows={rows.slice(0, 5)} loading={false} />
-                  </div>
-                  <div className="flex justify-center pt-3">
-                    <Button size="lg" onClick={() => setShowTransform(true)}>
-                      Start transforming →
-                    </Button>
                   </div>
                 </div>
               </div>
@@ -496,47 +460,91 @@ function WorkspaceContent() {
                     {rowCount.toLocaleString()} × {columnCount.toLocaleString()}
                   </Badge>
                 </div>
-                <div className="flex items-center gap-0.5">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className={chatOpen ? "h-8 w-8 text-primary" : "h-8 w-8 text-muted-foreground"}
-                    onClick={() => setChatOpen((v) => !v)}
-                    title={chatOpen ? "Hide Sage" : "Show Sage"}
-                    aria-label={chatOpen ? "Hide Sage chat panel" : "Show Sage chat panel"}
-                  >
-                    <MessageSquare className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={handleUndo} title="Undo (Ctrl+Z)">
-                    <Undo2 className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => setChartOpen(true)} title="Quick chart">
-                    <BarChart3 className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => setHistoryOpen(true)} title="History">
-                    <History className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => setRecipesOpen(true)} title="Recipes">
-                    <BookMarked className="h-4 w-4" />
-                  </Button>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" title="Download (Ctrl+S = CSV)" aria-label="Download">
-                        <Download className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => handleDownload("csv")}>CSV</DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleDownload("xlsx")}>Excel (.xlsx)</DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleDownload("json")}>JSON</DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleDownload("tsv")}>TSV</DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleDownload("parquet")}>Parquet</DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={handleResetClick} title="Upload new file">
-                    <Upload className="h-4 w-4" />
-                  </Button>
-                </div>
+                <TooltipProvider>
+                  <div className="flex items-center gap-0.5">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className={chatOpen ? "h-8 w-8 text-primary" : "h-8 w-8 text-muted-foreground"}
+                          onClick={() => setChatOpen((v) => !v)}
+                          aria-label={chatOpen ? "Hide Sage chat panel" : "Show Sage chat panel"}
+                        >
+                          <MessageSquare className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>{chatOpen ? "Hide Sage" : "Show Sage"}</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={handleUndo} aria-label="Undo last step">
+                          <Undo2 className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Undo ({modKey}+Z)</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => setChartOpen(true)} aria-label="Quick chart">
+                          <BarChart3 className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Quick chart</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => setSchemaOpen(true)} aria-label="View schema">
+                          <Columns3 className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Schema ({(schema?.columns ?? []).length} columns)</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => setHistoryOpen(true)} aria-label="History">
+                          <History className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>History</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => setRecipesOpen(true)} aria-label="Recipes">
+                          <BookMarked className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Recipes</TooltipContent>
+                    </Tooltip>
+                    <DropdownMenu>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" aria-label="Download">
+                              <Download className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                        </TooltipTrigger>
+                        <TooltipContent>Download ({modKey}+S = CSV)</TooltipContent>
+                      </Tooltip>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleDownload("csv")}>CSV</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleDownload("xlsx")}>Excel (.xlsx)</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleDownload("json")}>JSON</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleDownload("tsv")}>TSV</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleDownload("parquet")}>Parquet</DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={handleResetClick} aria-label="Upload new file">
+                          <Upload className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Upload new file</TooltipContent>
+                    </Tooltip>
+                  </div>
+                </TooltipProvider>
               </div>
 
               {/* Data grid */}
@@ -575,6 +583,7 @@ function WorkspaceContent() {
           </div>
         )}
 
+        <SchemaPanel open={schemaOpen} onClose={() => setSchemaOpen(false)} columns={schema?.columns ?? []} fileName={fileName} />
         <HistoryDrawer open={historyOpen} onClose={() => setHistoryOpen(false)} fileId={fileId} onRevert={handleRevert} />
         <RecipesDrawer
           open={recipesOpen}

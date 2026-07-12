@@ -23,6 +23,9 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 type FileItem = {
   id: string;
@@ -313,14 +316,21 @@ export default function DashboardPage() {
               placeholder="Search files…"
             />
           </div>
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => setView(view === "grid" ? "list" : "grid")}
-            title={view === "grid" ? "List view" : "Grid view"}
-          >
-            {view === "grid" ? <List className="h-4 w-4" /> : <Grid3X3 className="h-4 w-4" />}
-          </Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setView(view === "grid" ? "list" : "grid")}
+                  aria-label={view === "grid" ? "Switch to list view" : "Switch to grid view"}
+                >
+                  {view === "grid" ? <List className="h-4 w-4" /> : <Grid3X3 className="h-4 w-4" />}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{view === "grid" ? "List view" : "Grid view"}</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
 
         {loading && (
@@ -343,7 +353,8 @@ export default function DashboardPage() {
 
         {!loading && !loadError && files.length === 0 && (
           <div className="rounded-xl border border-dashed py-16 text-center">
-            <FileSpreadsheet className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
+            {/* eslint-disable-next-line @next/next/no-img-element -- static SVG */}
+            <img src="/logo.svg" className="mx-auto mb-3 h-10 w-10 opacity-50" alt="" />
             <p className="font-medium">{search ? "No files match your search" : "No files yet"}</p>
             <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
               {search
