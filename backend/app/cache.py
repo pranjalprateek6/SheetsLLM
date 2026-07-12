@@ -136,7 +136,7 @@ def evict_expired() -> int:
                 to_evict.append(key)
         for key in to_evict:
             _evict_entry(key)
-    return len(to_evict) + _evict_expired_pending()
+    return len(to_evict) + _evict_expired_pending() + _evict_expired_checkpoints()
 
 
 def file_cache_stats() -> dict:
@@ -144,6 +144,69 @@ def file_cache_stats() -> dict:
         now = time.monotonic()
         live = sum(1 for _, (_, exp) in _file_cache.items() if exp > now)
         return {"total_entries": len(_file_cache), "live_entries": live}
+
+
+# ── Transformation-chain checkpoints ──────────────────────────────────
+# Every operation used to replay the FULL step chain from the base
+# Parquet, so long chains got progressively slower (O(n²) total work).
+# A checkpoint is the materialized result after the first k steps,
+# content-addressed by (base path + the exact SQL of those steps): any
+# undo/revert/edit produces a different hash and simply misses, so no
+# invalidation logic exists to get wrong. Local-disk cache only — on
+# restart chains rebuild from base.
+
+_checkpoints: dict[str, tuple[str, float]] = {}  # key → (parquet path, expires)
+_CHECKPOINT_TTL = 1_800  # 30 minutes, refreshed on access
+_MAX_CHECKPOINTS = 30
+_checkpoint_lock = threading.Lock()
+
+
+def checkpoint_key(base_path: str | Path, steps: list[dict]) -> str:
+    """Content address for 'base file + this exact prefix of steps'."""
+    parts = [str(base_path)] + [s["sql_query"] for s in steps]
+    return hashlib.sha256("\x1f".join(parts).encode()).hexdigest()
+
+
+def get_checkpoint(key: str) -> str | None:
+    with _checkpoint_lock:
+        entry = _checkpoints.get(key)
+        if entry is None:
+            return None
+        path, expires_at = entry
+        if time.monotonic() <= expires_at and Path(path).exists():
+            _checkpoints[key] = (path, time.monotonic() + _CHECKPOINT_TTL)
+            return path
+        _checkpoints.pop(key, None)
+    Path(path).unlink(missing_ok=True)
+    return None
+
+
+def set_checkpoint(key: str, path: str) -> None:
+    stale: list[str] = []
+    with _checkpoint_lock:
+        if key in _checkpoints:
+            stale.append(_checkpoints.pop(key)[0])
+        while len(_checkpoints) >= _MAX_CHECKPOINTS:
+            oldest = min(_checkpoints, key=lambda k: _checkpoints[k][1])
+            stale.append(_checkpoints.pop(oldest)[0])
+        _checkpoints[key] = (path, time.monotonic() + _CHECKPOINT_TTL)
+    for p in stale:
+        if p != path:
+            Path(p).unlink(missing_ok=True)
+
+
+def _evict_expired_checkpoints() -> int:
+    now = time.monotonic()
+    stale: list[tuple[str, str]] = []
+    with _checkpoint_lock:
+        for key, (path, expires_at) in _checkpoints.items():
+            if expires_at < now:
+                stale.append((key, path))
+        for key, _ in stale:
+            _checkpoints.pop(key, None)
+    for _, path in stale:
+        Path(path).unlink(missing_ok=True)
+    return len(stale)
 
 
 # ── Pending multi-sheet uploads ───────────────────────────────────────

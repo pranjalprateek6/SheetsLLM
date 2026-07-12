@@ -35,6 +35,9 @@ MAX_COLUMNS: int = int(os.getenv("MAX_COLUMNS", "500"))
 DUCKDB_THREADS: int = int(os.getenv("DUCKDB_THREADS", "2"))
 DUCKDB_MEMORY_LIMIT: str = os.getenv("DUCKDB_MEMORY_LIMIT", "512MB")
 DUCKDB_QUERY_TIMEOUT: int = int(os.getenv("DUCKDB_QUERY_TIMEOUT", "30"))
+# Materialize a chain checkpoint every N steps so replays stay bounded
+# instead of re-running the whole chain from base (0 disables).
+CHECKPOINT_EVERY_N_STEPS: int = int(os.getenv("CHECKPOINT_EVERY_N_STEPS", "10"))
 
 # ── Usage limits (0 = unlimited) ────────────────────────────────────
 # Free-tier caps act as a circuit breaker so one user cannot exhaust the
