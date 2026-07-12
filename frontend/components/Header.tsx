@@ -101,8 +101,8 @@ export default function Header() {
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-card/85 backdrop-blur-md">
       <div className="relative mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:px-6">
-        {/* Logo */}
-        <Link href="/" className="flex items-center gap-2">
+        {/* Logo — home for prospects, dashboard for signed-in users */}
+        <Link href={user ? "/dashboard" : "/"} className="flex items-center gap-2">
           {/* eslint-disable-next-line @next/next/no-img-element -- static SVG, no optimizer needed */}
           <img src="/logo.svg" alt="" width={26} height={26} className="h-[26px] w-[26px]" />
           <span className="text-[15px] font-semibold tracking-tight">SheetsLLM</span>
