@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { BookMarked, Pencil, Play, Trash2, Plus } from "lucide-react";
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
+import EmptyState from "@/components/EmptyState";
 import { markOnboardingStep } from "@/components/GettingStarted";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -305,9 +306,13 @@ export default function RecipesDrawer({
           )}
 
           {!loading && recipes.length === 0 && (
-            <div className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-              No recipes yet. Transform a file, then save the chain here to
-              re-apply it to future uploads.
+            <div className="rounded-lg border border-dashed">
+              <EmptyState
+                compact
+                variant="recipes"
+                title="No recipes yet"
+                description="Transform a file, then save the chain here to re-apply it to future uploads — no AI call needed."
+              />
             </div>
           )}
 

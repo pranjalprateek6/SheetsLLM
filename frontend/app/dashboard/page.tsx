@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import AuthGuard from "@/components/AuthGuard";
+import EmptyState from "@/components/EmptyState";
 import UsageCard from "@/components/UsageCard";
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
 import {
@@ -352,19 +353,24 @@ export default function DashboardPage() {
         )}
 
         {!loading && !loadError && files.length === 0 && (
-          <div className="rounded-xl border border-dashed py-16 text-center">
-            {/* eslint-disable-next-line @next/next/no-img-element -- static SVG */}
-            <img src="/logo.svg" className="mx-auto mb-3 h-10 w-10 opacity-50" alt="" />
-            <p className="font-medium">{search ? "No files match your search" : "No files yet"}</p>
-            <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
-              {search
-                ? "Try a different search term."
-                : "Upload a spreadsheet — or start from a sample dataset — and describe your cleanup in plain English."}
-            </p>
-            {!search && (
-              <Button className="mt-4" onClick={() => router.push("/workspace")}>
-                <Upload className="mr-2 h-4 w-4" /> Upload your first file
-              </Button>
+          <div className="rounded-xl border border-dashed py-8">
+            {search ? (
+              <EmptyState
+                variant="search"
+                title="No files match your search"
+                description="Try a different search term."
+              />
+            ) : (
+              <EmptyState
+                variant="files"
+                title="No files yet"
+                description="Upload a spreadsheet — or start from a sample dataset — and describe your cleanup in plain English."
+                action={
+                  <Button onClick={() => router.push("/workspace")}>
+                    <Upload className="mr-2 h-4 w-4" /> Upload your first file
+                  </Button>
+                }
+              />
             )}
           </div>
         )}
