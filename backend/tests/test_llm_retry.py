@@ -50,6 +50,30 @@ def test_retryable_by_message():
     assert not is_retryable(Exception("invalid api key"))
 
 
+def test_explicit_code_beats_message():
+    # A 400 whose message merely mentions a retryable-looking word must
+    # NOT be retried — the explicit status is authoritative.
+    exc = _CodeError(400)
+    exc.args = ("Invalid internal error_code field",)
+    assert not is_retryable(exc)
+
+
+def test_network_timeouts_are_retryable():
+    class ConnectTimeout(Exception):
+        pass
+
+    class ReadTimeout(Exception):
+        pass
+
+    class ConnectError(Exception):
+        pass
+
+    assert is_retryable(ConnectTimeout(""))
+    assert is_retryable(ReadTimeout(""))
+    assert is_retryable(ConnectError("all connection attempts failed"))
+    assert not is_retryable(ValueError("bad input"))
+
+
 # ── call_with_retry ───────────────────────────────────────────────────
 
 

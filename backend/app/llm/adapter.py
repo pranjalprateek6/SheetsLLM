@@ -28,18 +28,28 @@ class LlmClient(ABC):
 _RETRYABLE_MARKERS = (
     "429", "RESOURCE_EXHAUSTED", "RATE_LIMIT",
     "500", "502", "503", "504", "UNAVAILABLE", "DEADLINE_EXCEEDED",
-    "INTERNAL", "OVERLOADED",
+    "INTERNAL ERROR", "OVERLOADED",
 )
+
+# Transport-level blips (httpx.ConnectTimeout, ReadTimeout, ConnectError,
+# builtin TimeoutError...) carry no status code and often no useful message
+# — classify by exception class name.
+_RETRYABLE_CLASS_MARKERS = ("TIMEOUT", "CONNECT")
 
 
 def is_retryable(exc: Exception) -> bool:
-    """Transient provider failure: rate limit or server-side error."""
+    """Transient provider failure: rate limit, server-side error, or a
+    network/timeout blip."""
     response = getattr(exc, "response", None)  # httpx.HTTPStatusError
     for source in (exc, response):
         for attr in ("code", "status_code"):
             code = getattr(source, attr, None)
             if isinstance(code, int):
+                # An explicit HTTP status is authoritative either way
                 return code == 429 or 500 <= code < 600
+    cls = type(exc).__name__.upper()
+    if any(marker in cls for marker in _RETRYABLE_CLASS_MARKERS):
+        return True
     msg = str(exc).upper()
     return any(marker in msg for marker in _RETRYABLE_MARKERS)
 
