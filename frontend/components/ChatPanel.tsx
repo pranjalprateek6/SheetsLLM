@@ -60,12 +60,14 @@ export default function ChatPanel({
   const abortRef = useRef<AbortController | null>(null);
 
   // Staged progress while Chef works — honest labels for the real pipeline
-  // (generate -> validate -> execute), rotated on a timer.
-  const STAGES = ["Writing SQL…", "Validating…", "Running on your data…"];
+  // (generate -> validate -> execute), rotated on a timer. A late fourth
+  // stage reassures on the occasional 30s+ answer instead of looking hung.
+  const STAGES = ["Writing SQL…", "Validating…", "Running on your data…", "Taking longer than usual, still working…"];
   useEffect(() => {
     if (!sending) { setStage(0); return; }
-    const t = setInterval(() => setStage((v) => Math.min(v + 1, STAGES.length - 1)), 2600);
-    return () => clearInterval(t);
+    const t = setInterval(() => setStage((v) => Math.min(v + 1, 2)), 2600);
+    const late = setTimeout(() => setStage(3), 15000);
+    return () => { clearInterval(t); clearTimeout(late); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sending]);
 
@@ -163,7 +165,14 @@ export default function ChatPanel({
         } else if (data.type === "insight") {
           setMessages((prev) => [...prev, { role: "assistant", content: data.message, message_type: "insight" }]);
         } else if (data.code) {
-          setMessages((prev) => [...prev, { role: "assistant", content: data.message || "Something went wrong.", message_type: "error" }]);
+          setMessages((prev) => [...prev, {
+            role: "assistant",
+            content:
+              data.code === "REQUEST_TIMEOUT"
+                ? "That took too long and was stopped. Try again, or ask something more specific."
+                : data.message || "Something went wrong.",
+            message_type: "error",
+          }]);
         } else {
           // Unrecognized response shape — never let "Thinking…" vanish silently.
           setMessages((prev) => [...prev, { role: "assistant", content: "I didn't get a usable response. Please try rephrasing.", message_type: "error" }]);
