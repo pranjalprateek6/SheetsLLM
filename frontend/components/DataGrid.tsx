@@ -389,7 +389,7 @@ export default function DataGrid({
                         return (
                           <td
                             key={h}
-                            className={`px-2 ${density === "comfortable" ? "py-2" : "py-1"} align-middle text-xs text-foreground cursor-pointer relative ${
+                            className={`px-2 ${density === "comfortable" ? "py-2" : "py-1"} align-middle text-center text-xs text-foreground cursor-pointer relative ${
                               highlighted ? "bg-primary/[0.05]" : ""
                             }`}
                             onClick={() => handleCopy(isNull ? "" : String(val), cellKey)}
@@ -400,7 +400,8 @@ export default function DataGrid({
                                 NULL
                               </span>
                             ) : (
-                              <div className="truncate max-w-[200px] font-mono text-xs tabular-nums">{String(val)}</div>
+                              // Centered as a block within the column, text left-aligned
+                              <span className="inline-block max-w-full truncate text-left align-middle font-mono text-xs tabular-nums">{String(val)}</span>
                             )}
                             {copiedCell === cellKey && (
                               <span className="absolute top-0.5 right-0.5 text-[10px] text-success flex items-center">
