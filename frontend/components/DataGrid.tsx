@@ -20,16 +20,33 @@ export type ColumnMeta = {
   unique_count?: number;
 };
 
+const NUMERIC_RE = /INT|DOUBLE|FLOAT|DECIMAL|NUMERIC|REAL|HUGEINT/;
+
+function isNumericDtype(dtype?: string): boolean {
+  return !!dtype && NUMERIC_RE.test(dtype.toUpperCase());
+}
+
 /** dtype → a small glyph so the header tells you what a column IS at a
  *  glance (numbers, text, dates, booleans) without opening the schema. */
 function TypeGlyph({ dtype }: { dtype?: string }) {
   if (!dtype) return null;
   const t = dtype.toUpperCase();
   const cls = "h-3 w-3 flex-shrink-0 text-muted-foreground/60";
-  if (/INT|DOUBLE|FLOAT|DECIMAL|NUMERIC|REAL|BIGINT|HUGEINT/.test(t)) return <Hash className={cls} aria-label="number" />;
+  if (NUMERIC_RE.test(t)) return <Hash className={cls} aria-label="number" />;
   if (/DATE|TIME/.test(t)) return <Calendar className={cls} aria-label="date" />;
   if (/BOOL/.test(t)) return <ToggleLeft className={cls} aria-label="boolean" />;
   return <Type className={cls} aria-label="text" />;
+}
+
+/** Text-measurement for double-click column auto-fit. */
+let _measureCtx: CanvasRenderingContext2D | null = null;
+function measureText(text: string, font: string): number {
+  if (!_measureCtx) {
+    _measureCtx = document.createElement("canvas").getContext("2d");
+  }
+  if (!_measureCtx) return text.length * 7;
+  _measureCtx.font = font;
+  return _measureCtx.measureText(text).width;
 }
 
 const DENSITY_KEY = "sllm_grid_density";
@@ -55,6 +72,8 @@ export default function DataGrid({
   totalRows,
   stepCount,
   onAskColumn,
+  onAskChef,
+  scrollToCol,
 }: {
   columns: string[];
   rows: Record<string, unknown>[];
@@ -69,6 +88,10 @@ export default function DataGrid({
   stepCount?: number;
   /** Bridge into Chef: prefill the chat with a question about a column. */
   onAskColumn?: (column: string) => void;
+  /** Bridge into Chef with arbitrary prefilled text (quick-filter escalation). */
+  onAskChef?: (text: string) => void;
+  /** Scroll a column into view (schema panel jump); nonce re-triggers. */
+  scrollToCol?: { name: string; nonce: number } | null;
 }) {
   const head = columns ?? [];
   const parentRef = useRef<HTMLDivElement>(null);
@@ -94,6 +117,8 @@ export default function DataGrid({
     } catch {}
   }, []);
 
+  const [filterQ, setFilterQ] = useState("");
+
   const sortedRows = useMemo(() => {
     if (!sortCol || !sortDir || onSort) return rows;
     return [...rows].sort((a, b) => {
@@ -111,8 +136,21 @@ export default function DataGrid({
     });
   }, [rows, sortCol, sortDir, onSort]);
 
+  // Quick-filter is an eyeball tool over the loaded preview only; the
+  // status bar says so, and Chef is one click away for a real filter.
+  const visibleRows = useMemo(() => {
+    const q = filterQ.trim().toLowerCase();
+    if (!q) return sortedRows;
+    return sortedRows.filter((row) =>
+      head.some((h) => {
+        const v = row[h];
+        return v != null && String(v).toLowerCase().includes(q);
+      })
+    );
+  }, [sortedRows, filterQ, head]);
+
   const rowVirtualizer = useVirtualizer({
-    count: sortedRows.length,
+    count: visibleRows.length,
     getScrollElement: () => parentRef.current,
     estimateSize: () => ROW_HEIGHT[density],
     overscan: 15,
@@ -168,6 +206,37 @@ export default function DataGrid({
     [colWidths]
   );
 
+  // Double-click the resize handle: fit the column to its content
+  // (measured over the loaded preview, clamped to sane bounds).
+  const handleAutoFit = useCallback(
+    (col: string) => {
+      let max = measureText(col, "500 12px sans-serif") + 44; // name + glyph/menu
+      for (const row of rows.slice(0, 300)) {
+        const v = row[col];
+        const text = v == null ? "NULL" : String(v);
+        const w = measureText(text, "12px monospace") + 20;
+        if (w > max) max = w;
+      }
+      setColWidths((prev) => ({ ...prev, [col]: Math.min(420, Math.max(60, Math.ceil(max))) }));
+    },
+    [rows]
+  );
+
+  // Scroll a column into view (schema panel jump) and flash it briefly
+  const [flashCol, setFlashCol] = useState<string | null>(null);
+  useEffect(() => {
+    if (!scrollToCol?.name) return;
+    const idx = head.indexOf(scrollToCol.name);
+    if (idx === -1 || !parentRef.current) return;
+    let left = 50; // row-number gutter
+    for (let i = 0; i < idx; i++) left += colWidths[head[i]] || 140;
+    parentRef.current.scrollTo({ left: Math.max(0, left - 80), behavior: "smooth" });
+    setFlashCol(scrollToCol.name);
+    const t = setTimeout(() => setFlashCol(null), 1600);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scrollToCol]);
+
   return (
     <div className="h-full flex flex-col rounded-xl border bg-card overflow-hidden">
       <div
@@ -197,7 +266,7 @@ export default function DataGrid({
               {head.map((h) => {
                 const meta = columnMeta?.[h];
                 const nullPct = meta?.null_pct ?? 0;
-                const highlighted = highlightCols?.includes(h);
+                const highlighted = highlightCols?.includes(h) || flashCol === h;
                 return (
                   <th
                     key={h}
@@ -267,6 +336,8 @@ export default function DataGrid({
                     <div
                       className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-primary/40 opacity-0 group-hover:opacity-100 transition-opacity"
                       onMouseDown={(e) => handleResizeStart(h, e)}
+                      onDoubleClick={() => handleAutoFit(h)}
+                      title="Drag to resize; double-click to fit"
                     />
                   </th>
                 );
@@ -284,10 +355,10 @@ export default function DataGrid({
                   <TextShimmer className="text-sm" duration={1.2}>Loading data...</TextShimmer>
                 </td>
               </tr>
-            ) : sortedRows.length === 0 ? (
+            ) : visibleRows.length === 0 ? (
               <tr>
                 <td className="px-3 py-8 text-center text-sm text-muted-foreground" colSpan={head.length + 1}>
-                  No data
+                  {filterQ ? "No preview rows match the filter" : "No data"}
                 </td>
               </tr>
             ) : (
@@ -301,7 +372,7 @@ export default function DataGrid({
                   </tr>
                 )}
                 {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                  const row = sortedRows[virtualRow.index];
+                  const row = visibleRows[virtualRow.index];
                   return (
                     <tr
                       key={virtualRow.index}
@@ -315,13 +386,14 @@ export default function DataGrid({
                         const val = row[h];
                         const isNull = val === null || val === undefined;
                         const cellKey = `${virtualRow.index}-${h}`;
-                        const highlighted = highlightCols?.includes(h);
+                        const highlighted = highlightCols?.includes(h) || flashCol === h;
+                        const numeric = isNumericDtype(columnMeta?.[h]?.dtype) || typeof val === "number";
                         return (
                           <td
                             key={h}
                             className={`px-2 ${density === "comfortable" ? "py-2" : "py-1"} align-middle text-xs text-foreground cursor-pointer relative ${
                               highlighted ? "bg-primary/[0.05]" : ""
-                            }`}
+                            } ${numeric ? "text-right" : ""}`}
                             onClick={() => handleCopy(isNull ? "" : String(val), cellKey)}
                             title={isNull ? "NULL" : String(val)}
                           >
@@ -330,7 +402,7 @@ export default function DataGrid({
                                 NULL
                               </span>
                             ) : (
-                              <div className="truncate max-w-[200px] font-mono text-xs tabular-nums">{String(val)}</div>
+                              <div className={`truncate max-w-[200px] font-mono text-xs tabular-nums ${numeric ? "ml-auto text-right" : ""}`}>{String(val)}</div>
                             )}
                             {copiedCell === cellKey && (
                               <span className="absolute top-0.5 right-0.5 text-[10px] text-success flex items-center">
@@ -358,15 +430,46 @@ export default function DataGrid({
         </table>
       </div>
       {/* Status bar */}
-      <div className="flex h-7 flex-shrink-0 items-center justify-between border-t bg-card px-3">
-        <span className="text-[11px] tabular-nums text-muted-foreground">
-          {typeof totalRows === "number" && totalRows > rows.length
-            ? `First ${rows.length.toLocaleString()} of ${totalRows.toLocaleString()} rows`
-            : `${rows.length.toLocaleString()} rows`}
-          {" × "}
-          {head.length.toLocaleString()} cols
-          {typeof stepCount === "number" && stepCount > 0 && ` · step ${stepCount}`}
+      <div className="flex h-7 flex-shrink-0 items-center justify-between gap-2 border-t bg-card px-3">
+        <span className="min-w-0 truncate text-[11px] tabular-nums text-muted-foreground">
+          {filterQ.trim()
+            ? `${visibleRows.length.toLocaleString()} of ${rows.length.toLocaleString()} preview rows match`
+            : typeof totalRows === "number" && totalRows > rows.length
+              ? `First ${rows.length.toLocaleString()} of ${totalRows.toLocaleString()} rows`
+              : `${rows.length.toLocaleString()} rows`}
+          {!filterQ.trim() && ` × ${head.length.toLocaleString()} cols`}
+          {!filterQ.trim() && typeof stepCount === "number" && stepCount > 0 && ` · step ${stepCount}`}
         </span>
+        <div className="flex items-center gap-2">
+          {filterQ.trim() && onAskChef && (
+            <button
+              type="button"
+              onClick={() => onAskChef(`Keep only rows where any column contains "${filterQ.trim()}"`)}
+              className="inline-flex items-center gap-1 whitespace-nowrap text-[11px] font-medium text-primary underline-offset-2 hover:underline"
+              title="Turn this preview filter into a real transform"
+            >
+              <ChefHat className="h-3 w-3" /> Filter all rows with Chef
+            </button>
+          )}
+          <input
+            type="text"
+            value={filterQ}
+            onChange={(e) => setFilterQ(e.target.value)}
+            placeholder="Filter preview…"
+            aria-label="Filter the loaded preview rows"
+            className="h-5 w-32 rounded border bg-background px-1.5 text-[11px] outline-none placeholder:text-muted-foreground/70 focus:ring-1 focus:ring-ring/40"
+          />
+          {filterQ && (
+            <button
+              type="button"
+              onClick={() => setFilterQ("")}
+              className="text-[11px] text-muted-foreground hover:text-foreground"
+              aria-label="Clear filter"
+            >
+              ✕
+            </button>
+          )}
+        </div>
         <div
           className="flex items-center gap-0.5 rounded-md bg-muted p-0.5"
           role="group"

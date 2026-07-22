@@ -58,6 +58,9 @@ export default function ChatPanel({
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  // Terminal-style recall: ArrowUp in an empty input restores the last
+  // prompt for quick "same thing, but…" iteration.
+  const lastSentRef = useRef<string>("");
 
   // Staged progress while Chef works — honest labels for the real pipeline
   // (generate -> validate -> execute), rotated on a timer. A late fourth
@@ -123,6 +126,7 @@ export default function ChatPanel({
       if (!msg || !fileId || sending) return;
 
       const userMsg: ChatMessage = { role: "user", content: msg };
+      lastSentRef.current = msg;
       setMessages((prev) => [...prev, userMsg]);
       setInput("");
       setSending(true);
@@ -427,6 +431,14 @@ export default function ChatPanel({
               if (e.key === "Enter" && !e.shiftKey && !sending) {
                 e.preventDefault();
                 sendMessage();
+              }
+              if (e.key === "ArrowUp" && input === "" && lastSentRef.current) {
+                e.preventDefault();
+                setInput(lastSentRef.current);
+                setTimeout(() => {
+                  const el = inputRef.current;
+                  if (el) el.setSelectionRange(el.value.length, el.value.length);
+                }, 0);
               }
             }}
             placeholder="Ask Chef anything…"

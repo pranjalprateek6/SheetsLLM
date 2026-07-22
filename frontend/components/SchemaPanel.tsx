@@ -20,11 +20,14 @@ export default function SchemaPanel({
   onClose,
   columns,
   fileName,
+  onJumpToColumn,
 }: {
   open: boolean;
   onClose: () => void;
   columns: SchemaColumn[];
   fileName?: string;
+  /** Click a column row → scroll the grid to that column. */
+  onJumpToColumn?: (name: string) => void;
 }) {
   return (
     <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
@@ -39,20 +42,27 @@ export default function SchemaPanel({
         <div className="flex-1 overflow-y-auto px-5 py-3">
           <ul className="divide-y">
             {columns.map((col) => (
-              <li key={col.name} className="flex items-center justify-between gap-3 py-2.5">
-                <div className="min-w-0">
-                  <p className="truncate font-mono text-sm">{col.name}</p>
-                  {(col.null_pct !== undefined || col.unique_count !== undefined) && (
-                    <p className="mt-0.5 text-xs tabular-nums text-muted-foreground">
-                      {col.null_pct !== undefined && `${col.null_pct}% nulls`}
-                      {col.null_pct !== undefined && col.unique_count !== undefined && " · "}
-                      {col.unique_count !== undefined && `${col.unique_count.toLocaleString()} unique`}
-                    </p>
-                  )}
-                </div>
-                <Badge variant="outline" className="flex-shrink-0 font-mono text-[10px]">
-                  {col.dtype}
-                </Badge>
+              <li key={col.name}>
+                <button
+                  onClick={() => onJumpToColumn?.(col.name)}
+                  disabled={!onJumpToColumn}
+                  className="flex w-full items-center justify-between gap-3 rounded-md px-1 py-2.5 text-left transition-colors enabled:hover:bg-accent"
+                  title={onJumpToColumn ? `Show "${col.name}" in the grid` : undefined}
+                >
+                  <div className="min-w-0">
+                    <p className="truncate font-mono text-sm">{col.name}</p>
+                    {(col.null_pct !== undefined || col.unique_count !== undefined) && (
+                      <p className="mt-0.5 text-xs tabular-nums text-muted-foreground">
+                        {col.null_pct !== undefined && `${col.null_pct}% nulls`}
+                        {col.null_pct !== undefined && col.unique_count !== undefined && " · "}
+                        {col.unique_count !== undefined && `${col.unique_count.toLocaleString()} unique`}
+                      </p>
+                    )}
+                  </div>
+                  <Badge variant="outline" className="flex-shrink-0 font-mono text-[10px]">
+                    {col.dtype}
+                  </Badge>
+                </button>
               </li>
             ))}
           </ul>

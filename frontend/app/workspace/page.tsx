@@ -2,7 +2,7 @@
 import { Suspense, useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import {
-  BarChart3, BookMarked, ChevronDown, Columns3, Download, FileSpreadsheet, History, Lightbulb, MessageSquare, Undo2, Upload,
+  BarChart3, BookMarked, ChevronDown, Columns3, Download, FileSpreadsheet, History, Lightbulb, MessageSquare, Pencil, Undo2, Upload,
 } from "lucide-react";
 import DropZone from "@/components/DropZone";
 import DataGrid from "@/components/DataGrid";
@@ -26,6 +26,8 @@ import { SAMPLE_DATASETS } from "@/lib/samples";
 import { TextShimmer } from "@/components/ui/text-shimmer";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -102,6 +104,67 @@ function WorkspaceContent() {
   const [chatPrefill, setChatPrefill] = useState<{ text: string; nonce: number } | null>(null);
   // Step to confirm-revert to from the pipeline strip (0 = original file)
   const [confirmRevert, setConfirmRevert] = useState<number | null>(null);
+  // The wedge, walking up to you: fresh file + you own recipes = offer one
+  const [recipeHint, setRecipeHint] = useState<{ name: string } | null>(null);
+  // Re-entry shortcut on the upload screen
+  const [lastFile, setLastFile] = useState<{ id: string; name: string } | null>(null);
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [renameValue, setRenameValue] = useState("");
+  // Schema panel → grid column jump
+  const [gridJump, setGridJump] = useState<{ name: string; nonce: number } | null>(null);
+
+  const rememberLastFile = (id: string, name: string) => {
+    try {
+      localStorage.setItem("sllm_last_file", JSON.stringify({ id, name }));
+    } catch {}
+  };
+
+  const handleRenameSubmit = async () => {
+    const name = renameValue.trim();
+    setRenameOpen(false);
+    if (!fileId || !name || name === fileName) return;
+    try {
+      const r = await fetchWithAuth(`/api/files/${fileId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      setFileName(name);
+      rememberLastFile(fileId, name);
+      toast.success("File renamed");
+    } catch (e) {
+      console.error("Rename failed:", e);
+      toast.error("Couldn't rename the file. Please try again.");
+    }
+  };
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("sllm_last_file");
+      if (raw) setLastFile(JSON.parse(raw));
+    } catch {}
+  }, []);
+
+  // Offer a recipe when a file is opened fresh (no steps yet)
+  useEffect(() => {
+    if (!fileReady || !showTransform || !fileId || steps.length > 0) {
+      setRecipeHint(null);
+      return;
+    }
+    let alive = true;
+    fetchWithAuth("/api/recipes")
+      .then((r) => r.json())
+      .then((d) => {
+        if (alive && Array.isArray(d.recipes) && d.recipes.length > 0) {
+          setRecipeHint({ name: d.recipes[0].name });
+        }
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [fileReady, showTransform, fileId, steps.length]);
   // Previous grid shape, for computing what a transform changed
   const prevGridRef = useRef<{ columns: string[]; rowCount: number }>({ columns: [], rowCount: 0 });
   useEffect(() => {
@@ -789,11 +852,13 @@ function WorkspaceContent() {
                       : lastChange.label}
                   </span>
                   <span className="tabular-nums text-muted-foreground">
-                    {lastChange.rowsAfter === lastChange.rowsBefore
-                      ? `${lastChange.rowsAfter.toLocaleString()} rows (unchanged)`
-                      : `${lastChange.rowsBefore.toLocaleString()} → ${lastChange.rowsAfter.toLocaleString()} rows (${
-                          lastChange.rowsAfter > lastChange.rowsBefore ? "+" : "−"
-                        }${Math.abs(lastChange.rowsAfter - lastChange.rowsBefore).toLocaleString()})`}
+                    {lastChange.rowsAfter === 0
+                      ? `Every row was removed (${lastChange.rowsBefore.toLocaleString()} → 0)`
+                      : lastChange.rowsAfter === lastChange.rowsBefore
+                        ? `${lastChange.rowsAfter.toLocaleString()} rows (unchanged)`
+                        : `${lastChange.rowsBefore.toLocaleString()} → ${lastChange.rowsAfter.toLocaleString()} rows (${
+                            lastChange.rowsAfter > lastChange.rowsBefore ? "+" : "−"
+                          }${Math.abs(lastChange.rowsAfter - lastChange.rowsBefore).toLocaleString()})`}
                   </span>
                   {lastChange.addedCols.length > 0 && (
                     <span className="text-muted-foreground">
@@ -837,6 +902,11 @@ function WorkspaceContent() {
                     setChatOpen(true);
                     setChatPrefill({ text: `Tell me about the "${col}" column`, nonce: Date.now() });
                   }}
+                  onAskChef={(text) => {
+                    setChatOpen(true);
+                    setChatPrefill({ text, nonce: Date.now() });
+                  }}
+                  scrollToCol={gridJump}
                 />
               </div>
             </div>
@@ -873,7 +943,16 @@ function WorkspaceContent() {
           </div>
         )}
 
-        <SchemaPanel open={schemaOpen} onClose={() => setSchemaOpen(false)} columns={schema?.columns ?? []} fileName={fileName} />
+        <SchemaPanel
+          open={schemaOpen}
+          onClose={() => setSchemaOpen(false)}
+          columns={schema?.columns ?? []}
+          fileName={fileName}
+          onJumpToColumn={(name) => {
+            setSchemaOpen(false);
+            setGridJump({ name, nonce: Date.now() });
+          }}
+        />
         <HistoryDrawer open={historyOpen} onClose={() => setHistoryOpen(false)} fileId={fileId} onRevert={handleRevert} />
         <RecipesDrawer
           open={recipesOpen}
@@ -898,6 +977,26 @@ function WorkspaceContent() {
           }}
         />
         <ConfirmDialog isOpen={showResetDialog} onConfirm={handleFullReset} onCancel={() => setShowResetDialog(false)} title="Are you sure you want to reset?" message="This will clear your current work and return to the upload screen." confirmText="Reset" cancelText="Cancel" items={["Clear your current file and all transformations", "Return to the upload screen"]} />
+        <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
+          <DialogContent className="sm:max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Rename file</DialogTitle>
+            </DialogHeader>
+            <Input
+              autoFocus
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleRenameSubmit();
+              }}
+              maxLength={200}
+              aria-label="File name"
+            />
+            <Button onClick={handleRenameSubmit} disabled={!renameValue.trim()}>
+              Save
+            </Button>
+          </DialogContent>
+        </Dialog>
         <ConfirmDialog
           isOpen={confirmRevert !== null}
           onConfirm={() => {
@@ -918,7 +1017,23 @@ function WorkspaceContent() {
         />
         <SheetSelector isOpen={showSheetSelector} sheets={availableSheets} onSelect={handleSheetSelect} onCancel={() => { setShowSheetSelector(false); setPendingFile(null); setPendingUploadId(null); setLoading(false); }} />
         <ChartPanel columns={columns} rows={rows} open={chartOpen} onClose={() => setChartOpen(false)} />
-        <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} onUpload={handleFullReset} onUndo={handleUndo} onDownload={handleDownload} onReset={handleResetClick} onChat={() => setChatOpen(true)} onHistory={() => setHistoryOpen(true)} fileId={fileId} />
+        <CommandPalette
+          open={paletteOpen}
+          onClose={() => setPaletteOpen(false)}
+          onUpload={handleFullReset}
+          onUndo={handleUndo}
+          onDownload={handleDownload}
+          onDownloadXlsx={() => handleDownload("xlsx")}
+          onReset={handleResetClick}
+          onChat={() => setChatOpen((v) => !v)}
+          onHistory={() => setHistoryOpen(true)}
+          onSaveRecipe={() => setRecipesOpen(true)}
+          onRename={() => {
+            setRenameValue(fileName);
+            setRenameOpen(true);
+          }}
+          fileId={fileId}
+        />
       </div>
     </ErrorBoundary>
   );
