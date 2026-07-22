@@ -28,10 +28,12 @@ type PreviewFn = (p: {
   rows: Record<string, unknown>[];
   totalRows?: number;
   totalColumns?: number;
+  stepNumber?: number;
+  instruction?: string;
 }) => void;
 
 export default function ChatPanel({
-  fileId, onPreview, open, fileName, onUndo, onReset, starterSuggestions,
+  fileId, onPreview, open, fileName, onUndo, onReset, starterSuggestions, prefill,
 }: {
   fileId?: string;
   onPreview: PreviewFn;
@@ -41,6 +43,9 @@ export default function ChatPanel({
   onReset?: () => void;
   /** Curated suggestions shown instantly instead of fetching LLM insights. */
   starterSuggestions?: string[] | null;
+  /** Externally-seeded input (e.g. "Ask Sage about this column"); nonce
+   *  forces re-application when the same text is sent twice. */
+  prefill?: { text: string; nonce: number } | null;
 }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -79,6 +84,19 @@ export default function ChatPanel({
   useEffect(() => {
     if (open) setTimeout(() => inputRef.current?.focus(), 100);
   }, [open]);
+
+  // Seed the input from outside (grid column menu → "Ask Sage")
+  useEffect(() => {
+    if (!prefill?.text) return;
+    setInput(prefill.text);
+    setTimeout(() => {
+      const el = inputRef.current;
+      if (el) {
+        el.focus();
+        el.setSelectionRange(el.value.length, el.value.length);
+      }
+    }, 80);
+  }, [prefill]);
 
   useEffect(() => {
     if (!fileId || !open) return;
@@ -128,7 +146,14 @@ export default function ChatPanel({
             message_type: "transform", metadata: { sql: data.sql, step_number: data.step_number },
           }]);
           if (data.preview) {
-            onPreview({ columns: data.preview.columns, rows: data.preview.rows, totalRows: data.preview.total_rows, totalColumns: data.preview.total_columns });
+            onPreview({
+              columns: data.preview.columns,
+              rows: data.preview.rows,
+              totalRows: data.preview.total_rows,
+              totalColumns: data.preview.total_columns,
+              stepNumber: data.step_number,
+              instruction: msg,
+            });
           }
         } else if (data.type === "clarification") {
           setMessages((prev) => [...prev, {

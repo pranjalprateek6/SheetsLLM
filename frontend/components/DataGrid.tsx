@@ -1,11 +1,36 @@
 "use client";
 import { useRef, useState, useMemo, useCallback, useEffect } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { ArrowUp, ArrowDown, Check, Rows3, Rows4 } from "lucide-react";
+import {
+  ArrowDown, ArrowUp, Calendar, Check, ChevronDown, Hash, Rows3, Rows4,
+  Sparkles, ToggleLeft, Type,
+} from "lucide-react";
 import { TextShimmer } from "@/components/ui/text-shimmer";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 type SortDir = "asc" | "desc" | null;
 type Density = "compact" | "comfortable";
+
+export type ColumnMeta = {
+  dtype?: string;
+  null_pct?: number;
+  unique_count?: number;
+};
+
+/** dtype → a small glyph so the header tells you what a column IS at a
+ *  glance (numbers, text, dates, booleans) without opening the schema. */
+function TypeGlyph({ dtype }: { dtype?: string }) {
+  if (!dtype) return null;
+  const t = dtype.toUpperCase();
+  const cls = "h-3 w-3 flex-shrink-0 text-muted-foreground/60";
+  if (/INT|DOUBLE|FLOAT|DECIMAL|NUMERIC|REAL|BIGINT|HUGEINT/.test(t)) return <Hash className={cls} aria-label="number" />;
+  if (/DATE|TIME/.test(t)) return <Calendar className={cls} aria-label="date" />;
+  if (/BOOL/.test(t)) return <ToggleLeft className={cls} aria-label="boolean" />;
+  return <Type className={cls} aria-label="text" />;
+}
 
 const DENSITY_KEY = "sllm_grid_density";
 const ROW_HEIGHT: Record<Density, number> = { compact: 36, comfortable: 44 };
@@ -25,11 +50,25 @@ export default function DataGrid({
   rows,
   loading,
   onSort,
+  columnMeta,
+  highlightCols,
+  totalRows,
+  stepCount,
+  onAskColumn,
 }: {
   columns: string[];
   rows: Record<string, unknown>[];
   loading: boolean;
   onSort?: (column: string, direction: "asc" | "desc") => void;
+  /** Per-column dtype/null stats from the file schema (best-effort). */
+  columnMeta?: Record<string, ColumnMeta>;
+  /** Columns the last transform added; briefly tinted so changes are visible. */
+  highlightCols?: string[];
+  /** True total row count of the result (rows[] is a capped preview). */
+  totalRows?: number;
+  stepCount?: number;
+  /** Bridge into Sage: prefill the chat with a question about a column. */
+  onAskColumn?: (column: string) => void;
 }) {
   const head = columns ?? [];
   const parentRef = useRef<HTMLDivElement>(null);
@@ -155,26 +194,83 @@ export default function DataGrid({
             {/* Column name row */}
             <tr className="border-b bg-muted/50">
               <th className="w-[50px] min-w-[50px] sticky left-0 z-20 [background:linear-gradient(hsl(var(--muted)/.5),hsl(var(--muted)/.5)),hsl(var(--card))]">&nbsp;</th>
-              {head.map((h) => (
-                <th
-                  key={h}
-                  className="h-10 px-2 text-left text-xs font-medium text-muted-foreground whitespace-nowrap relative select-none group"
-                  style={{ width: colWidths[h] || 140 }}
-                >
-                  <button
-                    className="inline-flex items-center gap-1.5 hover:text-foreground transition-colors"
-                    onClick={() => handleSort(h)}
+              {head.map((h) => {
+                const meta = columnMeta?.[h];
+                const nullPct = meta?.null_pct ?? 0;
+                const highlighted = highlightCols?.includes(h);
+                return (
+                  <th
+                    key={h}
+                    className={`h-10 px-2 text-left text-xs font-medium text-muted-foreground whitespace-nowrap relative select-none group ${
+                      highlighted ? "bg-primary/10" : ""
+                    }`}
+                    style={{ width: colWidths[h] || 140 }}
                   >
-                    <span className="truncate max-w-[120px]">{h}</span>
-                    {sortCol === h && sortDir === "asc" && <ArrowUp className="h-3 w-3 flex-shrink-0 text-primary" />}
-                    {sortCol === h && sortDir === "desc" && <ArrowDown className="h-3 w-3 flex-shrink-0 text-primary" />}
-                  </button>
-                  <div
-                    className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-primary/40 opacity-0 group-hover:opacity-100 transition-opacity"
-                    onMouseDown={(e) => handleResizeStart(h, e)}
-                  />
-                </th>
-              ))}
+                    <div className="flex items-center gap-1.5">
+                      <TypeGlyph dtype={meta?.dtype} />
+                      <button
+                        className="inline-flex min-w-0 items-center gap-1.5 hover:text-foreground transition-colors"
+                        onClick={() => handleSort(h)}
+                        title={
+                          meta
+                            ? `${h}${meta.dtype ? ` · ${meta.dtype}` : ""}${nullPct > 0 ? ` · ${nullPct}% nulls` : ""}`
+                            : h
+                        }
+                      >
+                        <span className="truncate max-w-[110px]">{h}</span>
+                        {nullPct > 0 && (
+                          <span
+                            className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-warning"
+                            aria-label={`${nullPct}% null values`}
+                          />
+                        )}
+                        {sortCol === h && sortDir === "asc" && <ArrowUp className="h-3 w-3 flex-shrink-0 text-primary" />}
+                        {sortCol === h && sortDir === "desc" && <ArrowDown className="h-3 w-3 flex-shrink-0 text-primary" />}
+                      </button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            className="rounded p-0.5 opacity-0 transition-opacity hover:bg-accent group-hover:opacity-100 data-[state=open]:opacity-100"
+                            aria-label={`Column menu for ${h}`}
+                          >
+                            <ChevronDown className="h-3 w-3" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" className="w-52">
+                          {meta && (
+                            <>
+                              <div className="px-2 py-1.5 text-xs text-muted-foreground">
+                                {meta.dtype ?? "unknown type"}
+                                {typeof meta.unique_count === "number" && ` · ${meta.unique_count.toLocaleString()} unique`}
+                                {nullPct > 0 && ` · ${nullPct}% nulls`}
+                              </div>
+                              <DropdownMenuSeparator />
+                            </>
+                          )}
+                          <DropdownMenuItem onClick={() => { setSortCol(h); setSortDir("asc"); onSort?.(h, "asc"); }}>
+                            <ArrowUp className="mr-2 h-3.5 w-3.5" /> Sort ascending
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => { setSortCol(h); setSortDir("desc"); onSort?.(h, "desc"); }}>
+                            <ArrowDown className="mr-2 h-3.5 w-3.5" /> Sort descending
+                          </DropdownMenuItem>
+                          {onAskColumn && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => onAskColumn(h)}>
+                                <Sparkles className="mr-2 h-3.5 w-3.5 text-primary" /> Ask Sage about this column
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                    <div
+                      className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-primary/40 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onMouseDown={(e) => handleResizeStart(h, e)}
+                    />
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody>
@@ -219,10 +315,13 @@ export default function DataGrid({
                         const val = row[h];
                         const isNull = val === null || val === undefined;
                         const cellKey = `${virtualRow.index}-${h}`;
+                        const highlighted = highlightCols?.includes(h);
                         return (
                           <td
                             key={h}
-                            className={`px-2 ${density === "comfortable" ? "py-2" : "py-1"} align-middle text-xs text-foreground cursor-pointer relative`}
+                            className={`px-2 ${density === "comfortable" ? "py-2" : "py-1"} align-middle text-xs text-foreground cursor-pointer relative ${
+                              highlighted ? "bg-primary/[0.05]" : ""
+                            }`}
                             onClick={() => handleCopy(isNull ? "" : String(val), cellKey)}
                             title={isNull ? "NULL" : String(val)}
                           >
@@ -261,7 +360,12 @@ export default function DataGrid({
       {/* Status bar */}
       <div className="flex h-7 flex-shrink-0 items-center justify-between border-t bg-card px-3">
         <span className="text-[11px] tabular-nums text-muted-foreground">
-          {rows.length.toLocaleString()} rows × {head.length.toLocaleString()} cols
+          {typeof totalRows === "number" && totalRows > rows.length
+            ? `First ${rows.length.toLocaleString()} of ${totalRows.toLocaleString()} rows`
+            : `${rows.length.toLocaleString()} rows`}
+          {" × "}
+          {head.length.toLocaleString()} cols
+          {typeof stepCount === "number" && stepCount > 0 && ` · step ${stepCount}`}
         </span>
         <div
           className="flex items-center gap-0.5 rounded-md bg-muted p-0.5"
