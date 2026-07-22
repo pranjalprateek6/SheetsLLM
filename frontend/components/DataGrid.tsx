@@ -269,12 +269,12 @@ export default function DataGrid({
                 return (
                   <th
                     key={h}
-                    className={`h-10 px-2 text-left text-xs font-medium text-muted-foreground whitespace-nowrap relative select-none group ${
+                    className={`h-10 px-2 text-center text-xs font-medium text-muted-foreground whitespace-nowrap relative select-none group ${
                       highlighted ? "bg-primary/10" : ""
                     }`}
                     style={{ width: colWidths[h] || 140 }}
                   >
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center justify-center gap-1.5">
                       <TypeGlyph dtype={meta?.dtype} />
                       <button
                         className="inline-flex min-w-0 items-center gap-1.5 hover:text-foreground transition-colors"
