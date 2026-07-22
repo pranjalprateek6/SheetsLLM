@@ -287,7 +287,9 @@ export default function DataGrid({
               {head.map((_, i) => (
                 <th
                   key={i}
-                  className="px-2 py-1 text-center text-[11px] font-normal text-muted-foreground"
+                  className={`px-2 py-1 text-[11px] font-normal text-muted-foreground ${
+                    numericCols.has(head[i]) ? "text-right" : "text-left"
+                  }`}
                   style={{ width: widthFor(head[i]) }}
                 >
                   {colLetter(i)}
