@@ -49,6 +49,19 @@ function measureText(text: string, font: string): number {
   return _measureCtx.measureText(text).width;
 }
 
+// Add thousands separators to a plain number string WITHOUT touching its
+// decimals (string-level grouping, so no float reparse / precision loss).
+// Anything that is not a bare number (percentages, ids, dates) is left as-is.
+const _PURE_NUMBER = /^-?\d+(\.\d+)?$/;
+function groupNumber(raw: string): string {
+  if (!_PURE_NUMBER.test(raw)) return raw;
+  const neg = raw.startsWith("-");
+  const body = neg ? raw.slice(1) : raw;
+  const [intPart, decPart] = body.split(".");
+  const grouped = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return (neg ? "-" : "") + grouped + (decPart !== undefined ? `.${decPart}` : "");
+}
+
 const DENSITY_KEY = "sllm_grid_density";
 const ROW_HEIGHT: Record<Density, number> = { compact: 36, comfortable: 44 };
 
@@ -95,11 +108,32 @@ export default function DataGrid({
 }) {
   const head = columns ?? [];
   const parentRef = useRef<HTMLDivElement>(null);
+
   const [sortCol, setSortCol] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>(null);
   const [copiedCell, setCopiedCell] = useState<string | null>(null);
   const [colWidths, setColWidths] = useState<Record<string, number>>({});
   const [density, setDensity] = useState<Density>("compact");
+
+  // A column counts as numeric if its schema dtype says so, or (for
+  // transform-created columns with no schema) its first value is a number.
+  const numericCols = useMemo(() => {
+    const set = new Set<string>();
+    const first = rows[0];
+    for (const h of head) {
+      if (isNumericDtype(columnMeta?.[h]?.dtype) || (first && typeof first[h] === "number")) {
+        set.add(h);
+      }
+    }
+    return set;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [head.join(""), columnMeta, rows[0]]);
+  // Numeric columns default a touch narrower so the right-aligned value
+  // sits closer to its (now also right-aligned) header.
+  const widthFor = useCallback(
+    (h: string) => colWidths[h] ?? (numericCols.has(h) ? 116 : 140),
+    [colWidths, numericCols]
+  );
 
   // Read persisted density after mount (avoids SSR/client hydration mismatch).
   useEffect(() => {
@@ -229,7 +263,7 @@ export default function DataGrid({
     const idx = head.indexOf(scrollToCol.name);
     if (idx === -1 || !parentRef.current) return;
     let left = 50; // row-number gutter
-    for (let i = 0; i < idx; i++) left += colWidths[head[i]] || 140;
+    for (let i = 0; i < idx; i++) left += widthFor(head[i]);
     parentRef.current.scrollTo({ left: Math.max(0, left - 80), behavior: "smooth" });
     setFlashCol(scrollToCol.name);
     const t = setTimeout(() => setFlashCol(null), 1600);
@@ -254,7 +288,7 @@ export default function DataGrid({
                 <th
                   key={i}
                   className="px-2 py-1 text-center text-[11px] font-normal text-muted-foreground"
-                  style={{ width: colWidths[head[i]] || 140 }}
+                  style={{ width: widthFor(head[i]) }}
                 >
                   {colLetter(i)}
                 </th>
@@ -267,15 +301,16 @@ export default function DataGrid({
                 const meta = columnMeta?.[h];
                 const nullPct = meta?.null_pct ?? 0;
                 const highlighted = highlightCols?.includes(h) || flashCol === h;
+                const numericHead = numericCols.has(h);
                 return (
                   <th
                     key={h}
-                    className={`h-10 px-2 text-left text-xs font-medium text-muted-foreground whitespace-nowrap relative select-none group ${
-                      highlighted ? "bg-primary/10" : ""
-                    }`}
-                    style={{ width: colWidths[h] || 140 }}
+                    className={`h-10 px-2 text-xs font-medium text-muted-foreground whitespace-nowrap relative select-none group ${
+                      numericHead ? "text-right" : "text-left"
+                    } ${highlighted ? "bg-primary/10" : ""}`}
+                    style={{ width: widthFor(h) }}
                   >
-                    <div className="flex items-center gap-1.5">
+                    <div className={`flex items-center gap-1.5 ${numericHead ? "justify-end" : ""}`}>
                       <TypeGlyph dtype={meta?.dtype} />
                       <button
                         className="inline-flex min-w-0 items-center gap-1.5 hover:text-foreground transition-colors"
@@ -402,7 +437,7 @@ export default function DataGrid({
                                 NULL
                               </span>
                             ) : (
-                              <div className={`truncate max-w-[200px] font-mono text-xs tabular-nums ${numeric ? "ml-auto text-right" : ""}`}>{String(val)}</div>
+                              <div className={`truncate max-w-[200px] font-mono text-xs tabular-nums ${numeric ? "ml-auto text-right" : ""}`}>{numeric ? groupNumber(String(val)) : String(val)}</div>
                             )}
                             {copiedCell === cellKey && (
                               <span className="absolute top-0.5 right-0.5 text-[10px] text-success flex items-center">
