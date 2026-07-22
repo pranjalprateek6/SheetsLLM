@@ -1,9 +1,9 @@
 "use client";
 import {
-  BarChart3, BookMarked, Columns3, Download, History, Sparkles, Undo2,
+  BarChart3, BookMarked, ChefHat, Columns3, Download, History, Undo2,
 } from "lucide-react";
 
-/** Faithful DOM-rendered replica of the workspace (grid + Sage panel).
+/** Faithful DOM-rendered replica of the workspace (grid + Chef panel).
  *  Rendered, not screenshotted: stays sharp on every display, follows
  *  the visitor's theme, and can't drift stale as the product evolves. */
 
@@ -63,7 +63,7 @@ function Grid() {
                   className={
                     "whitespace-nowrap px-2 py-1.5 " +
                     (j === 1
-                      ? "bg-primary/[0.06] text-foreground" // the column Sage just fixed
+                      ? "bg-primary/[0.06] text-foreground" // the column Chef just fixed
                       : j >= 3
                         ? "text-right tabular-nums text-muted-foreground"
                         : "text-muted-foreground")
@@ -83,12 +83,12 @@ function Grid() {
   );
 }
 
-function SagePanel() {
+function ChefPanel() {
   return (
     <div className="hidden w-[220px] shrink-0 flex-col border-l bg-card sm:flex">
       <div className="flex items-center gap-1.5 border-b px-3 py-2">
-        <Sparkles className="h-3 w-3 text-primary" />
-        <span className="text-xs font-semibold">Sage</span>
+        <ChefHat className="h-3 w-3 text-primary" />
+        <span className="text-xs font-semibold">Chef</span>
       </div>
       <div className="flex-1 space-y-2 p-2.5 text-[10px] leading-relaxed">
         <div className="ml-6 rounded-lg rounded-br-sm bg-primary px-2.5 py-1.5 text-primary-foreground">
@@ -134,7 +134,7 @@ export default function ProductShot() {
       <Toolbar />
       <div className="flex">
         <Grid />
-        <SagePanel />
+        <ChefPanel />
       </div>
     </div>
   );

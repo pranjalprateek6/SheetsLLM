@@ -3,7 +3,7 @@ import { useRef, useState, useMemo, useCallback, useEffect } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   ArrowDown, ArrowUp, Calendar, Check, ChevronDown, Hash, Rows3, Rows4,
-  Sparkles, ToggleLeft, Type,
+  ChefHat, ToggleLeft, Type,
 } from "lucide-react";
 import { TextShimmer } from "@/components/ui/text-shimmer";
 import {
@@ -67,7 +67,7 @@ export default function DataGrid({
   /** True total row count of the result (rows[] is a capped preview). */
   totalRows?: number;
   stepCount?: number;
-  /** Bridge into Sage: prefill the chat with a question about a column. */
+  /** Bridge into Chef: prefill the chat with a question about a column. */
   onAskColumn?: (column: string) => void;
 }) {
   const head = columns ?? [];
@@ -257,7 +257,7 @@ export default function DataGrid({
                             <>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem onClick={() => onAskColumn(h)}>
-                                <Sparkles className="mr-2 h-3.5 w-3.5 text-primary" /> Ask Sage about this column
+                                <ChefHat className="mr-2 h-3.5 w-3.5 text-primary" /> Ask Chef about this column
                               </DropdownMenuItem>
                             </>
                           )}

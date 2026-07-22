@@ -97,10 +97,19 @@ export default function Header() {
   };
 
   const links = user ? APP_LINKS : MARKETING_LINKS;
+  // The workspace is a full-bleed working surface; a centered max-width nav
+  // above it reads as a misaligned island. Marketing/app pages keep the
+  // centered container.
+  const fullBleed = pathname.startsWith("/workspace");
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-card/85 backdrop-blur-md">
-      <div className="relative mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:px-6">
+      <div
+        className={cn(
+          "relative flex h-14 items-center justify-between px-4",
+          fullBleed ? "w-full" : "mx-auto max-w-6xl sm:px-6"
+        )}
+      >
         {/* Logo — home for prospects, dashboard for signed-in users */}
         <Link href={user ? "/dashboard" : "/"} className="flex items-center gap-2">
           {/* eslint-disable-next-line @next/next/no-img-element -- static SVG, no optimizer needed */}

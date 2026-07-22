@@ -48,7 +48,7 @@ const STEPS = [
     icon: MessageSquare,
     step: "2",
     title: "Describe the cleanup",
-    body: "“Remove duplicates, fix the dates, total by region.” Sage writes validated, read-only SQL and shows you the result live.",
+    body: "“Remove duplicates, fix the dates, total by region.” Chef writes validated, read-only SQL and shows you the result live.",
   },
   {
     icon: RefreshCw,
@@ -186,7 +186,7 @@ export default function LandingPage() {
         <div className="mx-auto max-w-5xl px-4 py-20 sm:px-6 sm:py-24">
           <motion.div {...fadeUp} className="mb-10 text-center">
             <h2 className="text-3xl font-semibold tracking-tight">
-              Your data on the left, Sage on the right
+              Your data on the left, Chef on the right
             </h2>
             <p className="mx-auto mt-3 max-w-xl text-muted-foreground">
               A live grid of your file next to a chat that edits it. Every change previews

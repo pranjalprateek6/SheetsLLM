@@ -2,7 +2,7 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
-import { Bot, ChevronDown, Code2, Eraser, RotateCcw, Send, Sparkles, Square, Undo2, User } from "lucide-react";
+import { ChefHat, ChevronDown, Code2, Eraser, RotateCcw, Send, Square, Undo2, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
@@ -43,7 +43,7 @@ export default function ChatPanel({
   onReset?: () => void;
   /** Curated suggestions shown instantly instead of fetching LLM insights. */
   starterSuggestions?: string[] | null;
-  /** Externally-seeded input (e.g. "Ask Sage about this column"); nonce
+  /** Externally-seeded input (e.g. "Ask Chef about this column"); nonce
    *  forces re-application when the same text is sent twice. */
   prefill?: { text: string; nonce: number } | null;
 }) {
@@ -59,7 +59,7 @@ export default function ChatPanel({
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  // Staged progress while Sage works — honest labels for the real pipeline
+  // Staged progress while Chef works — honest labels for the real pipeline
   // (generate -> validate -> execute), rotated on a timer.
   const STAGES = ["Writing SQL…", "Validating…", "Running on your data…"];
   useEffect(() => {
@@ -85,7 +85,7 @@ export default function ChatPanel({
     if (open) setTimeout(() => inputRef.current?.focus(), 100);
   }, [open]);
 
-  // Seed the input from outside (grid column menu → "Ask Sage")
+  // Seed the input from outside (grid column menu → "Ask Chef")
   useEffect(() => {
     if (!prefill?.text) return;
     setInput(prefill.text);
@@ -197,8 +197,8 @@ export default function ChatPanel({
       <div className="flex-shrink-0 border-b px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-primary" />
-            <h3 className="text-sm font-semibold">Sage</h3>
+            <ChefHat className="h-4 w-4 text-primary" />
+            <h3 className="text-sm font-semibold">Chef</h3>
           </div>
           <TooltipProvider>
             <div className="flex items-center gap-0.5">
@@ -248,7 +248,7 @@ export default function ChatPanel({
         <div className="flex-shrink-0 space-y-4 border-b px-4 py-6">
           <div className="space-y-2 text-center">
             <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-              <Sparkles className="h-5 w-5 text-primary" />
+              <ChefHat className="h-5 w-5 text-primary" />
             </div>
             <div>
               <p className="text-sm font-medium">{fileName || "Your file"} is ready</p>
@@ -303,7 +303,7 @@ export default function ChatPanel({
           <div key={i} className={cn("flex gap-2", msg.role === "user" ? "justify-end" : "justify-start")}>
             {msg.role === "assistant" && (
               <div className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md bg-primary/10">
-                <Bot className="h-3 w-3 text-primary" />
+                <ChefHat className="h-3 w-3 text-primary" />
               </div>
             )}
             <div
@@ -362,7 +362,7 @@ export default function ChatPanel({
         {sending && (
           <div className="flex gap-2">
             <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md bg-primary/10">
-              <Bot className="h-3 w-3 text-primary" />
+              <ChefHat className="h-3 w-3 text-primary" />
             </div>
             <div className="flex items-center gap-2 rounded-xl bg-muted px-3 py-2">
               <TextShimmer className="text-xs" duration={1}>{STAGES[stage]}</TextShimmer>
@@ -420,7 +420,7 @@ export default function ChatPanel({
                 sendMessage();
               }
             }}
-            placeholder="Ask Sage anything…"
+            placeholder="Ask Chef anything…"
             className="max-h-[100px] min-h-[40px] flex-1 resize-none rounded-lg border bg-background px-3 py-2 text-sm shadow-xs outline-none transition-shadow placeholder:text-muted-foreground focus:ring-2 focus:ring-ring/30"
             disabled={sending}
             rows={1}

@@ -509,7 +509,7 @@ function WorkspaceContent() {
             onDownload={handleDownload}
             onUndo={handleUndo}
             onFocusInput={() => {
-              const input = document.querySelector<HTMLTextAreaElement>('textarea[placeholder*="Sage"]');
+              const input = document.querySelector<HTMLTextAreaElement>('textarea[placeholder*="Chef"]');
               input?.focus();
             }}
             onEscape={() => { setHistoryOpen(false); setChartOpen(false); }}
@@ -642,7 +642,7 @@ function WorkspaceContent() {
           </div>
         )}
 
-        {/* Phase 3: Transform with Sage sidebar */}
+        {/* Phase 3: Transform with Chef sidebar */}
         {fileReady && showTransform && (
           <div className="flex h-[calc(100vh-56px)] animate-fade-in-up">
             {/* Main content area */}
@@ -682,12 +682,12 @@ function WorkspaceContent() {
                           size="icon"
                           className={chatOpen ? "h-8 w-8 text-primary" : "h-8 w-8 text-muted-foreground"}
                           onClick={() => setChatOpen((v) => !v)}
-                          aria-label={chatOpen ? "Hide Sage chat panel" : "Show Sage chat panel"}
+                          aria-label={chatOpen ? "Hide Chef chat panel" : "Show Chef chat panel"}
                         >
                           <MessageSquare className="h-4 w-4" />
                         </Button>
                       </TooltipTrigger>
-                      <TooltipContent>{chatOpen ? "Hide Sage" : "Show Sage"}</TooltipContent>
+                      <TooltipContent>{chatOpen ? "Hide Chef" : "Show Chef"}</TooltipContent>
                     </Tooltip>
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -841,7 +841,7 @@ function WorkspaceContent() {
               </div>
             </div>
 
-            {/* Sage — desktop column (collapsible), mobile bottom sheet */}
+            {/* Chef — desktop column (collapsible), mobile bottom sheet */}
             {chatOpen && (
               <div className="hidden w-80 flex-shrink-0 lg:block xl:w-96">
                 <ChatPanel
