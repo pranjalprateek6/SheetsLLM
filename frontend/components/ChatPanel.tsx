@@ -207,7 +207,7 @@ export default function ChatPanel({
   if (!open) return null;
 
   return (
-    <div className="flex h-full flex-col border-l bg-card">
+    <div className="ws-glass-panel flex h-full flex-col border-l border-border/70">
       {/* Header */}
       <div className="flex-shrink-0 border-b px-4 py-3">
         <div className="flex items-center justify-between">
@@ -330,7 +330,7 @@ export default function ChatPanel({
                   ? "border border-destructive/30 bg-destructive/5 text-destructive"
                   : msg.message_type === "transform"
                   ? "border border-primary/20 bg-primary/5"
-                  : "bg-muted"
+                  : "border border-border/60 bg-card/85"
               )}
             >
               <p className="whitespace-pre-wrap">{msg.content}</p>
@@ -383,7 +383,7 @@ export default function ChatPanel({
               <TextShimmer className="text-xs" duration={1}>{STAGES[stage]}</TextShimmer>
               <button
                 onClick={() => abortRef.current?.abort()}
-                className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground"
+                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card/70 px-2.5 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground"
                 aria-label="Stop"
               >
                 <Square className="h-2.5 w-2.5 fill-current" /> Stop
