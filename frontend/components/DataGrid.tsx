@@ -118,6 +118,34 @@ export default function DataGrid({
 
   const [filterQ, setFilterQ] = useState("");
 
+  // A column reads as numeric if its schema dtype says so, or (for
+  // transform-created columns with no schema yet) its first value is a number.
+  // Numbers right-align so decimal places line up for comparison.
+  const numericCols = useMemo(() => {
+    const set = new Set<string>();
+    const first = rows[0];
+    for (const h of head) {
+      const dtype = columnMeta?.[h]?.dtype;
+      if ((dtype && NUMERIC_RE.test(dtype.toUpperCase())) || (first && typeof first[h] === "number")) {
+        set.add(h);
+      }
+    }
+    return set;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [head.join("|"), columnMeta, rows[0]]);
+
+  // Added-column tint fades after a few seconds so the grid returns to calm.
+  const [freshCols, setFreshCols] = useState<string[]>([]);
+  useEffect(() => {
+    if (highlightCols?.length) {
+      setFreshCols(highlightCols);
+      const t = setTimeout(() => setFreshCols([]), 6000);
+      return () => clearTimeout(t);
+    }
+    setFreshCols([]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [highlightCols?.join("|")]);
+
   const sortedRows = useMemo(() => {
     if (!sortCol || !sortDir || onSort) return rows;
     return [...rows].sort((a, b) => {
@@ -265,16 +293,17 @@ export default function DataGrid({
               {head.map((h) => {
                 const meta = columnMeta?.[h];
                 const nullPct = meta?.null_pct ?? 0;
-                const highlighted = highlightCols?.includes(h) || flashCol === h;
+                const highlighted = freshCols.includes(h) || flashCol === h;
+                const numeric = numericCols.has(h);
                 return (
                   <th
                     key={h}
-                    className={`h-10 px-2 text-center text-xs font-medium text-muted-foreground whitespace-nowrap relative select-none group ${
-                      highlighted ? "bg-primary/10" : ""
-                    }`}
+                    className={`h-10 px-2 text-xs font-medium text-muted-foreground whitespace-nowrap relative select-none group ${
+                      numeric ? "text-right" : "text-left"
+                    } ${highlighted ? "bg-primary/[0.06]" : ""}`}
                     style={{ width: colWidths[h] || 140 }}
                   >
-                    <div className="flex items-center justify-center gap-1.5">
+                    <div className={`flex items-center gap-1.5 ${numeric ? "justify-end" : ""}`}>
                       <TypeGlyph dtype={meta?.dtype} />
                       <button
                         className="inline-flex min-w-0 items-center gap-1.5 hover:text-foreground transition-colors"
@@ -286,6 +315,11 @@ export default function DataGrid({
                         }
                       >
                         <span className="truncate max-w-[110px]">{h}</span>
+                        {freshCols.includes(h) && (
+                          <span className="flex-shrink-0 rounded bg-primary/15 px-1 py-px text-[8px] font-bold tracking-wider text-primary">
+                            NEW
+                          </span>
+                        )}
                         {nullPct > 0 && (
                           <span
                             className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-warning"
@@ -375,7 +409,7 @@ export default function DataGrid({
                   return (
                     <tr
                       key={virtualRow.index}
-                      className="transition-colors"
+                      className="border-b border-border/60 transition-colors"
                       style={{ height: virtualRow.size }}
                     >
                       <td className="w-[50px] min-w-[50px] text-center text-[11px] text-muted-foreground tabular-nums select-none sticky left-0 z-[5] bg-card">
@@ -385,13 +419,14 @@ export default function DataGrid({
                         const val = row[h];
                         const isNull = val === null || val === undefined;
                         const cellKey = `${virtualRow.index}-${h}`;
-                        const highlighted = highlightCols?.includes(h) || flashCol === h;
+                        const highlighted = freshCols.includes(h) || flashCol === h;
+                        const numeric = numericCols.has(h);
                         return (
                           <td
                             key={h}
-                            className={`px-2 ${density === "comfortable" ? "py-2" : "py-1"} align-middle text-center text-xs text-foreground cursor-pointer relative ${
-                              highlighted ? "bg-primary/[0.05]" : ""
-                            }`}
+                            className={`px-2 ${density === "comfortable" ? "py-2" : "py-1"} align-middle text-xs text-foreground cursor-pointer relative ${
+                              numeric ? "text-right" : "text-left"
+                            } ${highlighted ? "bg-primary/[0.05]" : ""}`}
                             onClick={() => handleCopy(isNull ? "" : String(val), cellKey)}
                             title={isNull ? "NULL" : String(val)}
                           >
@@ -400,8 +435,7 @@ export default function DataGrid({
                                 NULL
                               </span>
                             ) : (
-                              // Centered as a block within the column, text left-aligned
-                              <span className="inline-block max-w-full truncate text-left align-middle font-mono text-xs tabular-nums">{String(val)}</span>
+                              <span className="inline-block max-w-full truncate align-middle font-mono text-xs tabular-nums">{String(val)}</span>
                             )}
                             {copiedCell === cellKey && (
                               <span className="absolute top-0.5 right-0.5 text-[10px] text-success flex items-center">
