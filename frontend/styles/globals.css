@@ -8,29 +8,30 @@
 
 @layer base {
   :root {
-    /* neutrals — two-level light system (GitHub/Stripe pattern):
-       tinted cool-gray canvas + pure white raised surfaces.
-       Never white-on-white; separation comes from surface contrast
-       first, borders second. */
-    --background: 220 27% 97%;
-    --foreground: 224 25% 12%;
-    --muted: 220 20% 94%;
-    --muted-foreground: 220 10% 40%;
+    /* neutrals — near-white canvas with white raised surfaces (v4 spec):
+       separation comes from hairline borders and soft shadows, not
+       surface tint. Grays are near-desaturated so the violet reads as
+       the only color in the chrome. */
+    --background: 240 9% 99%;
+    --foreground: 240 6% 10%;
+    --muted: 240 6% 96%;
+    --muted-foreground: 240 4% 44%;
     --card: 0 0% 100%;
-    --card-foreground: 224 25% 12%;
+    --card-foreground: 240 6% 10%;
     --popover: 0 0% 100%;
-    --popover-foreground: 224 25% 12%;
-    --border: 220 16% 88%;
-    --input: 220 16% 84%;
+    --popover-foreground: 240 6% 10%;
+    --border: 240 9% 94%;
+    --input: 240 8% 89%;
     --ring: 254 75% 64%;
 
-    /* brand — violet, matches the logo mark (#7C5CE8) */
+    /* brand — violet, matches the logo mark (#7C5CE8); reserved for
+       primary actions and moments of change, not a theme */
     --primary: 254 75% 64%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 220 20% 94%;
-    --secondary-foreground: 224 25% 12%;
-    --accent: 220 18% 93%;
-    --accent-foreground: 224 25% 12%;
+    --secondary: 240 6% 96%;
+    --secondary-foreground: 240 6% 10%;
+    --accent: 240 6% 95%;
+    --accent-foreground: 240 6% 10%;
 
     /* semantic */
     --destructive: 0 72% 51%;
@@ -55,23 +56,25 @@
   }
 
   .dark {
-    --background: 224 30% 7%;
-    --foreground: 220 20% 96%;
-    --muted: 224 20% 13%;
-    --muted-foreground: 220 10% 62%;
-    --card: 224 28% 9%;
-    --card-foreground: 220 20% 96%;
-    --popover: 224 28% 9%;
-    --popover-foreground: 220 20% 96%;
-    --border: 224 18% 18%;
-    --input: 224 18% 22%;
+    /* neutral charcoal, no navy cast (v4 spec): surfaces step up in
+       lightness, hairlines stay barely-there */
+    --background: 240 10% 6%;
+    --foreground: 240 9% 93%;
+    --muted: 240 8% 11%;
+    --muted-foreground: 240 5% 56%;
+    --card: 240 9% 7%;
+    --card-foreground: 240 9% 93%;
+    --popover: 240 8% 9%;
+    --popover-foreground: 240 9% 93%;
+    --border: 240 8% 12%;
+    --input: 240 8% 16%;
     --ring: 253 85% 69%;
     --primary: 253 85% 69%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 224 20% 13%;
-    --secondary-foreground: 220 20% 96%;
-    --accent: 224 20% 15%;
-    --accent-foreground: 220 20% 96%;
+    --secondary: 240 8% 11%;
+    --secondary-foreground: 240 9% 93%;
+    --accent: 240 8% 13%;
+    --accent-foreground: 240 9% 93%;
     --destructive: 0 66% 56%;
     --destructive-foreground: 0 0% 100%;
     --success: 160 70% 42%;
@@ -125,6 +128,47 @@
   .tabular-nums {
     font-variant-numeric: tabular-nums;
   }
+}
+
+/* ── Workspace chrome (v4 spec): ambient glow + glass ──────────────────
+   Glass over a flat background is invisible; the ambient layer gives the
+   frosted chrome something to refract. Exactly two glass layers per
+   screen: the toolbar/pipeline band and the Chef panel. The data grid
+   stays opaque — glass organizes chrome, never sits under data. */
+.ws-ambient {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(440px 320px at 88% 0%, hsl(var(--primary) / 0.1), transparent 65%),
+    radial-gradient(500px 360px at 96% 80%, hsl(var(--primary) / 0.07), transparent 65%),
+    radial-gradient(440px 320px at 6% 96%, hsl(var(--gradient-via) / 0.06), transparent 65%);
+}
+.dark .ws-ambient {
+  background:
+    radial-gradient(440px 320px at 88% 0%, hsl(var(--primary) / 0.17), transparent 65%),
+    radial-gradient(500px 360px at 96% 80%, hsl(var(--primary) / 0.12), transparent 65%),
+    radial-gradient(440px 320px at 6% 96%, hsl(var(--gradient-via) / 0.08), transparent 65%);
+}
+
+.ws-glass {
+  background: hsl(var(--background) / 0.6);
+  backdrop-filter: blur(18px) saturate(1.5);
+  box-shadow: inset 0 1px 0 hsl(0 0% 100% / 0.7);
+}
+.dark .ws-glass {
+  background: hsl(var(--background) / 0.5);
+  backdrop-filter: blur(20px) saturate(1.4);
+  box-shadow: inset 0 1px 0 hsl(0 0% 100% / 0.05);
+}
+
+.ws-glass-panel {
+  background: hsl(var(--background) / 0.55);
+  backdrop-filter: blur(20px) saturate(1.5);
+}
+.dark .ws-glass-panel {
+  background: hsl(240 8% 7% / 0.45);
+  backdrop-filter: blur(22px) saturate(1.4);
 }
 
 /* ── Motion tokens (transitions.dev scale) ─────────────────────────────
