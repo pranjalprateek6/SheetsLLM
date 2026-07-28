@@ -2,7 +2,7 @@
 import { Suspense, useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import {
-  BarChart3, BookMarked, ChevronDown, Columns3, FileSpreadsheet, History, Lightbulb, MessageSquare, Pencil, Undo2, Upload,
+  BarChart3, BookMarked, Check, ChevronDown, Columns3, FileSpreadsheet, History, Lightbulb, MessageSquare, Pencil, Undo2, Upload,
 } from "lucide-react";
 import { DownloadIcon, type DownloadIconHandle } from "@/components/icons/download";
 import DropZone from "@/components/DropZone";
@@ -709,11 +709,13 @@ function WorkspaceContent() {
 
         {/* Phase 3: Transform with Chef sidebar */}
         {fileReady && showTransform && (
-          <div className="flex h-[calc(100vh-56px)] animate-fade-in-up">
+          <div className="relative flex h-[calc(100vh-56px)] animate-fade-in-up">
+            {/* Ambient glow behind the chrome; the glass bands refract it */}
+            <div aria-hidden className="ws-ambient" />
             {/* Main content area */}
-            <div className="flex min-w-0 flex-1 flex-col">
+            <div className="relative flex min-w-0 flex-1 flex-col">
               {/* Toolbar: file identity + view tools + labeled primary actions */}
-              <div className="flex flex-shrink-0 items-center gap-2 border-b bg-card px-4 py-2">
+              <div className="ws-glass flex flex-shrink-0 items-center gap-2 border-b border-border/70 px-4 py-2">
                 <div className="flex min-w-0 flex-1 items-center gap-2">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -780,7 +782,7 @@ function WorkspaceContent() {
                     </Tooltip>
                     <div className="mx-1.5 h-5 w-px bg-border" aria-hidden />
                     <Button
-                      variant={steps.length > 0 ? "default" : "outline"}
+                      variant="outline"
                       size="sm"
                       className="h-8 gap-1.5"
                       onClick={() => setRecipesOpen(true)}
@@ -791,7 +793,6 @@ function WorkspaceContent() {
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button
-                          variant="outline"
                           size="sm"
                           className="h-8 gap-1.5"
                           aria-label="Export"
@@ -816,7 +817,10 @@ function WorkspaceContent() {
 
               {/* Pipeline strip: the step chain, always visible */}
               {steps.length > 0 && (
-                <div className="flex flex-shrink-0 items-center gap-1 overflow-x-auto border-b bg-card px-4 py-1.5">
+                <div className="ws-glass flex flex-shrink-0 items-center gap-1 overflow-x-auto border-b border-border/70 px-4 py-1.5">
+                  <span className="mr-1 flex-shrink-0 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/80">
+                    Steps
+                  </span>
                   <button
                     onClick={() => setConfirmRevert(0)}
                     className="flex-shrink-0 rounded-full border bg-background px-2.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
@@ -849,12 +853,29 @@ function WorkspaceContent() {
                       </div>
                     );
                   })}
+                  <button
+                    onClick={() => {
+                      setChatOpen(true);
+                      setChatPrefill({ text: "", nonce: Date.now() });
+                    }}
+                    className="ml-1 flex-shrink-0 rounded-full border border-dashed px-2.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+                    title="Describe the next step in the Chef panel"
+                  >
+                    ＋ Describe the next step…
+                  </button>
                 </div>
               )}
 
               {/* Change bar: what the last transform actually did */}
               {lastChange && (
-                <div className="flex flex-shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-primary/20 bg-primary/5 px-4 py-1.5 text-xs">
+                <div
+                  className={`flex flex-shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b px-4 py-1.5 text-xs ${
+                    lastChange.rowsAfter === 0
+                      ? "border-warning/30 bg-warning/10"
+                      : "border-success/25 bg-success/[0.07]"
+                  }`}
+                >
+                  {lastChange.rowsAfter > 0 && <Check className="h-3.5 w-3.5 flex-shrink-0 text-success" />}
                   <span className="font-medium">
                     {typeof lastChange.stepNumber === "number"
                       ? `Step ${lastChange.stepNumber} applied`
