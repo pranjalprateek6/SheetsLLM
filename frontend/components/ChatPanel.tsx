@@ -2,7 +2,8 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
-import { ChefHat, ChevronDown, Code2, Eraser, RotateCcw, Send, Square, Undo2, User } from "lucide-react";
+import { ChefHat, ChevronDown, Code2, Eraser, RotateCcw, Square, Undo2, User } from "lucide-react";
+import { SendIcon, type SendIconHandle } from "@/components/icons/send";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
@@ -58,6 +59,7 @@ export default function ChatPanel({
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const sendIconRef = useRef<SendIconHandle>(null);
   // Terminal-style recall: ArrowUp in an empty input restores the last
   // prompt for quick "same thing, but…" iteration.
   const lastSentRef = useRef<string>("");
@@ -449,10 +451,12 @@ export default function ChatPanel({
           <Button
             size="icon"
             onClick={() => sendMessage()}
+            onMouseEnter={() => sendIconRef.current?.startAnimation()}
+            onMouseLeave={() => sendIconRef.current?.stopAnimation()}
             disabled={sending || !input.trim()}
             aria-label="Send"
           >
-            <Send className="h-4 w-4" />
+            <SendIcon ref={sendIconRef} size={16} />
           </Button>
         </div>
       </div>

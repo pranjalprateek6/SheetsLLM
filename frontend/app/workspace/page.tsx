@@ -2,8 +2,9 @@
 import { Suspense, useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import {
-  BarChart3, BookMarked, ChevronDown, Columns3, Download, FileSpreadsheet, History, Lightbulb, MessageSquare, Pencil, Undo2, Upload,
+  BarChart3, BookMarked, ChevronDown, Columns3, FileSpreadsheet, History, Lightbulb, MessageSquare, Pencil, Undo2, Upload,
 } from "lucide-react";
+import { DownloadIcon, type DownloadIconHandle } from "@/components/icons/download";
 import DropZone from "@/components/DropZone";
 import DataGrid from "@/components/DataGrid";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -167,6 +168,7 @@ function WorkspaceContent() {
   }, [fileReady, showTransform, fileId, steps.length]);
   // Previous grid shape, for computing what a transform changed
   const prevGridRef = useRef<{ columns: string[]; rowCount: number }>({ columns: [], rowCount: 0 });
+  const exportIconRef = useRef<DownloadIconHandle>(null);
   useEffect(() => {
     prevGridRef.current = { columns, rowCount };
   }, [columns, rowCount]);
@@ -788,8 +790,15 @@ function WorkspaceContent() {
                     </Button>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="outline" size="sm" className="h-8 gap-1.5" aria-label="Export">
-                          <Download className="h-3.5 w-3.5" />
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 gap-1.5"
+                          aria-label="Export"
+                          onMouseEnter={() => exportIconRef.current?.startAnimation()}
+                          onMouseLeave={() => exportIconRef.current?.stopAnimation()}
+                        >
+                          <DownloadIcon ref={exportIconRef} size={14} />
                           Export
                         </Button>
                       </DropdownMenuTrigger>

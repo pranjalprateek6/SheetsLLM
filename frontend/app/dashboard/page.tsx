@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import AuthGuard from "@/components/AuthGuard";
@@ -7,8 +7,9 @@ import EmptyState from "@/components/EmptyState";
 import UsageCard from "@/components/UsageCard";
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
 import {
-  ArrowDown, ArrowUp, Copy, Download, FileSpreadsheet, Grid3X3, List, MoreHorizontal, Pencil, Search, Trash2, Upload,
+  ArrowDown, ArrowUp, Copy, Download, FileSpreadsheet, Grid3X3, List, MoreHorizontal, Pencil, Search, Trash2,
 } from "lucide-react";
+import { UploadIcon, type UploadIconHandle } from "@/components/icons/upload";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -67,6 +68,8 @@ export default function DashboardPage() {
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [page, setPage] = useState(1);
   const [renamingId, setRenamingId] = useState<string | null>(null);
+  const uploadIconRef = useRef<UploadIconHandle>(null);
+  const emptyUploadIconRef = useRef<UploadIconHandle>(null);
   const [renameValue, setRenameValue] = useState("");
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<FileItem | null>(null);
@@ -300,8 +303,12 @@ export default function DashboardPage() {
               {total} file{total !== 1 ? "s" : ""}
             </p>
           </div>
-          <Button onClick={() => router.push("/workspace")}>
-            <Upload className="mr-2 h-4 w-4" /> Upload
+          <Button
+            onClick={() => router.push("/workspace")}
+            onMouseEnter={() => uploadIconRef.current?.startAnimation()}
+            onMouseLeave={() => uploadIconRef.current?.stopAnimation()}
+          >
+            <UploadIcon ref={uploadIconRef} size={16} className="mr-2" /> Upload
           </Button>
         </div>
 
@@ -366,8 +373,12 @@ export default function DashboardPage() {
                 title="No files yet"
                 description="Upload a spreadsheet, or start from a sample dataset, and describe your cleanup in plain English."
                 action={
-                  <Button onClick={() => router.push("/workspace")}>
-                    <Upload className="mr-2 h-4 w-4" /> Upload your first file
+                  <Button
+                    onClick={() => router.push("/workspace")}
+                    onMouseEnter={() => emptyUploadIconRef.current?.startAnimation()}
+                    onMouseLeave={() => emptyUploadIconRef.current?.stopAnimation()}
+                  >
+                    <UploadIcon ref={emptyUploadIconRef} size={16} className="mr-2" /> Upload your first file
                   </Button>
                 }
               />
