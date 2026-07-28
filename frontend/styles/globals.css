@@ -8,29 +8,30 @@
 
 @layer base {
   :root {
-    /* neutrals — two-level light system (GitHub/Stripe pattern):
-       tinted cool-gray canvas + pure white raised surfaces.
-       Never white-on-white; separation comes from surface contrast
-       first, borders second. */
-    --background: 220 27% 97%;
-    --foreground: 224 25% 12%;
-    --muted: 220 20% 94%;
-    --muted-foreground: 220 10% 40%;
+    /* neutrals — flat white canvas (Vercel/Linear pattern): separation
+       comes from hairline borders and soft shadows, not surface tint.
+       Grays are near-desaturated so the violet reads as the only color
+       in the chrome. */
+    --background: 0 0% 100%;
+    --foreground: 240 6% 10%;
+    --muted: 240 5% 96%;
+    --muted-foreground: 240 4% 44%;
     --card: 0 0% 100%;
-    --card-foreground: 224 25% 12%;
+    --card-foreground: 240 6% 10%;
     --popover: 0 0% 100%;
-    --popover-foreground: 224 25% 12%;
-    --border: 220 16% 88%;
-    --input: 220 16% 84%;
+    --popover-foreground: 240 6% 10%;
+    --border: 240 6% 90%;
+    --input: 240 6% 85%;
     --ring: 254 75% 64%;
 
-    /* brand — violet, matches the logo mark (#7C5CE8) */
+    /* brand — violet, matches the logo mark (#7C5CE8); reserved for
+       primary actions and links so it stays an accent, not a theme */
     --primary: 254 75% 64%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 220 20% 94%;
-    --secondary-foreground: 224 25% 12%;
-    --accent: 220 18% 93%;
-    --accent-foreground: 224 25% 12%;
+    --secondary: 240 5% 96%;
+    --secondary-foreground: 240 6% 10%;
+    --accent: 240 5% 95%;
+    --accent-foreground: 240 6% 10%;
 
     /* semantic */
     --destructive: 0 72% 51%;
@@ -55,23 +56,25 @@
   }
 
   .dark {
-    --background: 224 30% 7%;
-    --foreground: 220 20% 96%;
-    --muted: 224 20% 13%;
-    --muted-foreground: 220 10% 62%;
-    --card: 224 28% 9%;
-    --card-foreground: 220 20% 96%;
-    --popover: 224 28% 9%;
-    --popover-foreground: 220 20% 96%;
-    --border: 224 18% 18%;
-    --input: 224 18% 22%;
+    /* near-black neutral, no navy cast — surfaces step up in lightness,
+       borders are low-contrast hairlines */
+    --background: 240 6% 4%;
+    --foreground: 0 0% 95%;
+    --muted: 240 5% 10%;
+    --muted-foreground: 240 4% 60%;
+    --card: 240 5% 7%;
+    --card-foreground: 0 0% 95%;
+    --popover: 240 5% 7%;
+    --popover-foreground: 0 0% 95%;
+    --border: 240 5% 15%;
+    --input: 240 5% 19%;
     --ring: 253 85% 69%;
     --primary: 253 85% 69%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 224 20% 13%;
-    --secondary-foreground: 220 20% 96%;
-    --accent: 224 20% 15%;
-    --accent-foreground: 220 20% 96%;
+    --secondary: 240 5% 10%;
+    --secondary-foreground: 0 0% 95%;
+    --accent: 240 5% 12%;
+    --accent-foreground: 0 0% 95%;
     --destructive: 0 66% 56%;
     --destructive-foreground: 0 0% 100%;
     --success: 160 70% 42%;
@@ -348,11 +351,11 @@
 }
 
 .dark ::-webkit-scrollbar-thumb {
-  background: hsl(224 14% 26%);
+  background: hsl(240 5% 24%);
 }
 
 .dark ::-webkit-scrollbar-thumb:hover {
-  background: hsl(224 12% 36%);
+  background: hsl(240 5% 34%);
 }
 
 /* Honor the OS reduce-motion preference: collapse CSS animations and
