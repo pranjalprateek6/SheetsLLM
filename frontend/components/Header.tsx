@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { IconSwap } from "@/components/ui/icon-swap";
 import { Switch } from "@/components/ui/switch";
 import {
   DropdownMenu,
@@ -45,7 +46,11 @@ function ThemeToggle() {
       onClick={() => setTheme(dark ? "light" : "dark")}
       aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
     >
-      {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+      <IconSwap
+        state={dark ? "a" : "b"}
+        a={<Sun className="h-4 w-4" />}
+        b={<Moon className="h-4 w-4" />}
+      />
     </Button>
   );
 }
@@ -208,7 +213,11 @@ export default function Header() {
           className="rounded-md p-2 text-muted-foreground hover:bg-accent"
           aria-label="Toggle menu"
         >
-          {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          <IconSwap
+            state={mobileOpen ? "a" : "b"}
+            a={<X className="h-5 w-5" />}
+            b={<Menu className="h-5 w-5" />}
+          />
         </button>
         </div>
       </div>
