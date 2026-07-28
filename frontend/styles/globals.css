@@ -328,7 +328,7 @@
   }
 }
 
-/* Scrollbar — quiet, light */
+/* Scrollbar — quiet, follows the active theme */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -345,6 +345,14 @@
 
 ::-webkit-scrollbar-thumb:hover {
   background: hsl(220 10% 72%);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: hsl(224 14% 26%);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: hsl(224 12% 36%);
 }
 
 /* Honor the OS reduce-motion preference: collapse CSS animations and
