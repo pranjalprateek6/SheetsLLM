@@ -312,7 +312,7 @@ export default function RecipesDrawer({
             </div>
           )}
           {error && (
-            <div className="rounded-md border border-destructive/30 bg-destructive/10 p-2.5 text-xs text-destructive">
+            <div className="rounded-md border border-destructive/30 bg-destructive/10 p-2.5 text-xs text-destructive-text">
               {error}
             </div>
           )}
@@ -398,7 +398,7 @@ export default function RecipesDrawer({
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
+                  className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive-text"
                   onClick={() => setConfirmDelete(recipe)}
                   aria-label={`Delete ${recipe.name}`}
                 >

@@ -147,7 +147,7 @@ export default function UsageCard({ embedded = false }: { embedded?: boolean }) 
             {m.limit > 0 ? (
               <div className="h-1.5 overflow-hidden rounded-full bg-muted">
                 <div
-                  className={cn("h-full rounded-full transition-all", barColor(m.pct))}
+                  className={cn("h-full rounded-full transition-[width] duration-500 ease-out", barColor(m.pct))}
                   style={{ width: `${m.pct * 100}%` }}
                 />
               </div>

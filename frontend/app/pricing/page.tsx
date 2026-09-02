@@ -258,12 +258,12 @@ function PricingContent() {
       )}
 
       {error && (
-        <div className="mb-6 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-center text-sm text-destructive">
+        <div className="mb-6 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-center text-sm text-destructive-text">
           {error}
         </div>
       )}
       {notice && (
-        <div className="mb-6 rounded-lg border border-success/30 bg-success/5 p-3 text-center text-sm text-success">
+        <div className="mb-6 rounded-lg border border-success/30 bg-success/5 p-3 text-center text-sm text-success-text">
           {notice}
         </div>
       )}

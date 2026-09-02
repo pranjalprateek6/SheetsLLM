@@ -86,7 +86,11 @@ export default function ChatPanel({
   }, [fileId, open]);
 
   useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    const el = scrollRef.current;
+    if (!el) return;
+    // Only follow the conversation if the reader is already at the bottom.
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    if (atBottom) el.scrollTop = el.scrollHeight;
   }, [messages]);
 
   useEffect(() => {
@@ -177,7 +181,7 @@ export default function ChatPanel({
             content:
               data.code === "REQUEST_TIMEOUT"
                 ? "That took too long and was stopped. Try again, or ask something more specific."
-                : data.message || "Something went wrong.",
+                : data.message || "I couldn't complete that. Try rephrasing it, or ask for something simpler.",
             message_type: "error",
           }]);
         } else {
@@ -314,7 +318,16 @@ export default function ChatPanel({
       )}
 
       {/* Messages */}
-      <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
+      {/* Announces the newest assistant turn and the working state. Kept
+          separate from the log so history is not re-read on mount. */}
+      <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
+        {sending
+          ? STAGES[stage]
+          : messages.length && messages[messages.length - 1].role === "assistant"
+            ? `Chef replied: ${messages[messages.length - 1].content}`
+            : ""}
+      </div>
+      <div ref={scrollRef} aria-busy={sending} className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
         {messages.map((msg, i) => (
           <div key={i} className={cn("flex gap-2", msg.role === "user" ? "justify-end" : "justify-start")}>
             {msg.role === "assistant" && (
@@ -328,7 +341,7 @@ export default function ChatPanel({
                 msg.role === "user"
                   ? "bg-primary text-primary-foreground"
                   : msg.message_type === "error"
-                  ? "border border-destructive/30 bg-destructive/5 text-destructive"
+                  ? "border border-destructive/30 bg-destructive/5 text-destructive-text"
                   : msg.message_type === "transform"
                   ? "border border-primary/20 bg-primary/5"
                   : "border border-border/60 bg-card/85"
@@ -340,13 +353,15 @@ export default function ChatPanel({
                 <div className="mt-1.5">
                   <button
                     onClick={() => setExpandedSql(expandedSql === String(i) ? null : String(i))}
+                    aria-expanded={expandedSql === String(i)}
+                    aria-controls={`sql-${i}`}
                     className="inline-flex items-center gap-1 text-[11px] font-medium text-primary/70 transition-colors hover:text-primary"
                   >
                     <Code2 className="h-3 w-3" /> SQL
                     <ChevronDown className={cn("h-3 w-3 transition-transform", expandedSql === String(i) && "rotate-180")} />
                   </button>
                   {expandedSql === String(i) && (
-                    <pre className="mt-1 overflow-x-auto rounded-md bg-muted p-2 font-mono text-[11px]">
+                    <pre id={`sql-${i}`} tabIndex={0} role="region" aria-label="Generated SQL" className="mt-1 overflow-x-auto rounded-md bg-muted p-2 font-mono text-[11px]">
                       {String(msg.metadata.sql)}
                     </pre>
                   )}

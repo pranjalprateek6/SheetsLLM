@@ -180,7 +180,7 @@ export default function Header() {
                   }}
                 >
                   <ShieldCheck
-                    className={cn("mt-0.5 h-4 w-4", privacyMode ? "text-success" : "text-muted-foreground")}
+                    className={cn("mt-0.5 h-4 w-4", privacyMode ? "text-success-text" : "text-muted-foreground")}
                   />
                   <div className="flex-1">
                     <p className="text-sm">Strict privacy mode</p>
@@ -196,7 +196,7 @@ export default function Header() {
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={handleSignOut}
-                  className="text-destructive focus:text-destructive"
+                  className="text-destructive-text focus:text-destructive-text"
                 >
                   <LogOut className="mr-2 h-4 w-4" />
                   Sign out
@@ -261,7 +261,7 @@ export default function Header() {
             {!loading && user && (
               <button
                 onClick={handleSignOut}
-                className="mt-2 flex items-center gap-2 rounded-md border-t border-border px-3 pb-1 pt-3 text-sm text-destructive"
+                className="mt-2 flex items-center gap-2 rounded-md border-t border-border px-3 pb-1 pt-3 text-sm text-destructive-text"
               >
                 <LogOut className="h-4 w-4" /> Sign out
               </button>

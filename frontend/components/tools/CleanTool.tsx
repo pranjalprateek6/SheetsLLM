@@ -124,7 +124,7 @@ export default function CleanTool() {
       ) : null}
 
       {error && (
-        <div className="mt-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm text-destructive">
+        <div className="mt-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm text-destructive-text">
           {error}
         </div>
       )}
@@ -155,7 +155,7 @@ export default function CleanTool() {
             <Download className="mr-2 h-4 w-4" /> Clean &amp; download
           </Button>
 
-          {done && <p className="mt-3 text-sm text-success">{done}</p>}
+          {done && <p className="mt-3 text-sm text-success-text">{done}</p>}
         </div>
       )}
     </div>

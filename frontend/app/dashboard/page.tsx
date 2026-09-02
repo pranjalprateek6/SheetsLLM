@@ -267,7 +267,7 @@ export default function DashboardPage() {
         </DropdownMenuSub>
         <DropdownMenuSeparator />
         <DropdownMenuItem
-          className="text-destructive focus:text-destructive"
+          className="text-destructive-text focus:text-destructive-text"
           onClick={() => setDeleteTarget(file)}
         >
           <Trash2 className="mr-2 h-4 w-4" /> Delete
@@ -358,7 +358,7 @@ export default function DashboardPage() {
 
         {!loading && loadError && (
           <div className="rounded-xl border border-destructive/30 bg-destructive/5 py-12 text-center">
-            <p className="font-medium text-destructive">Couldn&apos;t load your files</p>
+            <p className="font-medium text-destructive-text">Couldn&apos;t load your files</p>
             <p className="mt-1 text-sm text-muted-foreground">Check your connection and try again.</p>
             <Button variant="outline" className="mt-4" onClick={fetchFiles}>
               Retry

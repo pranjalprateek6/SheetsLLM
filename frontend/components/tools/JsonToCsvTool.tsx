@@ -88,14 +88,14 @@ export default function JsonToCsvTool() {
         className="min-h-[180px] font-mono text-xs"
       />
       {error && (
-        <div className="mt-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm text-destructive">
+        <div className="mt-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm text-destructive-text">
           {error}
         </div>
       )}
       <Button onClick={run} disabled={!text.trim()} className="mt-4 w-full sm:w-auto">
         <Download className="mr-2 h-4 w-4" /> Convert &amp; download CSV
       </Button>
-      {done && <p className="mt-3 text-sm text-success">{done}</p>}
+      {done && <p className="mt-3 text-sm text-success-text">{done}</p>}
     </div>
   );
 }

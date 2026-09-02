@@ -203,7 +203,7 @@ export default function LandingPage() {
       <section id="privacy" className="border-t bg-card">
         <div className="mx-auto grid max-w-5xl items-center gap-10 px-4 py-20 sm:px-6 sm:py-24 md:grid-cols-2">
           <motion.div {...fadeUp}>
-            <div className="mb-3 inline-flex items-center gap-1.5 rounded-full border bg-background px-3 py-1 text-xs font-medium text-success shadow-xs">
+            <div className="mb-3 inline-flex items-center gap-1.5 rounded-full border bg-background px-3 py-1 text-xs font-medium text-success-text shadow-xs">
               <ShieldCheck className="h-3.5 w-3.5" /> Privacy first
             </div>
             <h2 className="text-3xl font-semibold tracking-tight">
@@ -274,7 +274,7 @@ export default function LandingPage() {
                   <span className="rounded-lg bg-muted/60 px-3 py-2 text-xs tabular-nums">
                     <span className="text-muted-foreground">after</span> 4,982
                   </span>
-                  <span className="rounded-lg border border-success/30 bg-success/5 px-3 py-2 text-xs font-medium text-success">
+                  <span className="rounded-lg border border-success/30 bg-success/5 px-3 py-2 text-xs font-medium text-success-text">
                     Reversible
                   </span>
                 </div>

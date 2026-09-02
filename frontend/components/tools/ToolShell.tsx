@@ -25,7 +25,7 @@ export default function ToolShell({
       <div className="mb-8 text-center">
         <h1 className="text-3xl font-semibold tracking-tight">{title}</h1>
         <p className="mx-auto mt-3 max-w-xl text-muted-foreground">{intro}</p>
-        <p className="mt-4 inline-flex items-center gap-1.5 rounded-full border bg-card px-3 py-1 text-xs font-medium text-success shadow-xs">
+        <p className="mt-4 inline-flex items-center gap-1.5 rounded-full border bg-card px-3 py-1 text-xs font-medium text-success-text shadow-xs">
           <Lock className="h-3.5 w-3.5" />
           Runs entirely in your browser. Your file never leaves your computer
         </p>

@@ -88,7 +88,7 @@ export default function GettingStarted() {
       </div>
       <div className="mb-4 flex items-center gap-3">
         <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-          <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${pct}%` }} />
+          <div className="h-full rounded-full bg-primary transition-[width] duration-500 ease-out" style={{ width: `${pct}%` }} />
         </div>
         <span className="text-xs tabular-nums text-muted-foreground">{doneCount}/{ITEMS.length}</span>
       </div>

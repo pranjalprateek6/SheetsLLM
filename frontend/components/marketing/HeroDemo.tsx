@@ -72,7 +72,7 @@ export default function HeroDemo() {
                 initial={{ opacity: 0, y: -4 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
-                className="ml-auto inline-flex items-center gap-1 rounded-full bg-success/10 px-2.5 py-1 text-[11px] font-medium text-success"
+                className="ml-auto inline-flex items-center gap-1 rounded-full bg-success/10 px-2.5 py-1 text-[11px] font-medium text-success-text"
               >
                 <Check className="h-3 w-3" /> 3 steps applied
               </motion.span>
@@ -99,11 +99,11 @@ export default function HeroDemo() {
                     key={r.id}
                     className={cn(
                       "grid grid-cols-[1fr_1.2fr_0.9fr_1fr] gap-x-3 border-b border-border/50 py-1.5 font-mono text-xs",
-                      r.dup && "bg-destructive/5 text-destructive/80"
+                      r.dup && "bg-destructive/5 text-destructive-text/80"
                     )}
                   >
                     <span>{r.a}</span>
-                    <span className={cn(r.bad && "text-warning")}>{r.b}</span>
+                    <span className={cn(r.bad && "text-warning-text")}>{r.b}</span>
                     <span>{r.c}</span>
                     <span className="text-right tabular-nums">{r.d}</span>
                   </div>

@@ -438,7 +438,7 @@ export default function DataGrid({
                               <span className="inline-block max-w-full truncate align-middle font-mono text-xs tabular-nums">{String(val)}</span>
                             )}
                             {copiedCell === cellKey && (
-                              <span className="absolute top-0.5 right-0.5 text-[10px] text-success flex items-center">
+                              <span className="absolute top-0.5 right-0.5 text-[10px] text-success-text flex items-center">
                                 <Check className="h-3 w-3" />
                               </span>
                             )}

@@ -1,4 +1,5 @@
 "use client";
+import dynamic from "next/dynamic";
 import { Suspense, useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import {
@@ -9,16 +10,18 @@ import DropZone from "@/components/DropZone";
 import DataGrid from "@/components/DataGrid";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import SheetSelector from "@/components/SheetSelector";
-import HistoryDrawer from "@/components/HistoryDrawer";
-import RecipesDrawer, { type RecipeApplyResult } from "@/components/RecipesDrawer";
+const HistoryDrawer = dynamic(() => import("@/components/HistoryDrawer"));
+import { type RecipeApplyResult } from "@/components/RecipesDrawer";
+const RecipesDrawer = dynamic(() => import("@/components/RecipesDrawer"));
 import ChatPanel from "@/components/ChatPanel";
-import SchemaPanel, { type SchemaColumn } from "@/components/SchemaPanel";
-import ChartPanel from "@/components/ChartPanel";
-import CommandPalette from "@/components/CommandPalette";
+import { type SchemaColumn } from "@/components/SchemaPanel";
+const SchemaPanel = dynamic(() => import("@/components/SchemaPanel"));
+const ChartPanel = dynamic(() => import("@/components/ChartPanel"));
+const CommandPalette = dynamic(() => import("@/components/CommandPalette"));
 import FounderNote from "@/components/FounderNote";
 import GettingStarted, { markOnboardingStep, ONBOARDING_FLAGS } from "@/components/GettingStarted";
 import OnboardingIntent, { INTENT_LABELS, loadIntents, type Intent } from "@/components/OnboardingIntent";
-import KeyboardShortcuts from "@/components/KeyboardShortcuts";
+const KeyboardShortcuts = dynamic(() => import("@/components/KeyboardShortcuts"));
 import ErrorBoundary from "@/components/ErrorBoundary";
 import AuthGuard from "@/components/AuthGuard";
 import { toast } from "sonner";
@@ -643,7 +646,7 @@ function WorkspaceContent() {
                   <h2 className="mb-4 text-lg font-semibold tracking-tight">Upload a spreadsheet</h2>
                   <DropZone disabled={loading} onDropFile={onUpload} />
                   {uploadError && (
-                    <div className="mt-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm text-destructive">
+                    <div className="mt-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm text-destructive-text">
                       {uploadError}
                     </div>
                   )}
@@ -714,6 +717,7 @@ function WorkspaceContent() {
             <div aria-hidden className="ws-ambient" />
             {/* Main content area */}
             <div className="relative flex min-w-0 flex-1 flex-col">
+              <h1 className="sr-only">{fileName || "Workspace"}</h1>
               {/* Toolbar: file identity + view tools + labeled primary actions */}
               <div className="ws-glass flex flex-shrink-0 items-center gap-2 border-b border-border/70 px-4 py-2">
                 <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -875,7 +879,7 @@ function WorkspaceContent() {
                       : "border-success/25 bg-success/[0.07]"
                   }`}
                 >
-                  {lastChange.rowsAfter > 0 && <Check className="h-3.5 w-3.5 flex-shrink-0 text-success" />}
+                  {lastChange.rowsAfter > 0 && <Check className="h-3.5 w-3.5 flex-shrink-0 text-success-text" />}
                   <span className="font-medium">
                     {typeof lastChange.stepNumber === "number"
                       ? `Step ${lastChange.stepNumber} applied`

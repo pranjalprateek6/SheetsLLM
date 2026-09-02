@@ -101,7 +101,7 @@ function ChefPanel() {
           </p>
         </div>
         <div className="mr-3 flex items-center gap-1 text-muted-foreground">
-          <span className="rounded-full border border-success/40 bg-success/10 px-1.5 py-0.5 text-[9px] font-medium text-success">
+          <span className="rounded-full border border-success/40 bg-success/10 px-1.5 py-0.5 text-[9px] font-medium text-success-text">
             step 3 saved
           </span>
           <span className="text-[9px]">reversible</span>

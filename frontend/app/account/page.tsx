@@ -114,12 +114,12 @@ function AccountContent() {
       </p>
 
       {error && (
-        <div className="mt-4 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+        <div className="mt-4 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive-text">
           {error}
         </div>
       )}
       {notice && (
-        <div className="mt-4 rounded-lg border border-success/30 bg-success/5 p-3 text-sm text-success">
+        <div className="mt-4 rounded-lg border border-success/30 bg-success/5 p-3 text-sm text-success-text">
           {notice}
         </div>
       )}
@@ -177,7 +177,7 @@ function AccountContent() {
         <div className="rounded-xl border bg-card p-5 shadow-xs">
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-start gap-3">
-              <ShieldCheck className={`mt-0.5 h-5 w-5 ${privacyMode ? "text-success" : "text-muted-foreground"}`} />
+              <ShieldCheck className={`mt-0.5 h-5 w-5 ${privacyMode ? "text-success-text" : "text-muted-foreground"}`} />
               <div>
                 <p className="text-sm font-medium">Strict privacy mode</p>
                 <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
