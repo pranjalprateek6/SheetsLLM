@@ -18,7 +18,13 @@ export function TextShimmer({
   duration = 2,
   spread = 2,
 }: TextShimmerProps) {
-  const MotionComponent = motion(Component as keyof JSX.IntrinsicElements);
+  // Memoized because motion.create() mints a new component type per call:
+  // building it inline would remount the subtree (and restart the shimmer)
+  // on every render.
+  const MotionComponent = useMemo(
+    () => motion.create(Component as keyof JSX.IntrinsicElements),
+    [Component]
+  );
 
   const dynamicSpread = useMemo(() => {
     return children.length * spread;
