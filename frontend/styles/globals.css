@@ -21,7 +21,7 @@
     --popover: 0 0% 100%;
     --popover-foreground: 240 6% 10%;
     --border: 240 9% 94%;
-    --input: 240 8% 89%;
+    --input: 240 8% 60%;
     --ring: 254 75% 63%;
 
     /* brand — violet, matches the logo mark (#7C5CE8); reserved for
@@ -39,8 +39,13 @@
     /* semantic */
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
-    --success: 160 84% 33%;
+    --success: 160 84% 28%;
     --success-foreground: 0 0% 100%;
+    /* semantic hues used as text need their own step: the fill value is too
+       light to carry 4.5:1, and opacity on it only makes that worse */
+    --success-text: 160 84% 26%;
+    --warning-text: 38 92% 32%;
+    --destructive-text: 0 72% 42%;
     --warning: 38 92% 50%;
     --warning-foreground: 24 40% 15%;
 
@@ -69,8 +74,8 @@
     --card-foreground: 240 9% 93%;
     --popover: 240 8% 9%;
     --popover-foreground: 240 9% 93%;
-    --border: 240 8% 12%;
-    --input: 240 8% 16%;
+    --border: 240 8% 20%;
+    --input: 240 8% 40%;
     --ring: 253 85% 65%;
     --primary: 253 85% 65%;
     --primary-accent: 253 85% 68%;
@@ -82,9 +87,19 @@
     --destructive: 0 66% 56%;
     --destructive-foreground: 0 0% 100%;
     --success: 160 70% 42%;
-    --success-foreground: 0 0% 100%;
+    --success-foreground: 160 40% 10%;
+    --success-text: 160 70% 45%;
+    --warning-text: 38 92% 60%;
+    --destructive-text: 0 66% 62%;
     --warning: 38 92% 56%;
     --warning-foreground: 24 40% 15%;
+
+    /* Dark elevation: a black spread cannot separate near-black surfaces,
+       so each level also carries a light top rim. */
+    --shadow-xs: 0 1px 2px rgb(0 0 0 / 0.5), inset 0 1px 0 hsl(0 0% 100% / 0.04);
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.6), 0 2px 8px rgb(0 0 0 / 0.45), inset 0 1px 0 hsl(0 0% 100% / 0.05);
+    --shadow-md: 0 2px 4px rgb(0 0 0 / 0.6), 0 8px 24px rgb(0 0 0 / 0.5), inset 0 1px 0 hsl(0 0% 100% / 0.06);
+    --shadow-lg: 0 4px 8px rgb(0 0 0 / 0.6), 0 20px 48px rgb(0 0 0 / 0.55), inset 0 1px 0 hsl(0 0% 100% / 0.07);
   }
 
   * {
@@ -213,22 +228,22 @@
   --blur-large: 8px;
 
   /* Menu dropdown */
-  --dropdown-open-dur: 250ms;
-  --dropdown-close-dur: 150ms;
-  --dropdown-pre-scale: 0.97;
-  --dropdown-closing-scale: 0.99;
-  --dropdown-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --dropdown-open-dur: var(--duration-fast);
+  --dropdown-close-dur: var(--duration-quick);
+  --dropdown-pre-scale: var(--scale-medium);
+  --dropdown-closing-scale: var(--scale-tiny);
+  --dropdown-ease: var(--ease-smooth-out);
   /* Modal open / close */
-  --modal-open-dur: 250ms;
-  --modal-close-dur: 150ms;
-  --modal-scale: 0.96;
-  --modal-scale-close: 0.96;
-  --modal-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --modal-open-dur: var(--duration-fast);
+  --modal-close-dur: var(--duration-quick);
+  --modal-scale: var(--scale-large);
+  --modal-scale-close: var(--scale-large);
+  --modal-ease: var(--ease-smooth-out);
   /* Icon swap */
-  --icon-swap-dur: 250ms;
-  --icon-swap-blur: 2px;
+  --icon-swap-dur: var(--duration-fast);
+  --icon-swap-blur: var(--blur-small);
   --icon-swap-start-scale: 0.25;
-  --icon-swap-ease: ease-in-out;
+  --icon-swap-ease: var(--ease-in-out);
 }
 
 /* transitions-dev 05: menu dropdown — grows from the trigger corner,
@@ -238,7 +253,8 @@
    transform-origin comes from Radix per menu position (the skill's
    data-origin equivalent), set via a class on the content element. */
 .t-dropdown {
-  will-change: transform, opacity;
+  /* no permanent will-change: a composited CSS animation gets its own layer
+     for the duration and the browser releases it afterwards */
 }
 .t-dropdown[data-state="open"] {
   animation: t-dropdown-open var(--dropdown-open-dur) var(--dropdown-ease) both;
@@ -277,7 +293,8 @@
    because dialog surfaces are positioned at 50%/50%; the static
    translate utilities still center the box when animations are off. */
 .t-modal {
-  will-change: transform, opacity;
+  /* see .t-dropdown: hinting a permanently-mounted surface costs memory
+     and rasterization quality for no gain */
 }
 .t-modal[data-state="open"] {
   animation: t-modal-open var(--modal-open-dur) var(--modal-ease) both;
@@ -345,7 +362,6 @@
     opacity var(--icon-swap-dur) var(--icon-swap-ease),
     filter var(--icon-swap-dur) var(--icon-swap-ease),
     transform var(--icon-swap-dur) var(--icon-swap-ease) !important;
-  will-change: opacity, filter, transform;
 }
 .t-icon-swap[data-state="a"] .t-icon[data-icon="a"],
 .t-icon-swap[data-state="b"] .t-icon[data-icon="b"] {
