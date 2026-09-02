@@ -13,11 +13,11 @@
        separation comes from hairline borders and soft shadows, not
        surface tint. Grays are near-desaturated so the violet reads as
        the only color in the chrome. */
-    --background: 240 9% 99%;
+    --background: 40 20% 98%;
     --foreground: 240 6% 10%;
     --muted: 240 6% 96%;
     --muted-foreground: 240 4% 44%;
-    --card: 0 0% 100%;
+    --card: 40 25% 99%;
     --card-foreground: 240 6% 10%;
     --popover: 0 0% 100%;
     --popover-foreground: 240 6% 10%;
@@ -55,24 +55,26 @@
     --gradient-via: 189 94% 43%;
     --gradient-to: 254 75% 64%;
 
-    --radius: 0.625rem;
+    --radius: 0.375rem;
 
     /* light-mode elevation — always pair with a border */
-    --shadow-xs: 0 1px 2px rgb(15 23 42 / 0.04);
-    --shadow-sm: 0 1px 2px rgb(15 23 42 / 0.06), 0 2px 8px rgb(15 23 42 / 0.04);
-    --shadow-md: 0 2px 4px rgb(15 23 42 / 0.06), 0 8px 24px rgb(15 23 42 / 0.08);
-    --shadow-lg: 0 4px 8px rgb(15 23 42 / 0.06), 0 20px 48px rgb(15 23 42 / 0.12);
+    /* Elevation is for things that genuinely float (menus, dialogs). Flat
+       surfaces are separated by a hairline, not a glow. */
+    --shadow-xs: 0 1px 0 rgb(10 10 11 / 0.04);
+    --shadow-sm: 0 1px 2px rgb(10 10 11 / 0.06);
+    --shadow-md: 0 4px 12px rgb(10 10 11 / 0.10), 0 1px 2px rgb(10 10 11 / 0.06);
+    --shadow-lg: 0 12px 32px rgb(10 10 11 / 0.16), 0 2px 6px rgb(10 10 11 / 0.08);
   }
 
   .dark {
     color-scheme: dark;
     /* neutral charcoal, no navy cast (v4 spec): surfaces step up in
        lightness, hairlines stay barely-there */
-    --background: 240 10% 6%;
+    --background: 240 8% 4%;
     --foreground: 240 9% 93%;
     --muted: 240 8% 11%;
     --muted-foreground: 240 5% 56%;
-    --card: 240 9% 7%;
+    --card: 240 7% 7%;
     --card-foreground: 240 9% 93%;
     --popover: 240 8% 9%;
     --popover-foreground: 240 9% 93%;
@@ -161,45 +163,23 @@
   }
 }
 
-/* ── Workspace chrome (v4 spec): ambient glow + glass ──────────────────
-   Glass over a flat background is invisible; the ambient layer gives the
-   frosted chrome something to refract. Exactly two glass layers per
-   screen: the toolbar/pipeline band and the Chef panel. The data grid
-   stays opaque — glass organizes chrome, never sits under data. */
-.ws-ambient {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background:
-    radial-gradient(440px 320px at 88% 0%, hsl(var(--primary) / 0.1), transparent 65%),
-    radial-gradient(500px 360px at 96% 80%, hsl(var(--primary) / 0.07), transparent 65%),
-    radial-gradient(440px 320px at 6% 96%, hsl(var(--gradient-via) / 0.06), transparent 65%);
-}
-.dark .ws-ambient {
-  background:
-    radial-gradient(440px 320px at 88% 0%, hsl(var(--primary) / 0.17), transparent 65%),
-    radial-gradient(500px 360px at 96% 80%, hsl(var(--primary) / 0.12), transparent 65%),
-    radial-gradient(440px 320px at 6% 96%, hsl(var(--gradient-via) / 0.08), transparent 65%);
-}
+/* ── Workspace materials ──────────────────────────────────────────────
+   A data workspace is an instrument, not a surface to admire: separation
+   comes from hairlines, and the only thing allowed to glow is the thing
+   that just changed. Glass and ambient gradients were removed because
+   they sit between the reader and the numbers. */
 
-.ws-glass {
-  background: hsl(var(--background) / 0.6);
-  backdrop-filter: blur(18px) saturate(1.5);
-  box-shadow: inset 0 1px 0 hsl(0 0% 100% / 0.7);
+/* A cell that just changed: a brief violet wash that settles, so a
+   transform is visible without having to diff two screenshots. */
+@keyframes cell-settle {
+  from { background-color: hsl(var(--primary) / 0.22); }
+  to   { background-color: transparent; }
 }
-.dark .ws-glass {
-  background: hsl(var(--background) / 0.5);
-  backdrop-filter: blur(20px) saturate(1.4);
-  box-shadow: inset 0 1px 0 hsl(0 0% 100% / 0.05);
+.cell-changed {
+  animation: cell-settle 1.4s var(--ease-smooth-out) both;
 }
-
-.ws-glass-panel {
-  background: hsl(var(--background) / 0.55);
-  backdrop-filter: blur(20px) saturate(1.5);
-}
-.dark .ws-glass-panel {
-  background: hsl(240 8% 7% / 0.45);
-  backdrop-filter: blur(22px) saturate(1.4);
+@media (prefers-reduced-motion: reduce) {
+  .cell-changed { animation: none; background-color: hsl(var(--primary) / 0.08); }
 }
 
 /* ── Motion tokens (transitions.dev scale) ─────────────────────────────

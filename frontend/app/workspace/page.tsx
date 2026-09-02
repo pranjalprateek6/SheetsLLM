@@ -6,6 +6,8 @@ import {
   BarChart3, BookMarked, Check, ChevronDown, Columns3, FileSpreadsheet, History, Lightbulb, MessageSquare, Pencil, Undo2, Upload,
 } from "lucide-react";
 import { DownloadIcon, type DownloadIconHandle } from "@/components/icons/download";
+import ColumnHealth from "@/components/ColumnHealth";
+import PipelineSpine from "@/components/PipelineSpine";
 import DropZone from "@/components/DropZone";
 import DataGrid from "@/components/DataGrid";
 import ConfirmDialog from "@/components/ConfirmDialog";
@@ -712,14 +714,23 @@ function WorkspaceContent() {
 
         {/* Phase 3: Transform with Chef sidebar */}
         {fileReady && showTransform && (
-          <div className="relative flex h-[calc(100vh-56px)] animate-fade-in-up">
-            {/* Ambient glow behind the chrome; the glass bands refract it */}
-            <div aria-hidden className="ws-ambient" />
+          <div className="flex h-[calc(100dvh-56px)] animate-fade-in-up">
+            {/* The chain is the product, so it gets a permanent rail rather
+                than a strip that scrolls its own history off-screen. */}
+            <PipelineSpine
+              steps={steps}
+              onRevertTo={(n) => setConfirmRevert(n)}
+              onAddStep={() => {
+                setChatOpen(true);
+                setChatPrefill({ text: "", nonce: Date.now() });
+              }}
+              className="hidden lg:flex"
+            />
             {/* Main content area */}
             <div className="relative flex min-w-0 flex-1 flex-col">
               <h1 className="sr-only">{fileName || "Workspace"}</h1>
               {/* Toolbar: file identity + view tools + labeled primary actions */}
-              <div className="ws-glass flex flex-shrink-0 items-center gap-2 border-b border-border/70 px-4 py-2">
+              <div className="flex h-12 flex-shrink-0 items-center gap-3 border-b bg-card px-3">
                 <div className="flex min-w-0 flex-1 items-center gap-2">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -819,54 +830,21 @@ function WorkspaceContent() {
                 </TooltipProvider>
               </div>
 
-              {/* Pipeline strip: the step chain, always visible */}
-              {steps.length > 0 && (
-                <div className="ws-glass flex flex-shrink-0 items-center gap-1 overflow-x-auto border-b border-border/70 px-4 py-1.5">
-                  <span className="mr-1 flex-shrink-0 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    Steps
+              {/* Column fingerprint: one segment per column, filled by how
+                  complete it is. Nulls read as the gap and drain as you clean. */}
+              {(schema?.columns?.length ?? 0) > 0 && (
+                <div className="flex h-9 flex-shrink-0 items-center gap-3 border-b bg-card px-3">
+                  <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
+                    Columns
                   </span>
-                  <button
-                    onClick={() => setConfirmRevert(0)}
-                    className="flex-shrink-0 rounded-full border bg-background px-2.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
-                    title="Back to the original file"
-                  >
-                    Original
-                  </button>
-                  {steps.map((s, i) => {
-                    const isLast = i === steps.length - 1;
-                    const label = s.instruction.length > 26 ? `${s.instruction.slice(0, 26)}…` : s.instruction;
-                    return (
-                      <div key={s.step_number} className="flex flex-shrink-0 items-center gap-1">
-                        <span className="text-muted-foreground/50" aria-hidden>→</span>
-                        {isLast ? (
-                          <span
-                            className="rounded-full border border-primary/40 bg-primary/10 px-2.5 py-0.5 text-[11px] font-medium text-primary"
-                            title={s.instruction}
-                          >
-                            {s.step_number}. {label}
-                          </span>
-                        ) : (
-                          <button
-                            onClick={() => setConfirmRevert(s.step_number)}
-                            className="rounded-full border bg-background px-2.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
-                            title={`${s.instruction} (click to go back to this step)`}
-                          >
-                            {s.step_number}. {label}
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })}
-                  <button
-                    onClick={() => {
-                      setChatOpen(true);
-                      setChatPrefill({ text: "", nonce: Date.now() });
-                    }}
-                    className="ml-1 flex-shrink-0 rounded-full border border-dashed px-2.5 py-0.5 text-[11px] text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
-                    title="Describe the next step in the Chef panel"
-                  >
-                    ＋ Describe the next step…
-                  </button>
+                  <ColumnHealth
+                    columns={schema?.columns ?? []}
+                    changedCols={lastChange?.addedCols}
+                    onSelect={(name) => setGridJump({ name, nonce: Date.now() })}
+                  />
+                  <span className="ml-auto font-mono text-[10px] tabular-nums text-muted-foreground">
+                    {(schema?.columns ?? []).filter((c) => (c.null_pct ?? 0) > 0).length} with gaps
+                  </span>
                 </div>
               )}
 
@@ -923,7 +901,7 @@ function WorkspaceContent() {
               )}
 
               {/* Data grid */}
-              <div className="flex-1 overflow-hidden p-2">
+              <div className="flex-1 overflow-hidden">
                 <DataGrid
                   columns={columns}
                   rows={rows}
@@ -949,7 +927,7 @@ function WorkspaceContent() {
                 and a bottom sheet below it. Rendering it twice mounted two
                 panels with separate state and doubled every fetch. */}
             {chatOpen && (
-              <div className="fixed inset-x-0 bottom-0 z-40 h-[65vh] overflow-hidden rounded-t-2xl border-t bg-card shadow-lg lg:static lg:z-auto lg:h-auto lg:w-80 lg:flex-shrink-0 lg:rounded-none lg:border-l lg:border-t-0 lg:shadow-none xl:w-96">
+              <div className="fixed inset-x-0 bottom-0 z-40 h-[65vh] overflow-hidden rounded-t-lg border-t bg-card shadow-lg lg:static lg:z-auto lg:h-auto lg:w-[340px] lg:flex-shrink-0 lg:rounded-none lg:border-l lg:border-t-0 lg:shadow-none xl:w-[380px]">
                 <ChatPanel
                   fileId={fileId}
                   open={chatOpen}

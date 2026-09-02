@@ -265,7 +265,7 @@ export default function DataGrid({
   }, [scrollToCol]);
 
   return (
-    <div className="h-full flex flex-col rounded-xl border bg-card overflow-hidden">
+    <div className="flex h-full flex-col overflow-hidden bg-card">
       <div
         ref={parentRef}
         className="overflow-auto flex-1"
@@ -280,7 +280,7 @@ export default function DataGrid({
               {head.map((_, i) => (
                 <th
                   key={i}
-                  className="px-2 py-1 text-center text-[11px] font-normal text-muted-foreground"
+                  className="px-2 py-0.5 text-center font-mono text-[10px] font-normal text-muted-foreground/70 border-r border-border/60 last:border-r-0"
                   style={{ width: colWidths[head[i]] || 140 }}
                 >
                   {colLetter(i)}
@@ -298,7 +298,7 @@ export default function DataGrid({
                 return (
                   <th
                     key={h}
-                    className={`h-10 px-2 text-xs font-medium text-muted-foreground whitespace-nowrap relative select-none group ${
+                    className={`h-9 px-2 font-mono text-[11px] font-medium text-muted-foreground whitespace-nowrap relative select-none group border-r border-border/60 last:border-r-0 ${
                       numeric ? "text-right" : "text-left"
                     } ${highlighted ? "bg-primary/[0.06]" : ""}`}
                     style={{ width: colWidths[h] || 140 }}
@@ -381,7 +381,7 @@ export default function DataGrid({
             {/* Spacer after header */}
             <tr className="h-2" />
           </tbody>
-          <tbody className="[&_tr:hover]:bg-muted/40">
+          <tbody className="[&_tr:hover]:bg-accent">
             {loading ? (
               <tr>
                 <td className="px-3 py-8 text-center" colSpan={head.length + 1}>
@@ -412,7 +412,7 @@ export default function DataGrid({
                       className="border-b border-border/60 transition-colors"
                       style={{ height: virtualRow.size }}
                     >
-                      <td className="w-[50px] min-w-[50px] text-center text-[11px] text-muted-foreground tabular-nums select-none sticky left-0 z-[5] bg-card">
+                      <td className="w-[46px] min-w-[46px] border-r bg-card text-center font-mono text-[10px] text-muted-foreground/70 tabular-nums select-none sticky left-0 z-[5]">
                         {virtualRow.index + 1}
                       </td>
                       {head.map((h) => {
@@ -424,7 +424,7 @@ export default function DataGrid({
                         return (
                           <td
                             key={h}
-                            className={`px-2 ${density === "comfortable" ? "py-2" : "py-1"} align-middle text-xs text-foreground cursor-pointer relative ${
+                            className={`px-2 ${density === "comfortable" ? "py-2" : "py-1"} align-middle text-xs text-foreground cursor-pointer relative border-r border-border/40 last:border-r-0 ${
                               numeric ? "text-right" : "text-left"
                             } ${highlighted ? "bg-primary/[0.05]" : ""}`}
                             onClick={() => handleCopy(isNull ? "" : String(val), cellKey)}
