@@ -12,7 +12,7 @@ export interface DownloadIconHandle {
   stopAnimation: () => void;
 }
 
-interface DownloadIconProps extends HTMLAttributes<HTMLDivElement> {
+interface DownloadIconProps extends HTMLAttributes<HTMLSpanElement> {
   size?: number;
 }
 
@@ -44,7 +44,7 @@ const DownloadIcon = forwardRef<DownloadIconHandle, DownloadIconProps>(
     });
 
     const handleMouseEnter = useCallback(
-      (e: React.MouseEvent<HTMLDivElement>) => {
+      (e: React.MouseEvent<HTMLSpanElement>) => {
         if (isControlledRef.current) {
           onMouseEnter?.(e);
         } else {
@@ -55,7 +55,7 @@ const DownloadIcon = forwardRef<DownloadIconHandle, DownloadIconProps>(
     );
 
     const handleMouseLeave = useCallback(
-      (e: React.MouseEvent<HTMLDivElement>) => {
+      (e: React.MouseEvent<HTMLSpanElement>) => {
         if (isControlledRef.current) {
           onMouseLeave?.(e);
         } else {
@@ -66,8 +66,8 @@ const DownloadIcon = forwardRef<DownloadIconHandle, DownloadIconProps>(
     );
 
     return (
-      <div
-        className={cn(className)}
+      <span
+        className={cn("inline-flex", className)}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         {...props}
@@ -89,7 +89,7 @@ const DownloadIcon = forwardRef<DownloadIconHandle, DownloadIconProps>(
             <line x1="12" x2="12" y1="15" y2="3" />
           </motion.g>
         </svg>
-      </div>
+      </span>
     );
   }
 );

@@ -1,6 +1,6 @@
 'use client';
 import React, { useMemo, type JSX } from 'react';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
 interface TextShimmerProps {
@@ -26,16 +26,31 @@ export function TextShimmer({
     [Component]
   );
 
+  // MotionConfig reducedMotion="user" only suppresses transform and layout
+  // properties, and the CSS guards only reach CSS animations, so neither one
+  // stops an infinite backgroundPosition loop. An unstoppable indefinite
+  // animation is exactly what WCAG 2.2.2 forbids, so opt out here.
+  const reduce = useReducedMotion();
+
   const dynamicSpread = useMemo(() => {
     return children.length * spread;
   }, [children, spread]);
+
+  if (reduce) {
+    return <Component className={cn('inline-block text-muted-foreground', className)}>{children}</Component>;
+  }
 
   return (
     <MotionComponent
       className={cn(
         'relative inline-block bg-[length:250%_100%,auto] bg-clip-text',
         'text-transparent [--base-color:hsl(var(--muted-foreground))] [--base-gradient-color:hsl(var(--foreground))]',
-        '[--bg:linear-gradient(90deg,#0000_calc(50%-var(--spread)),var(--base-gradient-color),#0000_calc(50%+var(--spread)))] [background-repeat:no-repeat,padding-box]',
+        // background-repeat has no `padding-box` keyword; including it made the
+        // browser discard the whole declaration, so the gradient tiled.
+        '[--bg:linear-gradient(90deg,#0000_calc(50%-var(--spread)),var(--base-gradient-color),#0000_calc(50%+var(--spread)))] [background-repeat:no-repeat] [background-origin:padding-box]',
+        // Windows High Contrast strips background images; without this the
+        // transparent text would vanish entirely.
+        '[@media(forced-colors:active)]:text-[CanvasText] [@media(forced-colors:active)]:[-webkit-text-fill-color:CanvasText]',
         className
       )}
       initial={{ backgroundPosition: '100% center' }}

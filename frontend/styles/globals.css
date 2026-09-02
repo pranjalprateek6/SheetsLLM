@@ -8,6 +8,7 @@
 
 @layer base {
   :root {
+    color-scheme: light;
     /* neutrals — near-white canvas with white raised surfaces (v4 spec):
        separation comes from hairline borders and soft shadows, not
        surface tint. Grays are near-desaturated so the violet reads as
@@ -64,6 +65,7 @@
   }
 
   .dark {
+    color-scheme: dark;
     /* neutral charcoal, no navy cast (v4 spec): surfaces step up in
        lightness, hairlines stay barely-there */
     --background: 240 10% 6%;
@@ -132,6 +134,16 @@
       hsl(var(--gradient-via)) 45%,
       hsl(var(--gradient-to))
     );
+  }
+
+  /* Windows High Contrast removes background images, so clipped-text
+     headlines need a real colour to fall back to. */
+  @media (forced-colors: active) {
+    .text-gradient {
+      background-image: none;
+      color: CanvasText;
+      -webkit-text-fill-color: CanvasText;
+    }
   }
 
   .bg-gradient-brand {

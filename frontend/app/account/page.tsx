@@ -44,11 +44,11 @@ function AccountContent() {
         setTier(d.tier ?? "free");
         setBillingConfigured(d.billing_configured ?? false);
       })
-      .catch(() => setTier("free"));
+      .catch(() => setTier(null)); // unknown plan: render the loading state, never guess "free"
     fetchWithAuth("/api/settings")
       .then((r) => r.json())
       .then((d) => setPrivacyMode(!!d.privacy_mode))
-      .catch(() => setPrivacyMode(false));
+      .catch(() => setPrivacyMode(null)); // unknown, not "off"
   }, []);
 
   const togglePrivacy = async () => {
@@ -60,9 +60,13 @@ function AccountContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ privacy_mode: next }),
       });
-      if (!r.ok) setPrivacyMode(!next);
+      if (!r.ok) {
+        setPrivacyMode(!next);
+        toast.error("Couldn't save that. Strict privacy mode is unchanged.");
+      }
     } catch {
       setPrivacyMode(!next);
+      toast.error("Couldn't save that. Check your connection and try again.");
     }
   };
 

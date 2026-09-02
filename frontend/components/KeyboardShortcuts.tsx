@@ -23,9 +23,9 @@ export default function KeyboardShortcuts({
       const isInput = target.tagName === "INPUT" || target.tagName === "TEXTAREA";
 
       // Ctrl+Enter — Run transformation
-      if (ctrl && e.key === "Enter") {
+      if (ctrl && e.key === "Enter" && onRun) {
         e.preventDefault();
-        onRun?.();
+        onRun();
         return;
       }
 

@@ -134,7 +134,7 @@ function PricingContent() {
         setTier(d.tier ?? "free");
         setBillingConfigured(d.billing_configured ?? false);
       })
-      .catch(() => setTier("free"));
+      .catch(() => setTier(null));
   }, [user, authLoading]);
 
   // Razorpay's hosted subscription page has no return redirect, so checkout
@@ -189,11 +189,13 @@ function PricingContent() {
       const d = await r.json();
       if (r.ok && d.url) {
         setCheckoutUrl(d.url);
-        // Popup blockers return null from window.open — keep the URL so the
-        // waiting banner can offer a direct link instead of pointing at a
-        // tab that never opened.
-        window.open(d.url, "_blank", "noopener");
-        startPolling();
+        // The activation token is spent by the awaits above, so this is
+        // blocked in Safari and Firefox. Honour the null the comment always
+        // predicted: without a tab there is nothing to poll for, and the
+        // banner must lead with the direct link instead.
+        const opened = window.open(d.url, "_blank", "noopener");
+        if (opened) startPolling();
+        else setError("Your browser blocked the checkout tab. Use the payment link below to continue.");
       } else {
         setError(d.message || "Could not start checkout.");
       }

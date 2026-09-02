@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import AuthGuard from "@/components/AuthGuard";
@@ -233,7 +234,7 @@ export default function DashboardPage() {
           className="h-8 w-8 text-muted-foreground"
           disabled={actionLoading === file.id}
           onClick={(e) => e.stopPropagation()}
-          aria-label="File actions"
+          aria-label={`File actions for ${file.name}`}
         >
           <MoreHorizontal className="h-4 w-4" />
         </Button>
@@ -290,7 +291,13 @@ export default function DashboardPage() {
         aria-label="File name" className="h-8 max-w-xs"
       />
     ) : (
-      <span className="font-medium">{file.name}</span>
+      <Link
+        href={`/workspace?file_id=${file.id}`}
+        onClick={(e) => e.stopPropagation()}
+        className="font-medium underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+      >
+        {file.name}
+      </Link>
     );
 
   return (

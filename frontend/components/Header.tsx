@@ -17,6 +17,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ChevronDown, LogOut, Menu, Moon, ShieldCheck, Sun, User, X } from "lucide-react";
+import { toast } from "sonner";
 import { useTheme } from "next-themes";
 import FeedbackWidget from "@/components/FeedbackWidget";
 
@@ -69,7 +70,7 @@ export default function Header() {
       fetchWithAuth("/api/settings")
         .then((r) => r.json())
         .then((d) => setPrivacyMode(!!d.privacy_mode))
-        .catch(() => setPrivacyMode(false));
+        .catch(() => setPrivacyMode(null)); // unknown, not "off"
     }
   }, [menuOpen, privacyMode, user]);
 
@@ -90,15 +91,24 @@ export default function Header() {
         body: JSON.stringify({ privacy_mode: next }),
       });
       // On failure, reset to unknown so the next open refetches the truth.
-      if (!r.ok) setPrivacyMode(null);
+      if (!r.ok) {
+        setPrivacyMode(null);
+        toast.error("Couldn't save that. Strict privacy mode is unchanged.");
+      }
     } catch {
       setPrivacyMode(null);
+      toast.error("Couldn't save that. Check your connection and try again.");
     }
   };
 
   const handleSignOut = async () => {
-    await signOut();
-    router.push("/");
+    try {
+      await signOut();
+    } catch {
+      toast.error("Couldn't sign you out. Check your connection and try again.");
+      return;
+    }
+    router.replace("/");
   };
 
   const links = user ? APP_LINKS : MARKETING_LINKS;
@@ -124,7 +134,7 @@ export default function Header() {
 
         {/* Desktop nav — absolutely centered so it aligns with the page's
             center axis regardless of the logo/menu widths on either side */}
-        <nav className="absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 items-center gap-1 md:flex">
+        <nav className="pointer-events-none absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 items-center gap-1 md:flex [&>a]:pointer-events-auto">
           {links.map((l) => (
             <Link
               key={l.href}
@@ -163,7 +173,7 @@ export default function Header() {
                 <DropdownMenuItem
                   className="items-start gap-2.5"
                   role="menuitemcheckbox"
-                  aria-checked={!!privacyMode}
+                  aria-checked={privacyMode === null ? "mixed" : privacyMode}
                   onSelect={(e) => {
                     e.preventDefault(); // keep the menu open while toggling
                     togglePrivacy();
@@ -178,7 +188,7 @@ export default function Header() {
                       The AI sees column names and types only, never your data.
                     </p>
                   </div>
-                  <Switch checked={!!privacyMode} className="pointer-events-none mt-0.5" />
+                  <Switch checked={!!privacyMode} aria-hidden tabIndex={-1} className="pointer-events-none mt-0.5" />
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>

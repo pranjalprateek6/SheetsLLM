@@ -12,7 +12,7 @@ export interface UploadIconHandle {
   stopAnimation: () => void;
 }
 
-interface UploadIconProps extends HTMLAttributes<HTMLDivElement> {
+interface UploadIconProps extends HTMLAttributes<HTMLSpanElement> {
   size?: number;
 }
 
@@ -44,7 +44,7 @@ const UploadIcon = forwardRef<UploadIconHandle, UploadIconProps>(
     });
 
     const handleMouseEnter = useCallback(
-      (e: React.MouseEvent<HTMLDivElement>) => {
+      (e: React.MouseEvent<HTMLSpanElement>) => {
         if (isControlledRef.current) {
           onMouseEnter?.(e);
         } else {
@@ -55,7 +55,7 @@ const UploadIcon = forwardRef<UploadIconHandle, UploadIconProps>(
     );
 
     const handleMouseLeave = useCallback(
-      (e: React.MouseEvent<HTMLDivElement>) => {
+      (e: React.MouseEvent<HTMLSpanElement>) => {
         if (isControlledRef.current) {
           onMouseLeave?.(e);
         } else {
@@ -66,8 +66,8 @@ const UploadIcon = forwardRef<UploadIconHandle, UploadIconProps>(
     );
 
     return (
-      <div
-        className={cn(className)}
+      <span
+        className={cn("inline-flex", className)}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         {...props}
@@ -89,7 +89,7 @@ const UploadIcon = forwardRef<UploadIconHandle, UploadIconProps>(
             <line x1="12" x2="12" y1="3" y2="15" />
           </motion.g>
         </svg>
-      </div>
+      </span>
     );
   }
 );

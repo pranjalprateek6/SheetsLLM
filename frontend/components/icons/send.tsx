@@ -10,7 +10,7 @@ export interface SendIconHandle {
   stopAnimation: () => void;
 }
 
-interface SendIconProps extends HTMLAttributes<HTMLDivElement> {
+interface SendIconProps extends HTMLAttributes<HTMLSpanElement> {
   size?: number;
 }
 
@@ -28,7 +28,7 @@ const SendIcon = forwardRef<SendIconHandle, SendIconProps>(
     });
 
     const handleMouseEnter = useCallback(
-      (e: React.MouseEvent<HTMLDivElement>) => {
+      (e: React.MouseEvent<HTMLSpanElement>) => {
         if (isControlledRef.current) {
           onMouseEnter?.(e);
         } else {
@@ -39,7 +39,7 @@ const SendIcon = forwardRef<SendIconHandle, SendIconProps>(
     );
 
     const handleMouseLeave = useCallback(
-      (e: React.MouseEvent<HTMLDivElement>) => {
+      (e: React.MouseEvent<HTMLSpanElement>) => {
         if (isControlledRef.current) {
           onMouseLeave?.(e);
         } else {
@@ -50,8 +50,8 @@ const SendIcon = forwardRef<SendIconHandle, SendIconProps>(
     );
 
     return (
-      <div
-        className={cn(className)}
+      <span
+        className={cn("inline-flex", className)}
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         {...props}
@@ -109,7 +109,7 @@ const SendIcon = forwardRef<SendIconHandle, SendIconProps>(
             }}
           />
         </svg>
-      </div>
+      </span>
     );
   }
 );

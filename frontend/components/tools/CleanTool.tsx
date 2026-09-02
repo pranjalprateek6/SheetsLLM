@@ -113,6 +113,16 @@ export default function CleanTool() {
         </div>
       </label>
 
+      {table?.warnings?.length ? (
+
+        <div role="status" className="mt-3 rounded-lg border border-warning/30 bg-warning/5 px-3 py-2.5 text-sm text-warning-text">
+
+          {table.warnings.map((w) => (<p key={w}>{w}</p>))}
+
+        </div>
+
+      ) : null}
+
       {error && (
         <div className="mt-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm text-destructive">
           {error}
