@@ -84,7 +84,7 @@ export default function JsonToCsvTool() {
       <Textarea
         value={text}
         onChange={(e) => { setText(e.target.value); setDone(null); setError(null); }}
-        placeholder='[{"name": "Ada", "role": "Engineer"}, {"name": "Grace", "role": "Admiral"}]'
+        aria-label="JSON to convert" placeholder='[{"name": "Ada", "role": "Engineer"}, {"name": "Grace", "role": "Admiral"}]'
         className="min-h-[180px] font-mono text-xs"
       />
       {error && (

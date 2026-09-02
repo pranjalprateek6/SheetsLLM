@@ -217,22 +217,22 @@ export default function ChartPanel({
         <div className="flex flex-wrap items-center gap-3 border-b px-5 py-3">
           <div className="flex gap-1 rounded-lg bg-muted p-0.5">
             {([["bar", BarChart3], ["line", LineChart], ["pie", PieChart]] as const).map(([type, Icon]) => (
-              <button key={type} onClick={() => setChartType(type)} className={`rounded-md p-2 transition-colors ${chartType === type ? "bg-background text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"}`}>
+              <button key={type} onClick={() => setChartType(type)} aria-label={`Show ${type} chart`} aria-pressed={chartType === type} className={`rounded-md p-2 transition-colors ${chartType === type ? "bg-background text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"}`}>
                 <Icon className="h-4 w-4" />
               </button>
             ))}
           </div>
 
           <div className="flex items-center gap-1.5 text-sm">
-            <label className="text-xs font-medium text-muted-foreground">X</label>
-            <select value={xCol} onChange={(e) => setXCol(e.target.value)} className={selectClass}>
+            <label htmlFor="chart-x" className="text-xs font-medium text-muted-foreground">X</label>
+            <select id="chart-x" value={xCol} onChange={(e) => setXCol(e.target.value)} className={selectClass}>
               {columns.map((c) => (<option key={c} value={c}>{c}</option>))}
             </select>
           </div>
 
           <div className="flex items-center gap-1.5 text-sm">
-            <label className="text-xs font-medium text-muted-foreground">Y</label>
-            <select value={yCol} onChange={(e) => setYCol(e.target.value)} className={selectClass}>
+            <label htmlFor="chart-y" className="text-xs font-medium text-muted-foreground">Y</label>
+            <select id="chart-y" value={yCol} onChange={(e) => setYCol(e.target.value)} className={selectClass}>
               {numericCols.length > 0 ? (
                 numericCols.map((c) => (<option key={c} value={c}>{c}</option>))
               ) : (
@@ -242,8 +242,8 @@ export default function ChartPanel({
           </div>
 
           <div className="flex items-center gap-1.5 text-sm">
-            <label className="text-xs font-medium text-muted-foreground">Agg</label>
-            <select value={aggMode} onChange={(e) => setAggMode(e.target.value as AggMode)} className={selectClass}>
+            <label htmlFor="chart-agg" className="text-xs font-medium text-muted-foreground">Agg</label>
+            <select id="chart-agg" value={aggMode} onChange={(e) => setAggMode(e.target.value as AggMode)} className={selectClass}>
               <option value="sum">Sum</option>
               <option value="avg">Average</option>
               <option value="count">Count</option>
@@ -258,7 +258,7 @@ export default function ChartPanel({
           {chartData.length === 0 ? (
             <p className="text-sm text-muted-foreground">Select columns to visualize</p>
           ) : (
-            <svg ref={svgRef} width={W} height={H} viewBox={`0 0 ${W} ${H}`} className="text-foreground">
+            <svg ref={svgRef} width={W} height={H} viewBox={`0 0 ${W} ${H}`} className="h-auto w-full text-foreground">
               {/* Axes for bar/line */}
               {chartType !== "pie" && (
                 <g>

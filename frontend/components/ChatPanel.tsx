@@ -443,7 +443,7 @@ export default function ChatPanel({
                 }, 0);
               }
             }}
-            placeholder="Ask Chef anything…"
+            aria-label="Ask Chef anything" placeholder="Ask Chef anything…"
             className="max-h-[100px] min-h-[40px] flex-1 resize-none rounded-lg border bg-background px-3 py-2 text-sm shadow-xs outline-none transition-shadow placeholder:text-muted-foreground focus:ring-2 focus:ring-ring/30"
             disabled={sending}
             rows={1}

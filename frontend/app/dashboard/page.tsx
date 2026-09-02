@@ -287,7 +287,7 @@ export default function DashboardPage() {
           if (e.key === "Escape") setRenamingId(null);
         }}
         onClick={(e) => e.stopPropagation()}
-        className="h-8 max-w-xs"
+        aria-label="File name" className="h-8 max-w-xs"
       />
     ) : (
       <span className="font-medium">{file.name}</span>
@@ -321,7 +321,7 @@ export default function DashboardPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9"
-              placeholder="Search files…"
+              aria-label="Search files" placeholder="Search files…"
             />
           </div>
           <TooltipProvider>

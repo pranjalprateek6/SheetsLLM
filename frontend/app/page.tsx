@@ -169,7 +169,7 @@ export default function LandingPage() {
               className="rounded-2xl border bg-card p-6 shadow-xs"
             >
               <div className="mb-4 flex items-center gap-3">
-                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary-accent">
                   {s.step}
                 </span>
                 <s.icon className="h-5 w-5 text-muted-foreground" />

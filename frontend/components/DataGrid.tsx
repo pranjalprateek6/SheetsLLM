@@ -27,7 +27,7 @@ const NUMERIC_RE = /INT|DOUBLE|FLOAT|DECIMAL|NUMERIC|REAL|HUGEINT/;
 function TypeGlyph({ dtype }: { dtype?: string }) {
   if (!dtype) return null;
   const t = dtype.toUpperCase();
-  const cls = "h-3 w-3 flex-shrink-0 text-muted-foreground/60";
+  const cls = "h-3 w-3 flex-shrink-0 text-muted-foreground";
   if (NUMERIC_RE.test(t)) return <Hash className={cls} aria-label="number" />;
   if (/DATE|TIME/.test(t)) return <Calendar className={cls} aria-label="date" />;
   if (/BOOL/.test(t)) return <ToggleLeft className={cls} aria-label="boolean" />;
@@ -431,7 +431,7 @@ export default function DataGrid({
                             title={isNull ? "NULL" : String(val)}
                           >
                             {isNull ? (
-                              <span className="text-[11px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground/70 font-mono">
+                              <span className="text-[11px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-mono">
                                 NULL
                               </span>
                             ) : (
@@ -490,7 +490,7 @@ export default function DataGrid({
             onChange={(e) => setFilterQ(e.target.value)}
             placeholder="Filter preview…"
             aria-label="Filter the loaded preview rows"
-            className="h-5 w-32 rounded border bg-background px-1.5 text-[11px] outline-none placeholder:text-muted-foreground/70 focus:ring-1 focus:ring-ring/40"
+            className="h-5 w-32 rounded border bg-background px-1.5 text-[11px] outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-ring/40"
           />
           {filterQ && (
             <button

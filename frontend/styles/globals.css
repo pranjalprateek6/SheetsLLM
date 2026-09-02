@@ -22,11 +22,14 @@
     --popover-foreground: 240 6% 10%;
     --border: 240 9% 94%;
     --input: 240 8% 89%;
-    --ring: 254 75% 64%;
+    --ring: 254 75% 63%;
 
     /* brand — violet, matches the logo mark (#7C5CE8); reserved for
        primary actions and moments of change, not a theme */
-    --primary: 254 75% 64%;
+    --primary: 254 75% 63%;
+    /* accent used as text or icons on neutral surfaces; --primary is the
+       solid fill that white text sits on, and the two pull opposite ways */
+    --primary-accent: 254 75% 63%;
     --primary-foreground: 0 0% 100%;
     --secondary: 240 6% 96%;
     --secondary-foreground: 240 6% 10%;
@@ -68,8 +71,9 @@
     --popover-foreground: 240 9% 93%;
     --border: 240 8% 12%;
     --input: 240 8% 16%;
-    --ring: 253 85% 69%;
-    --primary: 253 85% 69%;
+    --ring: 253 85% 65%;
+    --primary: 253 85% 65%;
+    --primary-accent: 253 85% 68%;
     --primary-foreground: 0 0% 100%;
     --secondary: 240 8% 11%;
     --secondary-foreground: 240 9% 93%;

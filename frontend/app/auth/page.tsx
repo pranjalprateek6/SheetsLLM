@@ -193,14 +193,14 @@ function AuthContent() {
                 {mode === "signin" ? (
                   <>
                     New to SheetsLLM?{" "}
-                    <button onClick={() => switchMode("signup")} className="font-medium text-primary hover:underline">
+                    <button onClick={() => switchMode("signup")} className="font-medium text-primary-accent hover:underline">
                       Create an account
                     </button>
                   </>
                 ) : mode === "signup" ? (
                   <>
                     Describe a cleanup once, keep it forever.{" "}
-                    <button onClick={() => switchMode("signin")} className="font-medium text-primary hover:underline">
+                    <button onClick={() => switchMode("signin")} className="font-medium text-primary-accent hover:underline">
                       I have an account
                     </button>
                   </>
@@ -255,7 +255,7 @@ function AuthContent() {
                         <button
                           type="button"
                           onClick={() => switchMode("forgot")}
-                          className="text-xs font-medium text-primary hover:underline"
+                          className="text-xs font-medium text-primary-accent hover:underline"
                         >
                           Forgot password?
                         </button>

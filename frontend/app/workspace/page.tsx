@@ -818,7 +818,7 @@ function WorkspaceContent() {
               {/* Pipeline strip: the step chain, always visible */}
               {steps.length > 0 && (
                 <div className="ws-glass flex flex-shrink-0 items-center gap-1 overflow-x-auto border-b border-border/70 px-4 py-1.5">
-                  <span className="mr-1 flex-shrink-0 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/80">
+                  <span className="mr-1 flex-shrink-0 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                     Steps
                   </span>
                   <button

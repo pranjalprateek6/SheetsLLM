@@ -258,7 +258,7 @@ export default function RecipesDrawer({
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && saveRecipe()}
-                    placeholder="Recipe name, e.g. Monthly orders cleanup"
+                    aria-label="Recipe name" placeholder="Recipe name, e.g. Monthly orders cleanup"
                     maxLength={120}
                     className="h-9"
                   />
