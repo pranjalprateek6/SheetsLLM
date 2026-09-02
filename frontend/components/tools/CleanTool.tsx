@@ -97,7 +97,7 @@ export default function CleanTool() {
     <div>
       <label
         className={cn(
-          "group flex cursor-pointer items-center justify-center rounded-xl border-2 border-dashed border-border p-8 transition-colors hover:border-primary/50 hover:bg-primary/[0.03]",
+          "group focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 flex cursor-pointer items-center justify-center rounded-xl border-2 border-dashed border-border p-8 transition-colors hover:border-primary/50 hover:bg-primary/[0.03] focus-within:border-primary focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2",
           dragging && "border-primary bg-primary/[0.05]"
         )}
         onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
@@ -105,7 +105,7 @@ export default function CleanTool() {
         onDragLeave={() => setDragging(false)}
         onDrop={(e) => { e.preventDefault(); setDragging(false); onFile(e.dataTransfer.files?.[0]); }}
       >
-        <input type="file" accept=".csv,.tsv,.txt" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} disabled={busy} />
+        <input type="file" accept=".csv,.tsv,.txt" className="sr-only" onChange={(e) => onFile(e.target.files?.[0])} disabled={busy} />
         <div className="text-center">
           <Upload className="mx-auto mb-2 h-6 w-6 text-primary" />
           <p className="text-sm font-medium">{busy ? "Reading…" : "Choose a CSV file"}</p>

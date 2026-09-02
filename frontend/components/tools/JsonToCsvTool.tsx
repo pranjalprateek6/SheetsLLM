@@ -78,7 +78,7 @@ export default function JsonToCsvTool() {
         <p className="text-sm font-medium">Paste JSON or upload a file</p>
         <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-lg border bg-background px-3 py-1.5 text-xs font-medium shadow-xs transition-colors hover:bg-accent">
           <Upload className="h-3.5 w-3.5" /> Upload .json
-          <input type="file" accept=".json,.jsonl,.txt" className="hidden" onChange={(e) => onFile(e.target.files?.[0])} />
+          <input type="file" accept=".json,.jsonl,.txt" className="sr-only" onChange={(e) => onFile(e.target.files?.[0])} />
         </label>
       </div>
       <Textarea

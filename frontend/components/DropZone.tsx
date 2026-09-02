@@ -15,7 +15,7 @@ export default function DropZone({ disabled, onDropFile }: { disabled?: boolean;
   return (
     <label
       className={cn(
-        "group flex cursor-pointer items-center justify-center rounded-xl border-2 border-dashed border-border p-10 transition-colors hover:border-primary/50 hover:bg-primary/[0.03]",
+        "group flex cursor-pointer items-center justify-center rounded-xl border-2 border-dashed border-border p-10 transition-colors hover:border-primary/50 hover:bg-primary/[0.03] focus-within:border-primary focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2",
         dragging && "border-primary bg-primary/[0.05]"
       )}
       onMouseEnter={() => iconRef.current?.startAnimation()}
@@ -31,7 +31,7 @@ export default function DropZone({ disabled, onDropFile }: { disabled?: boolean;
         if (f && !disabled) onDropFile(f);
       }}
     >
-      <input type="file" className="hidden" onChange={onChange} accept=".csv,.xlsx,.xls,.tsv,.json,.jsonl,.parquet,.pq" disabled={disabled} />
+      <input type="file" className="sr-only" onChange={onChange} accept=".csv,.xlsx,.xls,.tsv,.json,.jsonl,.parquet,.pq" disabled={disabled} />
       <div className="text-center">
         <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 transition-colors group-hover:bg-primary/15">
           <UploadIcon ref={iconRef} size={24} className="text-primary" />

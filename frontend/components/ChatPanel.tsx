@@ -70,7 +70,8 @@ export default function ChatPanel({
   const STAGES = ["Writing SQL…", "Validating…", "Running on your data…", "Taking longer than usual, still working…"];
   useEffect(() => {
     if (!sending) { setStage(0); return; }
-    const t = setInterval(() => setStage((v) => Math.min(v + 1, 2)), 2600);
+    // Guard against the interval walking the late stage back down to 2.
+    const t = setInterval(() => setStage((v) => (v >= 3 ? v : Math.min(v + 1, 2))), 2600);
     const late = setTimeout(() => setStage(3), 15000);
     return () => { clearInterval(t); clearTimeout(late); };
     // eslint-disable-next-line react-hooks/exhaustive-deps

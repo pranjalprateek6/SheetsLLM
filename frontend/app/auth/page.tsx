@@ -62,10 +62,15 @@ function AuthContent() {
     const desc =
       searchParams.get("error_description") || hash.get("error_description");
     if (desc) {
+      // Never render the raw parameter: it is attacker-controlled and would
+      // appear as a first-party SheetsLLM notice. Map what we recognise and
+      // fall back to a fixed string.
       setError(
         /provider is not enabled/i.test(desc)
           ? "Google sign-in isn't available yet. Use email and password for now."
-          : desc.replace(/\+/g, " ")
+          : /access.?denied|cancelled/i.test(desc)
+            ? "Sign-in was cancelled. Try again when you're ready."
+            : "Sign-in didn't complete. Try again, or use email and password."
       );
     }
   }, [searchParams]);

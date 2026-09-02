@@ -941,23 +941,11 @@ function WorkspaceContent() {
               </div>
             </div>
 
-            {/* Chef — desktop column (collapsible), mobile bottom sheet */}
+            {/* Chef — one instance; the wrapper is an in-flow column at lg
+                and a bottom sheet below it. Rendering it twice mounted two
+                panels with separate state and doubled every fetch. */}
             {chatOpen && (
-              <div className="hidden w-80 flex-shrink-0 lg:block xl:w-96">
-                <ChatPanel
-                  fileId={fileId}
-                  open={chatOpen}
-                  onPreview={previewHandler}
-                  fileName={fileName}
-                  onUndo={handleUndo}
-                  onReset={handleReset}
-                  starterSuggestions={sampleSuggestions}
-                  prefill={chatPrefill}
-                />
-              </div>
-            )}
-            {chatOpen && (
-              <div className="fixed inset-x-0 bottom-0 z-40 h-[65vh] overflow-hidden rounded-t-2xl border-t bg-card shadow-lg lg:hidden">
+              <div className="fixed inset-x-0 bottom-0 z-40 h-[65vh] overflow-hidden rounded-t-2xl border-t bg-card shadow-lg lg:static lg:z-auto lg:h-auto lg:w-80 lg:flex-shrink-0 lg:rounded-none lg:border-l lg:border-t-0 lg:shadow-none xl:w-96">
                 <ChatPanel
                   fileId={fileId}
                   open={chatOpen}
@@ -983,7 +971,7 @@ function WorkspaceContent() {
             setGridJump({ name, nonce: Date.now() });
           }}
         />
-        <HistoryDrawer open={historyOpen} onClose={() => setHistoryOpen(false)} fileId={fileId} onRevert={handleRevert} />
+        <HistoryDrawer open={historyOpen} onClose={() => setHistoryOpen(false)} fileId={fileId} onRevert={(n) => { setHistoryOpen(false); setConfirmRevert(n); }} />
         <RecipesDrawer
           open={recipesOpen}
           onClose={() => setRecipesOpen(false)}
@@ -1050,7 +1038,7 @@ function WorkspaceContent() {
         <CommandPalette
           open={paletteOpen}
           onClose={() => setPaletteOpen(false)}
-          onUpload={handleFullReset}
+          onUpload={handleResetClick}
           onUndo={handleUndo}
           onDownload={handleDownload}
           onDownloadXlsx={() => handleDownload("xlsx")}
