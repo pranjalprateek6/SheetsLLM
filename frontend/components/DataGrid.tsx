@@ -335,7 +335,7 @@ export default function DataGrid({
                     <div className={`flex items-center gap-1.5 ${numeric ? "justify-end" : ""}`}>
                       <TypeGlyph dtype={meta?.dtype} />
                       <button
-                        className="inline-flex min-w-0 items-center gap-1.5 hover:text-foreground transition-colors"
+                        className="inline-flex h-full min-h-6 min-w-6 items-center gap-1.5 transition-colors hover:text-foreground"
                         onClick={() => handleSort(h)}
                         title={
                           meta
@@ -361,7 +361,7 @@ export default function DataGrid({
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <button
-                            className="rounded p-0.5 opacity-0 transition-opacity hover:bg-accent group-hover:opacity-100 data-[state=open]:opacity-100"
+                            className="relative flex h-4 w-4 items-center justify-center rounded opacity-0 transition-opacity after:absolute after:-inset-[5px] after:content-[''] hover:bg-accent focus-visible:opacity-100 group-hover:opacity-100 data-[state=open]:opacity-100"
                             aria-label={`Column menu for ${h}`}
                           >
                             <ChevronDown className="h-3 w-3" />
@@ -492,7 +492,7 @@ export default function DataGrid({
         </table>
       </div>
       {/* Status bar */}
-      <div className="flex h-7 flex-shrink-0 items-center justify-between gap-2 border-t bg-card px-3">
+      <div className="flex h-8 flex-shrink-0 items-center justify-between gap-2 border-t bg-card px-3">
         <span className="min-w-0 truncate text-[11px] tabular-nums text-muted-foreground">
           {filterQ.trim()
             ? `${visibleRows.length.toLocaleString()} of ${rows.length.toLocaleString()} preview rows match`
@@ -507,7 +507,7 @@ export default function DataGrid({
             <button
               type="button"
               onClick={() => onAskChef(`Keep only rows where any column contains "${filterQ.trim()}"`)}
-              className="inline-flex items-center gap-1 whitespace-nowrap text-[11px] font-medium text-primary underline-offset-2 hover:underline"
+              className="inline-flex h-6 items-center gap-1 whitespace-nowrap text-[11px] font-medium text-primary underline-offset-2 hover:underline"
               title="Turn this preview filter into a real transform"
             >
               <ChefHat className="h-3 w-3" /> Filter all rows with Chef
@@ -519,13 +519,13 @@ export default function DataGrid({
             onChange={(e) => setFilterQ(e.target.value)}
             placeholder="Filter preview…"
             aria-label="Filter the loaded preview rows"
-            className="h-5 w-32 rounded border bg-background px-1.5 text-[11px] outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-ring/40"
+            className="h-6 w-32 rounded border bg-background px-1.5 text-[11px] outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-ring/40"
           />
           {filterQ && (
             <button
               type="button"
               onClick={() => setFilterQ("")}
-              className="text-[11px] text-muted-foreground hover:text-foreground"
+              className="flex h-6 w-6 items-center justify-center rounded text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground"
               aria-label="Clear filter"
             >
               ✕
@@ -543,7 +543,7 @@ export default function DataGrid({
             aria-label="Compact rows"
             aria-pressed={density === "compact"}
             onClick={() => changeDensity("compact")}
-            className={`flex h-5 w-6 items-center justify-center rounded transition-colors ${
+            className={`flex h-6 w-7 items-center justify-center rounded transition-colors ${
               density === "compact"
                 ? "bg-card text-foreground shadow-xs"
                 : "text-muted-foreground hover:text-foreground"
@@ -557,7 +557,7 @@ export default function DataGrid({
             aria-label="Comfortable rows"
             aria-pressed={density === "comfortable"}
             onClick={() => changeDensity("comfortable")}
-            className={`flex h-5 w-6 items-center justify-center rounded transition-colors ${
+            className={`flex h-6 w-7 items-center justify-center rounded transition-colors ${
               density === "comfortable"
                 ? "bg-card text-foreground shadow-xs"
                 : "text-muted-foreground hover:text-foreground"

@@ -213,8 +213,9 @@ export default function DashboardPage() {
         <button
           type="button"
           // Browsers set text-transform: none on form controls, so the heading's
-          // uppercase does not reach a button nested inside it.
-          className={`inline-flex items-center gap-1 uppercase tracking-[0.08em] transition-colors hover:text-foreground ${active ? "text-foreground" : ""}`}
+          // uppercase does not reach a button nested inside it. min-h-6 keeps a
+          // 10px label above the 24px target floor (2.5.8).
+          className={`inline-flex min-h-6 items-center gap-1 uppercase tracking-[0.08em] transition-colors hover:text-foreground ${active ? "text-foreground" : ""}`}
           onClick={() => handleSort(col)}
         >
           {label}
@@ -232,7 +233,7 @@ export default function DashboardPage() {
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 text-muted-foreground"
+          className="h-7 w-7 text-muted-foreground"
           disabled={actionLoading === file.id}
           onClick={(e) => e.stopPropagation()}
           aria-label={`File actions for ${file.name}`}

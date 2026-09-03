@@ -355,7 +355,7 @@ export default function ChatPanel({
                     onClick={() => setExpandedSql(expandedSql === String(i) ? null : String(i))}
                     aria-expanded={expandedSql === String(i)}
                     aria-controls={`sql-${i}`}
-                    className="inline-flex items-center gap-1 text-[11px] font-medium text-primary/70 transition-colors hover:text-primary"
+                    className="inline-flex min-h-6 items-center gap-1 text-[11px] font-medium text-primary-accent transition-colors hover:text-primary"
                   >
                     <Code2 className="h-3 w-3" /> SQL
                     <ChevronDown className={cn("h-3 w-3 transition-transform", expandedSql === String(i) && "rotate-180")} />
