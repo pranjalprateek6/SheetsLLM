@@ -1,10 +1,19 @@
 "use client";
 import { useState } from "react";
-import { Download, FileSpreadsheet, Upload } from "lucide-react";
+import { Download, FileSpreadsheet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { baseName, downloadText, formatCount, parseCsvFile, toCsv, type Table } from "@/lib/csv-tools";
+import {
+  baseName,
+  downloadText,
+  formatCount,
+  inSlices,
+  toCsvAsync,
+  type Table,
+} from "@/lib/csv-tools";
 import { cn } from "@/lib/utils";
+import CsvDropzone from "./CsvDropzone";
+import ProgressBar from "./ProgressBar";
 
 /* Common one-click hygiene for messy exports: trim whitespace, drop fully
    empty rows and columns, collapse internal double spaces. */
@@ -31,100 +40,114 @@ export default function CleanTool() {
   const [opts, setOpts] = useState<Options>(DEFAULTS);
   const [done, setDone] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [dragging, setDragging] = useState(false);
+  const [running, setRunning] = useState(false);
+  const [progress, setProgress] = useState(0);
 
-  const onFile = async (f: File | undefined) => {
-    if (!f) return;
-    setError(null);
+  const run = async () => {
+    if (!table || running) return;
+    setRunning(true);
+    setProgress(0);
     setDone(null);
-    setBusy(true);
+    setError(null);
+
+    // The three passes below each walk every row, so they get a slice of the
+    // bar rather than each resetting it to zero.
+    const span = (from: number, to: number) => (f: number) => setProgress(from + (to - from) * f);
+
     try {
-      const t = await parseCsvFile(f);
-      setTable(t);
-      setFileName(f.name);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Could not read the file.");
-      setTable(null);
-    } finally {
-      setBusy(false);
-    }
-  };
+      let cellsTouched = 0;
+      const cleanCell = (v: string) => {
+        let next = v;
+        if (opts.trim) next = next.trim();
+        if (opts.collapseSpaces) next = next.replace(/ {2,}/g, " ");
+        if (next !== v) cellsTouched++;
+        return next;
+      };
 
-  const run = () => {
-    if (!table) return;
-    let headers = [...table.headers];
-    let rows = table.rows.map((r) => [...r]);
-    let cellsTouched = 0;
+      let headers = table.headers.map(cleanCell);
+      const rows: string[][] = [];
+      let removedRows = 0;
+      // Recorded during the cleaning pass so dropping empty columns costs no
+      // extra walk over the file.
+      const columnHasContent = headers.map((h) => h !== "");
 
-    const cleanCell = (v: string) => {
-      let next = v;
-      if (opts.trim) next = next.trim();
-      if (opts.collapseSpaces) next = next.replace(/ {2,}/g, " ");
-      if (next !== v) cellsTouched++;
-      return next;
-    };
-
-    headers = headers.map(cleanCell);
-    rows = rows.map((r) => r.map(cleanCell));
-
-    let removedRows = 0;
-    if (opts.dropEmptyRows) {
-      const before = rows.length;
-      rows = rows.filter((r) => r.some((c) => c !== ""));
-      removedRows = before - rows.length;
-    }
-
-    let removedCols = 0;
-    if (opts.dropEmptyCols) {
-      const keep = headers.map(
-        (h, i) => h !== "" || rows.some((r) => (r[i] ?? "") !== "")
+      await inSlices(
+        table.rows.length,
+        (start, end) => {
+          for (let i = start; i < end; i++) {
+            const cleaned = table.rows[i].map(cleanCell);
+            let hasContent = false;
+            for (let c = 0; c < cleaned.length; c++) {
+              if (cleaned[c] !== "") {
+                hasContent = true;
+                columnHasContent[c] = true;
+              }
+            }
+            if (opts.dropEmptyRows && !hasContent) removedRows++;
+            else rows.push(cleaned);
+          }
+        },
+        span(0, 0.5)
       );
-      removedCols = keep.filter((k) => !k).length;
-      if (removedCols) {
-        headers = headers.filter((_, i) => keep[i]);
-        rows = rows.map((r) => r.filter((_, i) => keep[i]));
-      }
-    }
 
-    downloadText(`${baseName(fileName)}_cleaned.csv`, toCsv({ headers, rows }));
-    setDone(
-      `Cleaned ${formatCount(cellsTouched)} cells, removed ${formatCount(removedRows)} empty rows and ${formatCount(removedCols)} empty columns.`
-    );
+      let removedCols = 0;
+      if (opts.dropEmptyCols) {
+        removedCols = columnHasContent.filter((k) => !k).length;
+        if (removedCols) {
+          headers = headers.filter((_, i) => columnHasContent[i]);
+          await inSlices(
+            rows.length,
+            (start, end) => {
+              for (let i = start; i < end; i++) rows[i] = rows[i].filter((_, c) => columnHasContent[c]);
+            },
+            span(0.5, 0.65)
+          );
+        }
+      }
+
+      const csv = await toCsvAsync({ headers, rows }, span(removedCols ? 0.65 : 0.5, 1));
+      downloadText(`${baseName(fileName)}_cleaned.csv`, csv);
+      setDone(
+        `Cleaned ${formatCount(cellsTouched)} cells, removed ${formatCount(removedRows)} empty rows and ${formatCount(removedCols)} empty columns.`
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not clean the file.");
+    } finally {
+      setRunning(false);
+    }
   };
 
   return (
     <div>
-      <label
-        className={cn(
-          "group focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2 flex cursor-pointer items-center justify-center rounded-xl border-2 border-dashed border-border p-8 transition-colors hover:border-primary/50 hover:bg-primary/[0.03] focus-within:border-primary focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2",
-          dragging && "border-primary bg-primary/[0.05]"
-        )}
-        onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
-        onDragEnter={(e) => { e.preventDefault(); setDragging(true); }}
-        onDragLeave={() => setDragging(false)}
-        onDrop={(e) => { e.preventDefault(); setDragging(false); onFile(e.dataTransfer.files?.[0]); }}
-      >
-        <input type="file" accept=".csv,.tsv,.txt" className="sr-only" onChange={(e) => onFile(e.target.files?.[0])} disabled={busy} />
-        <div className="text-center">
-          <Upload className="mx-auto mb-2 h-6 w-6 text-primary" />
-          <p className="text-sm font-medium">{busy ? "Reading…" : "Choose a CSV file"}</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">cleaning happens on your machine</p>
-        </div>
-      </label>
+      <CsvDropzone
+        hint="cleaning happens on your machine"
+        onStart={() => {
+          setTable(null);
+          setDone(null);
+          setError(null);
+        }}
+        onTable={(t, name) => {
+          setTable(t);
+          setFileName(name);
+        }}
+      />
 
       {table?.warnings?.length ? (
-
-        <div role="status" className="mt-3 rounded-lg border border-warning/30 bg-warning/5 px-3 py-2.5 text-sm text-warning-text">
-
-          {table.warnings.map((w) => (<p key={w}>{w}</p>))}
-
+        <div
+          role="status"
+          className="mt-3 rounded-lg border border-warning/30 bg-warning/5 px-3 py-2.5 text-sm text-warning-text"
+        >
+          {table.warnings.map((w) => (
+            <p key={w}>{w}</p>
+          ))}
         </div>
-
       ) : null}
 
       {error && (
-        <div className="mt-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm text-destructive-text">
+        <div
+          role="alert"
+          className="mt-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm text-destructive-text"
+        >
           {error}
         </div>
       )}
@@ -143,6 +166,7 @@ export default function CleanTool() {
                 <input
                   type="checkbox"
                   checked={opts[key]}
+                  disabled={running}
                   onChange={() => { setOpts((o) => ({ ...o, [key]: !o[key] })); setDone(null); }}
                   className={cn("h-4 w-4 rounded border-input accent-[hsl(var(--primary))]")}
                 />
@@ -151,11 +175,12 @@ export default function CleanTool() {
             ))}
           </div>
 
-          <Button onClick={run} className="w-full sm:w-auto">
-            <Download className="mr-2 h-4 w-4" /> Clean &amp; download
+          <Button onClick={run} disabled={running} className="w-full sm:w-auto">
+            <Download className="mr-2 h-4 w-4" /> {running ? "Cleaning…" : "Clean & download"}
           </Button>
 
-          {done && <p className="mt-3 text-sm text-success-text">{done}</p>}
+          {running && <ProgressBar value={progress} label="Cleaning" />}
+          {done && <p role="status" className="mt-3 text-sm text-success-text">{done}</p>}
         </div>
       )}
     </div>
