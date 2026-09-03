@@ -43,9 +43,21 @@ export function formatBytes(bytes: number): string {
   return `${n < 10 ? n.toFixed(1) : Math.round(n)} ${units[i]}`;
 }
 
-/** Hands the frame back to the browser so it can paint before the next slice. */
+/** Hands the frame back to the browser so it can paint before the next slice.
+ *
+ *  Not setTimeout: browsers clamp timers to roughly one second in a background
+ *  tab, so switching away mid-job would stretch a 20-slice pass into 20 seconds.
+ *  A MessageChannel post is a task the browser does not throttle, and it still
+ *  yields the thread. This is the same primitive React's scheduler uses. */
 function yieldToBrowser(): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, 0));
+  return new Promise((resolve) => {
+    const channel = new MessageChannel();
+    channel.port1.onmessage = () => {
+      channel.port1.close();
+      resolve();
+    };
+    channel.port2.postMessage(null);
+  });
 }
 
 /** Walks `total` items in slices, yielding between each. `work` is handed a
