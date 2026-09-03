@@ -1,7 +1,9 @@
 "use client";
 import { useMemo } from "react";
 import { cn } from "@/lib/utils";
-import type { SchemaColumn } from "@/components/SchemaPanel";
+/** A column as the strip needs it: a transform-created column has no
+ *  dtype or null stats until the schema is next fetched. */
+export type HealthColumn = { name: string; dtype?: string; null_pct?: number };
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
@@ -34,7 +36,7 @@ export default function ColumnHealth({
   onSelect,
   className,
 }: {
-  columns: SchemaColumn[];
+  columns: HealthColumn[];
   changedCols?: string[];
   onSelect?: (name: string) => void;
   className?: string;

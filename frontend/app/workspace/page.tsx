@@ -6,7 +6,7 @@ import {
   BarChart3, BookMarked, Check, ChevronDown, Columns3, FileSpreadsheet, History, Lightbulb, MessageSquare, Pencil, Undo2, Upload,
 } from "lucide-react";
 import { DownloadIcon, type DownloadIconHandle } from "@/components/icons/download";
-import ColumnHealth from "@/components/ColumnHealth";
+import ColumnHealth, { type HealthColumn } from "@/components/ColumnHealth";
 import PipelineSpine from "@/components/PipelineSpine";
 import DropZone from "@/components/DropZone";
 import DataGrid from "@/components/DataGrid";
@@ -218,6 +218,15 @@ function WorkspaceContent() {
     }
     return map;
   }, [schema]);
+
+  // The fingerprint follows the GRID, not the upload-time schema: a transform
+  // that adds a column must show up immediately, and the schema is only
+  // fetched on load, so driving the strip from it left the new column missing
+  // and its "just changed" cap unable to fire.
+  const healthColumns = useMemo<HealthColumn[]>(() => {
+    const meta = new Map((schema?.columns ?? []).map((c) => [c.name, c] as const));
+    return columns.map((name) => meta.get(name) ?? { name });
+  }, [columns, schema]);
 
   // Answers unlock something visible: matching samples float to the top
   // and the starter prompts speak the user's domain.
@@ -832,18 +841,18 @@ function WorkspaceContent() {
 
               {/* Column fingerprint: one segment per column, filled by how
                   complete it is. Nulls read as the gap and drain as you clean. */}
-              {(schema?.columns?.length ?? 0) > 0 && (
+              {healthColumns.length > 0 && (
                 <div className="flex h-9 flex-shrink-0 items-center gap-3 border-b bg-card px-3">
                   <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
                     Columns
                   </span>
                   <ColumnHealth
-                    columns={schema?.columns ?? []}
+                    columns={healthColumns}
                     changedCols={lastChange?.addedCols}
                     onSelect={(name) => setGridJump({ name, nonce: Date.now() })}
                   />
                   <span className="ml-auto font-mono text-[10px] tabular-nums text-muted-foreground">
-                    {(schema?.columns ?? []).filter((c) => (c.null_pct ?? 0) > 0).length} with gaps
+                    {healthColumns.filter((c) => (c.null_pct ?? 0) > 0).length} with gaps
                   </span>
                 </div>
               )}
