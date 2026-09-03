@@ -35,7 +35,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
@@ -87,7 +87,13 @@ function WorkspaceContent() {
   const [pendingUploadId, setPendingUploadId] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [recipesOpen, setRecipesOpen] = useState(false);
-  const [chatOpen, setChatOpen] = useState(true);
+  // Below lg the chat is a 65vh bottom sheet rather than a side rail, so
+  // defaulting it open there buried the grid under it on arrival. Read once at
+  // mount: the transform view is not rendered during hydration, so the server
+  // and client values are never both on screen.
+  const [chatOpen, setChatOpen] = useState(
+    () => typeof window === "undefined" || window.matchMedia("(min-width: 1024px)").matches
+  );
   const [chartOpen, setChartOpen] = useState(false);
   const [schemaOpen, setSchemaOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -794,6 +800,18 @@ function WorkspaceContent() {
                           <FileSpreadsheet className="mr-2 h-4 w-4" /> Go to Files
                         </a>
                       </DropdownMenuItem>
+                      {/* Narrow screens have no room for these in the bar, and
+                          the command palette is not reachable without a keyboard. */}
+                      <DropdownMenuSeparator className="sm:hidden" />
+                      <DropdownMenuItem className="sm:hidden" onClick={() => setChartOpen(true)}>
+                        <BarChart3 className="mr-2 h-4 w-4" /> Quick chart
+                      </DropdownMenuItem>
+                      <DropdownMenuItem className="sm:hidden" onClick={() => setSchemaOpen(true)}>
+                        <Columns3 className="mr-2 h-4 w-4" /> Schema
+                      </DropdownMenuItem>
+                      <DropdownMenuItem className="sm:hidden" onClick={() => setHistoryOpen(true)}>
+                        <History className="mr-2 h-4 w-4" /> History &amp; SQL
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
@@ -815,7 +833,7 @@ function WorkspaceContent() {
                     </Tooltip>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => setChartOpen(true)} aria-label="Quick chart">
+                        <Button variant="ghost" size="icon" className="hidden h-8 w-8 text-muted-foreground sm:inline-flex" onClick={() => setChartOpen(true)} aria-label="Quick chart">
                           <BarChart3 className="h-4 w-4" />
                         </Button>
                       </TooltipTrigger>
@@ -823,7 +841,7 @@ function WorkspaceContent() {
                     </Tooltip>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => setSchemaOpen(true)} aria-label="View schema">
+                        <Button variant="ghost" size="icon" className="hidden h-8 w-8 text-muted-foreground sm:inline-flex" onClick={() => setSchemaOpen(true)} aria-label="View schema">
                           <Columns3 className="h-4 w-4" />
                         </Button>
                       </TooltipTrigger>
@@ -831,7 +849,7 @@ function WorkspaceContent() {
                     </Tooltip>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => setHistoryOpen(true)} aria-label="History and SQL detail">
+                        <Button variant="ghost" size="icon" className="hidden h-8 w-8 text-muted-foreground sm:inline-flex" onClick={() => setHistoryOpen(true)} aria-label="History and SQL detail">
                           <History className="h-4 w-4" />
                         </Button>
                       </TooltipTrigger>
@@ -841,11 +859,14 @@ function WorkspaceContent() {
                     <Button
                       variant="outline"
                       size="sm"
-                      className="h-8 gap-1.5"
+                      className="h-8 gap-1.5 px-2 sm:px-3"
                       onClick={() => setRecipesOpen(true)}
+                      aria-label={steps.length > 0 ? "Save recipe" : "Recipes"}
                     >
                       <BookMarked className="h-3.5 w-3.5" />
-                      {steps.length > 0 ? "Save recipe" : "Recipes"}
+                      <span className="hidden sm:inline">
+                        {steps.length > 0 ? "Save recipe" : "Recipes"}
+                      </span>
                     </Button>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -882,10 +903,16 @@ function WorkspaceContent() {
                   <ColumnHealth
                     columns={healthColumns}
                     widths={gridWidths}
-                    className="flex-1"
+                    className="hidden flex-1 sm:flex"
                     changedCols={lastChange?.addedCols}
                     onSelect={(name) => setGridJump({ name, nonce: Date.now() })}
                   />
+                  {/* The segments are proportional to column width, so on a
+                      phone the narrow ones compress to 14px: too small to read
+                      and too small to tap. The row states the count instead. */}
+                  <span className="flex-1 font-mono text-[10px] tabular-nums text-muted-foreground sm:hidden">
+                    {healthColumns.length}
+                  </span>
                   <span className="shrink-0 font-mono text-[10px] tabular-nums text-muted-foreground">
                     {healthColumns.filter((c) => (c.null_pct ?? 0) > 0).length} with gaps
                   </span>

@@ -252,6 +252,8 @@ export default function Header() {
           onClick={() => setMobileOpen(!mobileOpen)}
           className="rounded-md p-2 text-muted-foreground hover:bg-accent"
           aria-label="Toggle menu"
+          aria-expanded={mobileOpen}
+          aria-controls="mobile-nav"
         >
           <IconSwap
             state={mobileOpen ? "a" : "b"}
@@ -264,7 +266,7 @@ export default function Header() {
 
       {/* Mobile nav */}
       {mobileOpen && (
-        <div className="border-t border-border bg-background px-4 py-3 md:hidden">
+        <div id="mobile-nav" className="border-t border-border bg-background px-4 py-3 md:hidden">
           <nav className="flex flex-col gap-1">
             {links.map((l) => (
               <Link
@@ -275,6 +277,14 @@ export default function Header() {
                 {l.label}
               </Link>
             ))}
+            {!loading && user && (
+              <Link
+                href="/account"
+                className="rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
+              >
+                Account &amp; billing
+              </Link>
+            )}
             <div className="px-1 pt-1">
               <FeedbackWidget variant="outline" />
             </div>

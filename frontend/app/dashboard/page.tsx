@@ -401,10 +401,10 @@ export default function DashboardPage() {
               <TableHeader>
                 <TableRow>
                   {sortableHead("Name", "name")}
-                  <TableHead className="w-24 text-right">Size</TableHead>
-                  {sortableHead("Rows", "row_count", "w-24 text-right")}
-                  <TableHead className="w-20 text-right">Cols</TableHead>
-                  {sortableHead("Created", "created_at", "w-32")}
+                  <TableHead className="hidden w-24 text-right sm:table-cell">Size</TableHead>
+                  {sortableHead("Rows", "row_count", "hidden w-24 text-right sm:table-cell")}
+                  <TableHead className="hidden w-20 text-right sm:table-cell">Cols</TableHead>
+                  {sortableHead("Created", "created_at", "hidden w-32 sm:table-cell")}
                   <TableHead className="w-12" />
                 </TableRow>
               </TableHeader>
@@ -415,25 +415,32 @@ export default function DashboardPage() {
                     className="cursor-pointer"
                     onClick={() => handleOpen(file.id)}
                   >
-                    <TableCell className="flex items-center gap-2.5">
-                      <FileSpreadsheet className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
-                      {nameCell(file)}
-                      {/* The format is a property of the file, not a status, so
-                          it wears the grid's type-mark treatment, not a pill. */}
-                      <span className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
-                        {file.original_format}
-                      </span>
+                    <TableCell>
+                      <div className="flex min-w-0 items-center gap-2.5">
+                        <FileSpreadsheet className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                        {nameCell(file)}
+                        {/* The format is a property of the file, not a status, so
+                            it wears the grid's type-mark treatment, not a pill. */}
+                        <span className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
+                          {file.original_format}
+                        </span>
+                      </div>
+                      {/* The columns those numbers live in are hidden below sm,
+                          so the row carries them itself. */}
+                      <p className="mt-1 pl-[26px] font-mono text-[11px] tabular-nums text-muted-foreground sm:hidden">
+                        {file.row_count.toLocaleString()} × {file.column_count.toLocaleString()} · {formatBytes(file.size_bytes)} · {formatDate(file.created_at)}
+                      </p>
                     </TableCell>
-                    <TableCell className="text-right font-mono text-xs tabular-nums text-muted-foreground">
+                    <TableCell className="hidden text-right font-mono text-xs tabular-nums text-muted-foreground sm:table-cell">
                       {formatBytes(file.size_bytes)}
                     </TableCell>
-                    <TableCell className="text-right font-mono text-xs tabular-nums text-muted-foreground">
+                    <TableCell className="hidden text-right font-mono text-xs tabular-nums text-muted-foreground sm:table-cell">
                       {file.row_count.toLocaleString()}
                     </TableCell>
-                    <TableCell className="text-right font-mono text-xs tabular-nums text-muted-foreground">
+                    <TableCell className="hidden text-right font-mono text-xs tabular-nums text-muted-foreground sm:table-cell">
                       {file.column_count.toLocaleString()}
                     </TableCell>
-                    <TableCell className="text-xs tabular-nums text-muted-foreground">
+                    <TableCell className="hidden text-xs tabular-nums text-muted-foreground sm:table-cell">
                       {formatDate(file.created_at)}
                     </TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>{rowActions(file)}</TableCell>
