@@ -3,8 +3,10 @@
 @tailwind utilities;
 
 /* ── Design tokens (see DESIGN.md) ─────────────────────────────────────
-   Light is the default. `.dark` is defined for future use but not yet
-   exposed in the UI. All colors are HSL triplets for hsl(var(--x)). */
+   Light is `:root`, dark is `.dark`, and next-themes toggles the class
+   from the header. Both ship. All colors are HSL triplets for
+   hsl(var(--x)), except the chart ramp, which is hex because it is
+   validated as absolute colours rather than composed. */
 
 @layer base {
   :root {
