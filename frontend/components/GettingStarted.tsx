@@ -64,7 +64,7 @@ export default function GettingStarted() {
     return (
       <button
         onClick={reopen}
-        className="inline-flex items-center gap-2 rounded-full border bg-card px-3 py-1.5 text-xs text-muted-foreground shadow-xs transition-colors hover:border-primary/40 hover:text-foreground"
+        className="inline-flex items-center gap-2 rounded-full border bg-card px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
       >
         <span className="flex h-4 w-4 items-center justify-center rounded-full bg-primary/10">
           <Check className="h-2.5 w-2.5 text-primary" />
@@ -75,7 +75,7 @@ export default function GettingStarted() {
   }
 
   return (
-    <div className="rounded-2xl border bg-card p-5 shadow-xs">
+    <div className="rounded-md border bg-card p-5">
       <div className="mb-3 flex items-center justify-between">
         <h3 className="text-sm font-medium">Getting started</h3>
         <button

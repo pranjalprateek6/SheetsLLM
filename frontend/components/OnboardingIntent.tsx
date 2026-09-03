@@ -75,7 +75,7 @@ export default function OnboardingIntent({
   };
 
   return (
-    <div className="rounded-2xl border bg-card p-5 shadow-xs">
+    <div className="rounded-md border bg-card p-5">
       <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
         <div className="min-w-[220px]">
           <h3 className="text-sm font-medium">What kind of files land on your desk?</h3>

@@ -267,7 +267,7 @@ export default function ChatPanel({
       {fileId && messages.length === 0 && (
         <div className="flex-shrink-0 space-y-4 border-b px-4 py-6">
           <div className="space-y-2 text-center">
-            <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+            <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-md bg-primary/10">
               <ChefHat className="h-5 w-5 text-primary" />
             </div>
             <div>
@@ -291,7 +291,7 @@ export default function ChatPanel({
                 <button
                   key={i}
                   onClick={() => sendMessage(s)}
-                  className="block w-full rounded-lg border bg-background px-3 py-2 text-left text-xs text-foreground/80 shadow-xs transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-foreground"
+                  className="block w-full rounded-lg border bg-background px-3 py-2 text-left text-xs text-foreground/80 transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-foreground"
                 >
                   {s}
                 </button>
@@ -337,7 +337,7 @@ export default function ChatPanel({
             )}
             <div
               className={cn(
-                "max-w-[85%] rounded-xl px-3 py-2 text-[13px]",
+                "max-w-[85%] rounded-md px-3 py-2 text-[13px]",
                 msg.role === "user"
                   ? "bg-primary text-primary-foreground"
                   : msg.message_type === "error"
@@ -395,7 +395,7 @@ export default function ChatPanel({
             <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md bg-primary/10">
               <ChefHat className="h-3 w-3 text-primary" />
             </div>
-            <div className="flex items-center gap-2 rounded-xl bg-muted px-3 py-2">
+            <div className="flex items-center gap-2 rounded-md bg-muted px-3 py-2">
               <TextShimmer className="text-xs" duration={1}>{STAGES[stage]}</TextShimmer>
               <button
                 onClick={() => abortRef.current?.abort()}
@@ -460,7 +460,7 @@ export default function ChatPanel({
               }
             }}
             aria-label="Ask Chef anything" placeholder="Ask Chef anything…"
-            className="max-h-[100px] min-h-[40px] flex-1 resize-none rounded-lg border bg-background px-3 py-2 text-sm shadow-xs outline-none transition-shadow placeholder:text-muted-foreground focus:ring-2 focus:ring-ring/30"
+            className="max-h-[100px] min-h-[40px] flex-1 resize-none rounded-lg border bg-background px-3 py-2 text-sm outline-none transition-shadow placeholder:text-muted-foreground focus:ring-2 focus:ring-ring/30"
             disabled={sending}
             rows={1}
           />

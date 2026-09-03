@@ -118,7 +118,7 @@ function ChefPanel() {
 
 export default function ProductShot() {
   return (
-    <div className="overflow-hidden rounded-2xl border bg-background shadow-lg">
+    <div className="overflow-hidden rounded-lg border bg-background shadow-lg">
       {/* window chrome */}
       <div className="flex items-center gap-2 border-b bg-muted/40 px-3 py-2">
         <span className="flex gap-1.5" aria-hidden>

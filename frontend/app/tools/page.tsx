@@ -53,7 +53,7 @@ export default function ToolsIndex() {
           <Link
             key={t.href}
             href={t.href}
-            className="group rounded-2xl border bg-card p-5 shadow-xs transition-shadow hover:shadow-md"
+            className="group rounded-lg border bg-card p-5 transition-colors hover:border-primary/40 hover:bg-accent/40"
           >
             <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
               <t.icon className="h-5 w-5 text-primary" />
@@ -64,7 +64,7 @@ export default function ToolsIndex() {
         ))}
       </div>
 
-      <div className="relative mt-12 overflow-hidden rounded-2xl border p-8 text-center shadow-xs">
+      <div className="relative mt-12 overflow-hidden rounded-lg border p-8 text-center">
         <div aria-hidden className="absolute inset-0 -z-10 bg-gradient-brand opacity-[0.06]" />
         <h2 className="text-xl font-semibold tracking-tight">
           Same cleanup every week? Stop doing it by hand.

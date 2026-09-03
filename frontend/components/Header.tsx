@@ -126,30 +126,60 @@ export default function Header() {
         )}
       >
         {/* Logo — home for prospects, dashboard for signed-in users */}
-        <Link href={user ? "/dashboard" : "/"} className="flex items-center gap-2">
-          {/* eslint-disable-next-line @next/next/no-img-element -- static SVG, no optimizer needed */}
-          <img src="/logo.svg" alt="" width={26} height={26} className="h-[26px] w-[26px]" />
-          <span className="text-[15px] font-semibold tracking-tight">SheetsLLM</span>
-        </Link>
+        <div className="flex min-w-0 items-center">
+          <Link href={user ? "/dashboard" : "/"} className="flex items-center gap-2">
+            {/* eslint-disable-next-line @next/next/no-img-element -- static SVG, no optimizer needed */}
+            <img src="/logo.svg" alt="" width={26} height={26} className="h-[26px] w-[26px]" />
+            <span className="text-[15px] font-semibold tracking-tight">SheetsLLM</span>
+          </Link>
 
-        {/* Desktop nav — absolutely centered so it aligns with the page's
-            center axis regardless of the logo/menu widths on either side */}
-        <nav className="pointer-events-none absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 items-center gap-1 md:flex [&>a]:pointer-events-auto">
-          {links.map((l) => (
-            <Link
-              key={l.href}
-              href={l.href}
-              className={cn(
-                "rounded-md px-3 py-1.5 text-sm transition-colors",
-                pathname === l.href
-                  ? "text-foreground"
-                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
-              )}
-            >
-              {l.label}
-            </Link>
-          ))}
-        </nav>
+          {/* Signed in, the nav is a location rather than a menu, so it sits
+              beside the mark and marks the current place with a surface. */}
+          {user && (
+            <>
+              <span className="mx-3 hidden h-4 w-px bg-border md:block" aria-hidden />
+              <nav className="hidden items-center gap-0.5 md:flex">
+                {links.map((l) => (
+                  <Link
+                    key={l.href}
+                    href={l.href}
+                    aria-current={pathname === l.href ? "page" : undefined}
+                    className={cn(
+                      "rounded-md px-2.5 py-1 text-sm transition-colors",
+                      pathname === l.href
+                        ? "bg-accent text-foreground"
+                        : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+                    )}
+                  >
+                    {l.label}
+                  </Link>
+                ))}
+              </nav>
+            </>
+          )}
+        </div>
+
+        {/* Signed out, the nav is a menu: centered on the page's axis regardless
+            of the logo and account widths on either side */}
+        {!user && (
+          <nav className="pointer-events-none absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 items-center gap-1 md:flex [&>a]:pointer-events-auto">
+            {links.map((l) => (
+              <Link
+                key={l.href}
+                href={l.href}
+                aria-current={pathname === l.href ? "page" : undefined}
+                className={cn(
+                  "rounded-md px-3 py-1.5 text-sm transition-colors",
+                  pathname === l.href
+                    ? "text-foreground"
+                    : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                )}
+              >
+                {l.label}
+              </Link>
+            ))}
+          </nav>
+        )}
 
         {/* Right side */}
         <div className="hidden items-center gap-2 md:flex">

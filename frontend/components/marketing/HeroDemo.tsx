@@ -57,13 +57,13 @@ export default function HeroDemo() {
       {/* soft gradient glow behind the card */}
       <div className="absolute -inset-6 -z-10 rounded-[2rem] bg-gradient-brand opacity-[0.07] blur-2xl" />
 
-      <div className="overflow-hidden rounded-2xl border bg-card shadow-lg">
+      <div className="overflow-hidden rounded-lg border bg-card shadow-lg">
         {/* window chrome */}
         <div className="flex items-center gap-2 border-b bg-muted/50 px-4 py-2.5">
           <span className="h-2.5 w-2.5 rounded-full bg-border" />
           <span className="h-2.5 w-2.5 rounded-full bg-border" />
           <span className="h-2.5 w-2.5 rounded-full bg-border" />
-          <span className="ml-3 rounded-md bg-background px-2.5 py-1 font-mono text-[11px] text-muted-foreground shadow-xs">
+          <span className="ml-3 rounded-md bg-background px-2.5 py-1 font-mono text-[11px] text-muted-foreground">
             march_orders.csv
           </span>
           <AnimatePresence>
@@ -151,7 +151,7 @@ export default function HeroDemo() {
 
         {/* instruction bar */}
         <div className="border-t bg-muted/40 px-4 py-3">
-          <div className="flex items-center gap-2 rounded-lg border bg-background px-3 py-2 shadow-xs">
+          <div className="flex items-center gap-2 rounded-lg border bg-background px-3 py-2">
             <span className="min-h-[1rem] flex-1 text-xs text-foreground/80">
               {shown === "messy" ? (
                 <span className="text-muted-foreground">Describe your cleanup…</span>

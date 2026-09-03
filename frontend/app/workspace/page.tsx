@@ -622,7 +622,7 @@ function WorkspaceContent() {
         {/* Bad ?file_id= — dead-end recovery */}
         {fileLoadError && !fileReady && (
           <div className="flex min-h-[calc(100vh-56px)] items-center justify-center px-4">
-            <div className="w-full max-w-md rounded-2xl border bg-card p-8 text-center shadow-sm">
+            <div className="w-full max-w-md rounded-md border bg-card p-8 text-center shadow-sm">
               {/* eslint-disable-next-line @next/next/no-img-element -- static SVG */}
               <img src="/logo.svg" className="mx-auto mb-3 h-10 w-10 opacity-50" alt="" />
               <h2 className="text-lg font-semibold tracking-tight">This file couldn&apos;t be loaded</h2>
@@ -644,12 +644,22 @@ function WorkspaceContent() {
         {/* Phase 1: Upload */}
         {showUpload && !fileReady && !fileLoadError && !(loading && urlFileId) && (
           <div className="min-h-[calc(100vh-56px)] animate-fade-in-up">
-            <div className="mx-auto max-w-4xl space-y-5 px-4 pb-12 pt-12 sm:px-6">
+            {/* The header runs full width here, so a centered island below it
+                shares no edge with anything. The same status bar the loaded
+                workspace uses gives this phase the left edge instead, and says
+                which of the two states you are looking at. */}
+            <div className="flex h-9 items-center gap-3 border-b bg-card px-4 sm:px-6">
+              <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
+                Workspace
+              </span>
+              <span className="text-xs text-muted-foreground">No file open</span>
+            </div>
+            <div className="max-w-5xl space-y-5 px-4 pb-12 pt-8 sm:px-6">
               {intentsLoaded && intents === null && (
                 <OnboardingIntent onDone={handleIntentsDone} />
               )}
               {justAnswered && intents && intents.length > 0 && (
-                <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-primary/30 bg-primary/5 px-5 py-3.5">
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-primary/30 bg-primary/5 px-5 py-3.5">
                   <p className="text-sm">
                     <span className="font-medium">
                       Set up for {intents.map((i) => INTENT_LABELS[i]).join(" + ")}.
@@ -670,7 +680,7 @@ function WorkspaceContent() {
                 </div>
               )}
               <div className="grid gap-5 md:grid-cols-2">
-                <div className="rounded-2xl border bg-card p-6 shadow-xs">
+                <div className="rounded-md border bg-card p-6">
                   <h2 className="mb-4 text-lg font-semibold tracking-tight">Upload a spreadsheet</h2>
                   <DropZone disabled={loading} onDropFile={onUpload} />
                   {uploadError && (
@@ -692,7 +702,7 @@ function WorkspaceContent() {
                             key={sample.id}
                             onClick={() => loadSample(sample.id)}
                             disabled={loading}
-                            className={`w-full rounded-lg border px-3 py-2 text-left shadow-xs transition-colors hover:border-primary/40 hover:bg-primary/[0.03] disabled:opacity-50 ${
+                            className={`w-full rounded-lg border px-3 py-2 text-left transition-colors hover:border-primary/40 hover:bg-primary/[0.03] disabled:opacity-50 ${
                               picked ? "border-primary/40 bg-primary/[0.04]" : "bg-background"
                             }`}
                           >
@@ -713,7 +723,7 @@ function WorkspaceContent() {
                 </div>
                 <div className="space-y-4">
                   <GettingStarted />
-                  <div className="rounded-2xl border bg-card p-5 shadow-xs">
+                  <div className="rounded-md border bg-card p-5">
                     <div className="flex items-start gap-3">
                       <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-primary/10">
                         <Lightbulb className="h-4 w-4 text-primary" />

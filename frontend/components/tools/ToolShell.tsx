@@ -25,19 +25,19 @@ export default function ToolShell({
       <div className="mb-8 text-center">
         <h1 className="text-3xl font-semibold tracking-tight">{title}</h1>
         <p className="mx-auto mt-3 max-w-xl text-muted-foreground">{intro}</p>
-        <p className="mt-4 inline-flex items-center gap-1.5 rounded-full border bg-card px-3 py-1 text-xs font-medium text-success-text shadow-xs">
+        <p className="mt-4 inline-flex items-center gap-1.5 rounded-full border bg-card px-3 py-1 text-xs font-medium text-success-text">
           <Lock className="h-3.5 w-3.5" />
           Runs entirely in your browser. Your file never leaves your computer
         </p>
       </div>
 
       {/* The tool itself */}
-      <div className="rounded-2xl border bg-card p-6 shadow-sm">{children}</div>
+      <div className="rounded-lg border bg-card p-6">{children}</div>
 
       {/* How it works */}
       <div className="mt-12 grid gap-4 sm:grid-cols-3">
         {steps.map((s, i) => (
-          <div key={i} className="rounded-xl border bg-card p-4 shadow-xs">
+          <div key={i} className="rounded-lg border bg-card p-4">
             <span className="mb-2 flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
               {i + 1}
             </span>
@@ -47,7 +47,7 @@ export default function ToolShell({
       </div>
 
       {/* Recipe CTA */}
-      <div className="relative mt-12 overflow-hidden rounded-2xl border p-8 text-center shadow-xs">
+      <div className="relative mt-12 overflow-hidden rounded-lg border p-8 text-center">
         <div aria-hidden className="absolute inset-0 -z-10 bg-gradient-brand opacity-[0.06]" />
         <RefreshCw className="mx-auto mb-3 h-6 w-6 text-primary" />
         <h2 className="text-xl font-semibold tracking-tight">
@@ -67,7 +67,7 @@ export default function ToolShell({
       {/* FAQ */}
       <div className="mt-12">
         <h2 className="mb-4 text-lg font-semibold tracking-tight">Frequently asked questions</h2>
-        <div className="divide-y rounded-2xl border bg-card px-5 shadow-xs">
+        <div className="divide-y rounded-lg border bg-card px-5">
           {faq.map((item) => (
             <details key={item.q} className="group py-4">
               <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-medium [&::-webkit-details-marker]:hidden">

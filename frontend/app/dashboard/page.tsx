@@ -13,7 +13,6 @@ import {
 import { UploadIcon, type UploadIconHandle } from "@/components/icons/upload";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -213,13 +212,15 @@ export default function DashboardPage() {
       >
         <button
           type="button"
-          className={`inline-flex items-center gap-1 transition-colors hover:text-foreground ${active ? "text-foreground" : ""}`}
+          // Browsers set text-transform: none on form controls, so the heading's
+          // uppercase does not reach a button nested inside it.
+          className={`inline-flex items-center gap-1 uppercase tracking-[0.08em] transition-colors hover:text-foreground ${active ? "text-foreground" : ""}`}
           onClick={() => handleSort(col)}
         >
           {label}
           {active && (sortDir === "asc"
-            ? <ArrowUp className="h-4 w-4" />
-            : <ArrowDown className="h-4 w-4" />)}
+            ? <ArrowUp className="h-3 w-3" />
+            : <ArrowDown className="h-3 w-3" />)}
         </button>
       </TableHead>
     );
@@ -288,13 +289,13 @@ export default function DashboardPage() {
           if (e.key === "Escape") setRenamingId(null);
         }}
         onClick={(e) => e.stopPropagation()}
-        aria-label="File name" className="h-8 max-w-xs"
+        aria-label="File name" className="h-7 max-w-xs font-mono text-[13px]"
       />
     ) : (
       <Link
         href={`/workspace?file_id=${file.id}`}
         onClick={(e) => e.stopPropagation()}
-        className="font-medium underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+        className="rounded-sm font-mono text-[13px] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
       >
         {file.name}
       </Link>
@@ -302,12 +303,12 @@ export default function DashboardPage() {
 
   return (
     <AuthGuard>
-      <div className="mx-auto max-w-6xl px-4 pb-16 pt-8 sm:px-6">
-        <div className="mb-6 flex items-center justify-between">
+      <div className="mx-auto max-w-7xl px-4 pb-16 pt-8 sm:px-6">
+        <div className="mb-6 flex items-end justify-between gap-4">
           <div>
             <h1 className="text-xl font-semibold tracking-tight">Files</h1>
-            <p className="mt-0.5 text-sm text-muted-foreground">
-              {total} file{total !== 1 ? "s" : ""}
+            <p className="mt-1 font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
+              <span className="tabular-nums">{total.toLocaleString()}</span> file{total !== 1 ? "s" : ""}
             </p>
           </div>
           <Button
@@ -357,7 +358,7 @@ export default function DashboardPage() {
         )}
 
         {!loading && loadError && (
-          <div className="rounded-xl border border-destructive/30 bg-destructive/5 py-12 text-center">
+          <div className="rounded-md border border-destructive/30 bg-destructive/5 py-12 text-center">
             <p className="font-medium text-destructive-text">Couldn&apos;t load your files</p>
             <p className="mt-1 text-sm text-muted-foreground">Check your connection and try again.</p>
             <Button variant="outline" className="mt-4" onClick={fetchFiles}>
@@ -367,7 +368,7 @@ export default function DashboardPage() {
         )}
 
         {!loading && !loadError && files.length === 0 && (
-          <div className="rounded-xl border border-dashed py-8">
+          <div className="rounded-md border border-dashed py-8">
             {search ? (
               <EmptyState
                 variant="search"
@@ -394,13 +395,14 @@ export default function DashboardPage() {
         )}
 
         {!loading && !loadError && files.length > 0 && view === "list" && (
-          <div className="overflow-hidden rounded-xl border bg-card shadow-xs">
+          <div className="overflow-hidden rounded-md border bg-card">
             <Table>
               <TableHeader>
                 <TableRow>
                   {sortableHead("Name", "name")}
                   <TableHead className="w-24 text-right">Size</TableHead>
-                  {sortableHead("Rows", "row_count", "w-28 text-right")}
+                  {sortableHead("Rows", "row_count", "w-24 text-right")}
+                  <TableHead className="w-20 text-right">Cols</TableHead>
                   {sortableHead("Created", "created_at", "w-32")}
                   <TableHead className="w-12" />
                 </TableRow>
@@ -415,17 +417,24 @@ export default function DashboardPage() {
                     <TableCell className="flex items-center gap-2.5">
                       <FileSpreadsheet className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
                       {nameCell(file)}
-                      <Badge variant="outline" className="uppercase text-[10px]">
+                      {/* The format is a property of the file, not a status, so
+                          it wears the grid's type-mark treatment, not a pill. */}
+                      <span className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
                         {file.original_format}
-                      </Badge>
+                      </span>
                     </TableCell>
-                    <TableCell className="text-right tabular-nums text-muted-foreground">
+                    <TableCell className="text-right font-mono text-xs tabular-nums text-muted-foreground">
                       {formatBytes(file.size_bytes)}
                     </TableCell>
-                    <TableCell className="text-right tabular-nums text-muted-foreground">
+                    <TableCell className="text-right font-mono text-xs tabular-nums text-muted-foreground">
                       {file.row_count.toLocaleString()}
                     </TableCell>
-                    <TableCell className="text-muted-foreground">{formatDate(file.created_at)}</TableCell>
+                    <TableCell className="text-right font-mono text-xs tabular-nums text-muted-foreground">
+                      {file.column_count.toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-xs tabular-nums text-muted-foreground">
+                      {formatDate(file.created_at)}
+                    </TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>{rowActions(file)}</TableCell>
                   </TableRow>
                 ))}
@@ -439,25 +448,25 @@ export default function DashboardPage() {
             {gridFiles.map((file) => (
               <div
                 key={file.id}
-                className="group cursor-pointer rounded-xl border bg-card p-5 shadow-xs transition-shadow hover:shadow-md"
+                className="group cursor-pointer rounded-md border bg-card p-4 transition-colors hover:border-primary/40 hover:bg-accent/40"
                 onClick={() => handleOpen(file.id)}
               >
                 <div className="mb-3 flex items-start justify-between">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
-                    <FileSpreadsheet className="h-5 w-5 text-muted-foreground" />
+                  <div className="flex h-8 w-8 items-center justify-center rounded border bg-muted/60">
+                    <FileSpreadsheet className="h-4 w-4 text-muted-foreground" />
                   </div>
-                  <div className="flex items-center gap-1">
-                    <Badge variant="outline" className="uppercase text-[10px]">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
                       {file.original_format}
-                    </Badge>
+                    </span>
                     {rowActions(file)}
                   </div>
                 </div>
-                <div className="mb-1 truncate text-sm font-medium">{nameCell(file)}</div>
-                <p className="text-xs tabular-nums text-muted-foreground">
-                  {file.row_count.toLocaleString()} rows · {file.column_count.toLocaleString()} cols · {formatBytes(file.size_bytes)}
+                <div className="mb-1.5 truncate text-sm">{nameCell(file)}</div>
+                <p className="font-mono text-[11px] tabular-nums text-muted-foreground">
+                  {file.row_count.toLocaleString()} × {file.column_count.toLocaleString()} · {formatBytes(file.size_bytes)}
                 </p>
-                <p className="mt-0.5 text-xs text-muted-foreground">{formatDate(file.created_at)}</p>
+                <p className="mt-0.5 text-[11px] tabular-nums text-muted-foreground">{formatDate(file.created_at)}</p>
               </div>
             ))}
           </div>

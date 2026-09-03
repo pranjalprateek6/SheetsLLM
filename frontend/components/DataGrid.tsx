@@ -309,7 +309,7 @@ export default function DataGrid({
               {head.map((_, i) => (
                 <th
                   key={i}
-                  className="px-2 py-0.5 text-center font-mono text-[10px] font-normal text-muted-foreground/70 border-r border-border/60 last:border-r-0"
+                  className="px-2 py-0.5 text-center font-mono text-[10px] font-normal text-muted-foreground border-r border-border/60 last:border-r-0"
                   style={{ width: colWidths[head[i]] || 140 }}
                 >
                   {colLetter(i)}
@@ -441,7 +441,7 @@ export default function DataGrid({
                       className="border-b border-border/60 transition-colors"
                       style={{ height: virtualRow.size }}
                     >
-                      <td className="w-[46px] min-w-[46px] border-r bg-card text-center font-mono text-[10px] text-muted-foreground/70 tabular-nums select-none sticky left-0 z-[5]">
+                      <td className="w-[46px] min-w-[46px] border-r bg-card text-center font-mono text-[10px] text-muted-foreground tabular-nums select-none sticky left-0 z-[5]">
                         {virtualRow.index + 1}
                       </td>
                       {head.map((h) => {

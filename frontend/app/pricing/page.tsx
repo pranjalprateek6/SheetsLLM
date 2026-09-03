@@ -251,7 +251,7 @@ function PricingContent() {
 
       {/* Personalized entry from a paywall hit */}
       {reason && !isPro && (
-        <div className="mb-8 rounded-xl border border-primary/30 bg-primary/5 p-4 text-center">
+        <div className="mb-8 rounded-lg border border-primary/30 bg-primary/5 p-4 text-center">
           <p className="font-medium">{reason.headline}</p>
           <p className="mt-1 text-sm text-muted-foreground">{reason.sub}</p>
         </div>
@@ -268,7 +268,7 @@ function PricingContent() {
         </div>
       )}
       {awaitingPayment && (
-        <div className="mb-6 flex flex-wrap items-center justify-center gap-3 rounded-lg border bg-card p-3 text-sm shadow-xs">
+        <div className="mb-6 flex flex-wrap items-center justify-center gap-3 rounded-lg border bg-card p-3 text-sm">
           <Loader2 className="h-4 w-4 animate-spin text-primary" />
           <span>
             Complete the payment in the Razorpay tab. This page updates automatically once
@@ -292,7 +292,7 @@ function PricingContent() {
 
       <div className="grid gap-6 md:grid-cols-2">
         {/* Free */}
-        <div className="flex flex-col rounded-2xl border bg-card p-7 shadow-xs">
+        <div className="flex flex-col rounded-lg border bg-card p-7">
           <h2 className="font-medium">Free</h2>
           <p className="mt-2 text-4xl font-semibold tracking-tight">
             ₹0<span className="text-base font-normal text-muted-foreground">/mo</span>
@@ -329,7 +329,7 @@ function PricingContent() {
         </div>
 
         {/* Pro */}
-        <div className="relative flex flex-col rounded-2xl border-2 border-primary bg-card p-7 shadow-md">
+        <div className="relative flex flex-col rounded-lg border border-primary bg-card p-7 ring-1 ring-primary/25">
           <Badge className="absolute -top-3 left-6">Recommended</Badge>
           <h2 className="font-medium">Pro</h2>
           <p className="mt-2 text-4xl font-semibold tracking-tight">
@@ -393,7 +393,7 @@ function PricingContent() {
           </h2>
           <div className="grid gap-4 sm:grid-cols-3">
             {UPGRADE_TIMELINE.map((step) => (
-              <div key={step.title} className="rounded-2xl border bg-card p-5 shadow-xs">
+              <div key={step.title} className="rounded-lg border bg-card p-5">
                 <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
                   <step.icon className="h-4 w-4 text-primary" />
                 </div>
@@ -410,7 +410,7 @@ function PricingContent() {
         <h2 className="mb-6 text-center text-xl font-semibold tracking-tight">
           Compare plans
         </h2>
-        <div className="overflow-hidden rounded-2xl border bg-card shadow-xs">
+        <div className="overflow-hidden rounded-lg border bg-card">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b bg-muted/40 text-left">
@@ -449,7 +449,7 @@ function PricingContent() {
         <h2 className="mb-6 text-center text-xl font-semibold tracking-tight">
           Frequently asked questions
         </h2>
-        <div className="divide-y rounded-2xl border bg-card px-6 shadow-xs">
+        <div className="divide-y rounded-lg border bg-card px-6">
           {FAQ.map((item) => (
             <details key={item.q} className="group py-4">
               <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-medium [&::-webkit-details-marker]:hidden">
