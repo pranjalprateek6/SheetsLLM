@@ -20,7 +20,9 @@ def _get_gemini_client():
             api_key=GEMINI_API_KEY,
             # Without an explicit timeout the SDK can hang indefinitely on a
             # stalled connection and pin its worker thread forever (value ms).
-            http_options=types.HttpOptions(timeout=60_000),
+            # 40s keeps two attempts (40 + 2s backoff + 40) inside the 90s
+            # /chat and /transform route budgets in main.py.
+            http_options=types.HttpOptions(timeout=40_000),
         )
     return _GEMINI_CLIENT
 

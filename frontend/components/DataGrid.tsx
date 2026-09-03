@@ -1,11 +1,50 @@
 "use client";
 import { useRef, useState, useMemo, useCallback, useEffect } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { ArrowUp, ArrowDown, Check, Rows3, Rows4 } from "lucide-react";
+import {
+  ArrowDown, ArrowUp, Calendar, Check, ChevronDown, Hash, Rows3, Rows4,
+  ChefHat, ToggleLeft, Type,
+} from "lucide-react";
 import { TextShimmer } from "@/components/ui/text-shimmer";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 type SortDir = "asc" | "desc" | null;
 type Density = "compact" | "comfortable";
+
+export type ColumnMeta = {
+  dtype?: string;
+  null_pct?: number;
+  unique_count?: number;
+};
+
+const NUMERIC_RE = /INT|DOUBLE|FLOAT|DECIMAL|NUMERIC|REAL|HUGEINT/;
+
+/** dtype → a small glyph so the header tells you what a column IS at a
+ *  glance (numbers, text, dates, booleans) without opening the schema. */
+function TypeGlyph({ dtype }: { dtype?: string }) {
+  if (!dtype) return null;
+  const t = dtype.toUpperCase();
+  const cls = "h-3 w-3 flex-shrink-0 text-muted-foreground";
+  if (NUMERIC_RE.test(t)) return <Hash className={cls} aria-label="number" />;
+  if (/DATE|TIME/.test(t)) return <Calendar className={cls} aria-label="date" />;
+  if (/BOOL/.test(t)) return <ToggleLeft className={cls} aria-label="boolean" />;
+  return <Type className={cls} aria-label="text" />;
+}
+
+/** Text-measurement for double-click column auto-fit. */
+let _measureCtx: CanvasRenderingContext2D | null = null;
+function measureText(text: string, font: string): number {
+  if (!_measureCtx) {
+    _measureCtx = document.createElement("canvas").getContext("2d");
+  }
+  if (!_measureCtx) return text.length * 7;
+  _measureCtx.font = font;
+  return _measureCtx.measureText(text).width;
+}
+
 
 const DENSITY_KEY = "sllm_grid_density";
 const ROW_HEIGHT: Record<Density, number> = { compact: 36, comfortable: 44 };
@@ -25,19 +64,44 @@ export default function DataGrid({
   rows,
   loading,
   onSort,
+  columnMeta,
+  highlightCols,
+  totalRows,
+  stepCount,
+  onAskColumn,
+  onAskChef,
+  scrollToCol,
+  onColumnWidths,
 }: {
   columns: string[];
   rows: Record<string, unknown>[];
   loading: boolean;
   onSort?: (column: string, direction: "asc" | "desc") => void;
+  /** Per-column dtype/null stats from the file schema (best-effort). */
+  columnMeta?: Record<string, ColumnMeta>;
+  /** Columns the last transform added; briefly tinted so changes are visible. */
+  highlightCols?: string[];
+  /** True total row count of the result (rows[] is a capped preview). */
+  totalRows?: number;
+  stepCount?: number;
+  /** Bridge into Chef: prefill the chat with a question about a column. */
+  onAskColumn?: (column: string) => void;
+  /** Bridge into Chef with arbitrary prefilled text (quick-filter escalation). */
+  onAskChef?: (text: string) => void;
+  /** Scroll a column into view (schema panel jump); nonce re-triggers. */
+  scrollToCol?: { name: string; nonce: number } | null;
+  /** Effective width per column, so a caller can align a strip to the grid. */
+  onColumnWidths?: (widths: Record<string, number>) => void;
 }) {
   const head = columns ?? [];
   const parentRef = useRef<HTMLDivElement>(null);
+
   const [sortCol, setSortCol] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>(null);
   const [copiedCell, setCopiedCell] = useState<string | null>(null);
   const [colWidths, setColWidths] = useState<Record<string, number>>({});
   const [density, setDensity] = useState<Density>("compact");
+
 
   // Read persisted density after mount (avoids SSR/client hydration mismatch).
   useEffect(() => {
@@ -54,6 +118,62 @@ export default function DataGrid({
       window.localStorage.setItem(DENSITY_KEY, d);
     } catch {}
   }, []);
+
+  const [filterQ, setFilterQ] = useState("");
+
+  // Publish the widths the grid actually RENDERS. The declared width is only a
+  // request: tableLayout:fixed with min-w-full redistributes any spare space,
+  // so a strip aligned to the declared value would not line up with the grid.
+  const headRowRef = useRef<HTMLTableRowElement>(null);
+  useEffect(() => {
+    if (!onColumnWidths) return;
+    const measure = () => {
+      const row = headRowRef.current;
+      if (!row) return;
+      // cell 0 is the row-number gutter; the rest map 1:1 onto head
+      const cells = Array.from(row.children).slice(1) as HTMLElement[];
+      const w: Record<string, number> = {};
+      cells.forEach((cell, i) => {
+        const name = head[i];
+        if (name) w[name] = cell.getBoundingClientRect().width;
+      });
+      if (Object.keys(w).length) onColumnWidths(w);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    if (headRowRef.current) ro.observe(headRowRef.current);
+    if (parentRef.current) ro.observe(parentRef.current);
+    return () => ro.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [head.join("|"), colWidths, density, onColumnWidths]);
+
+  // A column reads as numeric if its schema dtype says so, or (for
+  // transform-created columns with no schema yet) its first value is a number.
+  // Numbers right-align so decimal places line up for comparison.
+  const numericCols = useMemo(() => {
+    const set = new Set<string>();
+    const first = rows[0];
+    for (const h of head) {
+      const dtype = columnMeta?.[h]?.dtype;
+      if ((dtype && NUMERIC_RE.test(dtype.toUpperCase())) || (first && typeof first[h] === "number")) {
+        set.add(h);
+      }
+    }
+    return set;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [head.join("|"), columnMeta, rows[0]]);
+
+  // Added-column tint fades after a few seconds so the grid returns to calm.
+  const [freshCols, setFreshCols] = useState<string[]>([]);
+  useEffect(() => {
+    if (highlightCols?.length) {
+      setFreshCols(highlightCols);
+      const t = setTimeout(() => setFreshCols([]), 6000);
+      return () => clearTimeout(t);
+    }
+    setFreshCols([]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [highlightCols?.join("|")]);
 
   const sortedRows = useMemo(() => {
     if (!sortCol || !sortDir || onSort) return rows;
@@ -72,8 +192,21 @@ export default function DataGrid({
     });
   }, [rows, sortCol, sortDir, onSort]);
 
+  // Quick-filter is an eyeball tool over the loaded preview only; the
+  // status bar says so, and Chef is one click away for a real filter.
+  const visibleRows = useMemo(() => {
+    const q = filterQ.trim().toLowerCase();
+    if (!q) return sortedRows;
+    return sortedRows.filter((row) =>
+      head.some((h) => {
+        const v = row[h];
+        return v != null && String(v).toLowerCase().includes(q);
+      })
+    );
+  }, [sortedRows, filterQ, head]);
+
   const rowVirtualizer = useVirtualizer({
-    count: sortedRows.length,
+    count: visibleRows.length,
     getScrollElement: () => parentRef.current,
     estimateSize: () => ROW_HEIGHT[density],
     overscan: 15,
@@ -129,8 +262,39 @@ export default function DataGrid({
     [colWidths]
   );
 
+  // Double-click the resize handle: fit the column to its content
+  // (measured over the loaded preview, clamped to sane bounds).
+  const handleAutoFit = useCallback(
+    (col: string) => {
+      let max = measureText(col, "500 12px sans-serif") + 44; // name + glyph/menu
+      for (const row of rows.slice(0, 300)) {
+        const v = row[col];
+        const text = v == null ? "NULL" : String(v);
+        const w = measureText(text, "12px monospace") + 20;
+        if (w > max) max = w;
+      }
+      setColWidths((prev) => ({ ...prev, [col]: Math.min(420, Math.max(60, Math.ceil(max))) }));
+    },
+    [rows]
+  );
+
+  // Scroll a column into view (schema panel jump) and flash it briefly
+  const [flashCol, setFlashCol] = useState<string | null>(null);
+  useEffect(() => {
+    if (!scrollToCol?.name) return;
+    const idx = head.indexOf(scrollToCol.name);
+    if (idx === -1 || !parentRef.current) return;
+    let left = 50; // row-number gutter
+    for (let i = 0; i < idx; i++) left += colWidths[head[i]] || 140;
+    parentRef.current.scrollTo({ left: Math.max(0, left - 80), behavior: "smooth" });
+    setFlashCol(scrollToCol.name);
+    const t = setTimeout(() => setFlashCol(null), 1600);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scrollToCol]);
+
   return (
-    <div className="h-full flex flex-col rounded-xl border bg-card overflow-hidden">
+    <div className="flex h-full flex-col overflow-hidden bg-card">
       <div
         ref={parentRef}
         className="overflow-auto flex-1"
@@ -145,7 +309,7 @@ export default function DataGrid({
               {head.map((_, i) => (
                 <th
                   key={i}
-                  className="px-2 py-1 text-center text-[11px] font-normal text-muted-foreground"
+                  className="px-2 py-0.5 text-center font-mono text-[10px] font-normal text-muted-foreground border-r border-border/60 last:border-r-0"
                   style={{ width: colWidths[head[i]] || 140 }}
                 >
                   {colLetter(i)}
@@ -153,45 +317,110 @@ export default function DataGrid({
               ))}
             </tr>
             {/* Column name row */}
-            <tr className="border-b bg-muted/50">
+            <tr ref={headRowRef} className="border-b bg-muted/50">
               <th className="w-[50px] min-w-[50px] sticky left-0 z-20 [background:linear-gradient(hsl(var(--muted)/.5),hsl(var(--muted)/.5)),hsl(var(--card))]">&nbsp;</th>
-              {head.map((h) => (
-                <th
-                  key={h}
-                  className="h-10 px-2 text-left text-xs font-medium text-muted-foreground whitespace-nowrap relative select-none group"
-                  style={{ width: colWidths[h] || 140 }}
-                >
-                  <button
-                    className="inline-flex items-center gap-1.5 hover:text-foreground transition-colors"
-                    onClick={() => handleSort(h)}
+              {head.map((h) => {
+                const meta = columnMeta?.[h];
+                const nullPct = meta?.null_pct ?? 0;
+                const highlighted = freshCols.includes(h) || flashCol === h;
+                const numeric = numericCols.has(h);
+                return (
+                  <th
+                    key={h}
+                    className={`h-9 px-2 font-mono text-[11px] font-medium text-muted-foreground whitespace-nowrap relative select-none group border-r border-border/60 last:border-r-0 ${
+                      numeric ? "text-right" : "text-left"
+                    } ${highlighted ? "bg-primary/[0.06]" : ""}`}
+                    style={{ width: colWidths[h] || 140 }}
                   >
-                    <span className="truncate max-w-[120px]">{h}</span>
-                    {sortCol === h && sortDir === "asc" && <ArrowUp className="h-3 w-3 flex-shrink-0 text-primary" />}
-                    {sortCol === h && sortDir === "desc" && <ArrowDown className="h-3 w-3 flex-shrink-0 text-primary" />}
-                  </button>
-                  <div
-                    className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-primary/40 opacity-0 group-hover:opacity-100 transition-opacity"
-                    onMouseDown={(e) => handleResizeStart(h, e)}
-                  />
-                </th>
-              ))}
+                    <div className={`flex items-center gap-1.5 ${numeric ? "justify-end" : ""}`}>
+                      <TypeGlyph dtype={meta?.dtype} />
+                      <button
+                        className="inline-flex h-full min-h-6 min-w-6 items-center gap-1.5 transition-colors hover:text-foreground"
+                        onClick={() => handleSort(h)}
+                        title={
+                          meta
+                            ? `${h}${meta.dtype ? ` · ${meta.dtype}` : ""}${nullPct > 0 ? ` · ${nullPct}% nulls` : ""}`
+                            : h
+                        }
+                      >
+                        <span className="truncate max-w-[110px]">{h}</span>
+                        {freshCols.includes(h) && (
+                          <span className="flex-shrink-0 rounded bg-primary/15 px-1 py-px text-[8px] font-bold tracking-wider text-primary">
+                            NEW
+                          </span>
+                        )}
+                        {nullPct > 0 && (
+                          <span
+                            className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-warning"
+                            aria-label={`${nullPct}% null values`}
+                          />
+                        )}
+                        {sortCol === h && sortDir === "asc" && <ArrowUp className="h-3 w-3 flex-shrink-0 text-primary" />}
+                        {sortCol === h && sortDir === "desc" && <ArrowDown className="h-3 w-3 flex-shrink-0 text-primary" />}
+                      </button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            className="relative flex h-4 w-4 items-center justify-center rounded opacity-0 transition-opacity after:absolute after:-inset-[5px] after:content-[''] hover:bg-accent focus-visible:opacity-100 group-hover:opacity-100 data-[state=open]:opacity-100"
+                            aria-label={`Column menu for ${h}`}
+                          >
+                            <ChevronDown className="h-3 w-3" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" className="w-52">
+                          {meta && (
+                            <>
+                              <div className="px-2 py-1.5 text-xs text-muted-foreground">
+                                {meta.dtype ?? "unknown type"}
+                                {typeof meta.unique_count === "number" && ` · ${meta.unique_count.toLocaleString()} unique`}
+                                {nullPct > 0 && ` · ${nullPct}% nulls`}
+                              </div>
+                              <DropdownMenuSeparator />
+                            </>
+                          )}
+                          <DropdownMenuItem onClick={() => { setSortCol(h); setSortDir("asc"); onSort?.(h, "asc"); }}>
+                            <ArrowUp className="mr-2 h-3.5 w-3.5" /> Sort ascending
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => { setSortCol(h); setSortDir("desc"); onSort?.(h, "desc"); }}>
+                            <ArrowDown className="mr-2 h-3.5 w-3.5" /> Sort descending
+                          </DropdownMenuItem>
+                          {onAskColumn && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => onAskColumn(h)}>
+                                <ChefHat className="mr-2 h-3.5 w-3.5 text-primary" /> Ask Chef about this column
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                    <div
+                      className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-primary/40 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onMouseDown={(e) => handleResizeStart(h, e)}
+                      onDoubleClick={() => handleAutoFit(h)}
+                      title="Drag to resize; double-click to fit"
+                    />
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody>
             {/* Spacer after header */}
             <tr className="h-2" />
           </tbody>
-          <tbody className="[&_tr:hover]:bg-muted/40">
+          <tbody className="[&_tr:hover]:bg-accent">
             {loading ? (
               <tr>
                 <td className="px-3 py-8 text-center" colSpan={head.length + 1}>
                   <TextShimmer className="text-sm" duration={1.2}>Loading data...</TextShimmer>
                 </td>
               </tr>
-            ) : sortedRows.length === 0 ? (
+            ) : visibleRows.length === 0 ? (
               <tr>
                 <td className="px-3 py-8 text-center text-sm text-muted-foreground" colSpan={head.length + 1}>
-                  No data
+                  {filterQ ? "No preview rows match the filter" : "No data"}
                 </td>
               </tr>
             ) : (
@@ -205,36 +434,40 @@ export default function DataGrid({
                   </tr>
                 )}
                 {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                  const row = sortedRows[virtualRow.index];
+                  const row = visibleRows[virtualRow.index];
                   return (
                     <tr
                       key={virtualRow.index}
-                      className="transition-colors"
+                      className="border-b border-border/60 transition-colors"
                       style={{ height: virtualRow.size }}
                     >
-                      <td className="w-[50px] min-w-[50px] text-center text-[11px] text-muted-foreground tabular-nums select-none sticky left-0 z-[5] bg-card">
+                      <td className="w-[46px] min-w-[46px] border-r bg-card text-center font-mono text-[10px] text-muted-foreground tabular-nums select-none sticky left-0 z-[5]">
                         {virtualRow.index + 1}
                       </td>
                       {head.map((h) => {
                         const val = row[h];
                         const isNull = val === null || val === undefined;
                         const cellKey = `${virtualRow.index}-${h}`;
+                        const highlighted = freshCols.includes(h) || flashCol === h;
+                        const numeric = numericCols.has(h);
                         return (
                           <td
                             key={h}
-                            className={`px-2 ${density === "comfortable" ? "py-2" : "py-1"} align-middle text-xs text-foreground cursor-pointer relative`}
+                            className={`px-2 ${density === "comfortable" ? "py-2" : "py-1"} align-middle text-xs text-foreground cursor-pointer relative border-r border-border/40 last:border-r-0 ${
+                              numeric ? "text-right" : "text-left"
+                            } ${highlighted ? "bg-primary/[0.05]" : ""}`}
                             onClick={() => handleCopy(isNull ? "" : String(val), cellKey)}
                             title={isNull ? "NULL" : String(val)}
                           >
                             {isNull ? (
-                              <span className="text-[11px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground/70 font-mono">
+                              <span className="text-[11px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-mono">
                                 NULL
                               </span>
                             ) : (
-                              <div className="truncate max-w-[200px] font-mono text-xs tabular-nums">{String(val)}</div>
+                              <span className="inline-block max-w-full truncate align-middle font-mono text-xs tabular-nums">{String(val)}</span>
                             )}
                             {copiedCell === cellKey && (
-                              <span className="absolute top-0.5 right-0.5 text-[10px] text-success flex items-center">
+                              <span className="absolute top-0.5 right-0.5 text-[10px] text-success-text flex items-center">
                                 <Check className="h-3 w-3" />
                               </span>
                             )}
@@ -259,10 +492,46 @@ export default function DataGrid({
         </table>
       </div>
       {/* Status bar */}
-      <div className="flex h-7 flex-shrink-0 items-center justify-between border-t bg-card px-3">
-        <span className="text-[11px] tabular-nums text-muted-foreground">
-          {rows.length.toLocaleString()} rows × {head.length.toLocaleString()} cols
+      <div className="flex h-8 flex-shrink-0 items-center justify-between gap-2 border-t bg-card px-3">
+        <span className="min-w-0 truncate text-[11px] tabular-nums text-muted-foreground">
+          {filterQ.trim()
+            ? `${visibleRows.length.toLocaleString()} of ${rows.length.toLocaleString()} preview rows match`
+            : typeof totalRows === "number" && totalRows > rows.length
+              ? `First ${rows.length.toLocaleString()} of ${totalRows.toLocaleString()} rows`
+              : `${rows.length.toLocaleString()} rows`}
+          {!filterQ.trim() && ` × ${head.length.toLocaleString()} cols`}
+          {!filterQ.trim() && typeof stepCount === "number" && stepCount > 0 && ` · step ${stepCount}`}
         </span>
+        <div className="flex items-center gap-2">
+          {filterQ.trim() && onAskChef && (
+            <button
+              type="button"
+              onClick={() => onAskChef(`Keep only rows where any column contains "${filterQ.trim()}"`)}
+              className="inline-flex h-6 items-center gap-1 whitespace-nowrap text-[11px] font-medium text-primary underline-offset-2 hover:underline"
+              title="Turn this preview filter into a real transform"
+            >
+              <ChefHat className="h-3 w-3" /> Filter all rows with Chef
+            </button>
+          )}
+          <input
+            type="text"
+            value={filterQ}
+            onChange={(e) => setFilterQ(e.target.value)}
+            placeholder="Filter preview…"
+            aria-label="Filter the loaded preview rows"
+            className="h-6 w-32 rounded border bg-background px-1.5 text-[11px] outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-ring/40"
+          />
+          {filterQ && (
+            <button
+              type="button"
+              onClick={() => setFilterQ("")}
+              className="flex h-6 w-6 items-center justify-center rounded text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground"
+              aria-label="Clear filter"
+            >
+              ✕
+            </button>
+          )}
+        </div>
         <div
           className="flex items-center gap-0.5 rounded-md bg-muted p-0.5"
           role="group"
@@ -274,7 +543,7 @@ export default function DataGrid({
             aria-label="Compact rows"
             aria-pressed={density === "compact"}
             onClick={() => changeDensity("compact")}
-            className={`flex h-5 w-6 items-center justify-center rounded transition-colors ${
+            className={`flex h-6 w-7 items-center justify-center rounded transition-colors ${
               density === "compact"
                 ? "bg-card text-foreground shadow-xs"
                 : "text-muted-foreground hover:text-foreground"
@@ -288,7 +557,7 @@ export default function DataGrid({
             aria-label="Comfortable rows"
             aria-pressed={density === "comfortable"}
             onClick={() => changeDensity("comfortable")}
-            className={`flex h-5 w-6 items-center justify-center rounded transition-colors ${
+            className={`flex h-6 w-7 items-center justify-center rounded transition-colors ${
               density === "comfortable"
                 ? "bg-card text-foreground shadow-xs"
                 : "text-muted-foreground hover:text-foreground"

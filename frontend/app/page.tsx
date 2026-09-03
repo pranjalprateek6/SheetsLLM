@@ -48,7 +48,7 @@ const STEPS = [
     icon: MessageSquare,
     step: "2",
     title: "Describe the cleanup",
-    body: "“Remove duplicates, fix the dates, total by region.” Sage writes validated, read-only SQL and shows you the result live.",
+    body: "“Remove duplicates, fix the dates, total by region.” Chef writes validated, read-only SQL and shows you the result live.",
   },
   {
     icon: RefreshCw,
@@ -142,7 +142,7 @@ export default function LandingPage() {
         <div className="mx-auto grid max-w-5xl gap-8 px-4 py-16 sm:grid-cols-3 sm:px-6 sm:py-20">
           {PILLARS.map((p, i) => (
             <motion.div key={p.title} {...fadeUp} transition={{ ...fadeUp.transition, delay: 0.06 * i }}>
-              <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg border bg-background shadow-xs">
+              <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg border bg-background">
                 <p.icon className="h-5 w-5 text-primary" />
               </div>
               <h3 className="font-medium">{p.title}</h3>
@@ -166,10 +166,10 @@ export default function LandingPage() {
               key={s.step}
               {...fadeUp}
               transition={{ ...fadeUp.transition, delay: 0.08 * i }}
-              className="rounded-2xl border bg-card p-6 shadow-xs"
+              className="rounded-lg border bg-card p-6"
             >
               <div className="mb-4 flex items-center gap-3">
-                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary-accent">
                   {s.step}
                 </span>
                 <s.icon className="h-5 w-5 text-muted-foreground" />
@@ -186,7 +186,7 @@ export default function LandingPage() {
         <div className="mx-auto max-w-5xl px-4 py-20 sm:px-6 sm:py-24">
           <motion.div {...fadeUp} className="mb-10 text-center">
             <h2 className="text-3xl font-semibold tracking-tight">
-              Your data on the left, Sage on the right
+              Your data on the left, Chef on the right
             </h2>
             <p className="mx-auto mt-3 max-w-xl text-muted-foreground">
               A live grid of your file next to a chat that edits it. Every change previews
@@ -203,7 +203,7 @@ export default function LandingPage() {
       <section id="privacy" className="border-t bg-card">
         <div className="mx-auto grid max-w-5xl items-center gap-10 px-4 py-20 sm:px-6 sm:py-24 md:grid-cols-2">
           <motion.div {...fadeUp}>
-            <div className="mb-3 inline-flex items-center gap-1.5 rounded-full border bg-background px-3 py-1 text-xs font-medium text-success shadow-xs">
+            <div className="mb-3 inline-flex items-center gap-1.5 rounded-full border bg-background px-3 py-1 text-xs font-medium text-success-text">
               <ShieldCheck className="h-3.5 w-3.5" /> Privacy first
             </div>
             <h2 className="text-3xl font-semibold tracking-tight">
@@ -220,7 +220,7 @@ export default function LandingPage() {
             </p>
           </motion.div>
           <motion.div {...fadeUp} transition={{ ...fadeUp.transition, delay: 0.1 }}>
-            <div className="rounded-2xl border bg-card p-6 shadow-md">
+            <div className="rounded-lg border bg-card p-6">
               <p className="mb-3 text-xs font-medium text-muted-foreground">WHAT THE AI SEES</p>
               <div className="flex flex-wrap gap-2">
                 {SCHEMA_CHIPS.map(([name, type]) => (
@@ -256,7 +256,7 @@ export default function LandingPage() {
       <section className="mx-auto max-w-5xl px-4 py-20 sm:px-6 sm:py-24">
         <div className="grid items-center gap-10 md:grid-cols-2">
           <motion.div {...fadeUp} className="order-2 md:order-1">
-            <div className="rounded-2xl border bg-card p-6 shadow-md">
+            <div className="rounded-lg border bg-card p-6">
               <p className="mb-4 text-xs font-medium text-muted-foreground">STEP 2 OF 3</p>
               <div className="space-y-3 text-sm">
                 <div className="rounded-lg bg-muted/60 px-3 py-2">
@@ -274,7 +274,7 @@ export default function LandingPage() {
                   <span className="rounded-lg bg-muted/60 px-3 py-2 text-xs tabular-nums">
                     <span className="text-muted-foreground">after</span> 4,982
                   </span>
-                  <span className="rounded-lg border border-success/30 bg-success/5 px-3 py-2 text-xs font-medium text-success">
+                  <span className="rounded-lg border border-success/30 bg-success/5 px-3 py-2 text-xs font-medium text-success-text">
                     Reversible
                   </span>
                 </div>
@@ -282,7 +282,7 @@ export default function LandingPage() {
             </div>
           </motion.div>
           <motion.div {...fadeUp} transition={{ ...fadeUp.transition, delay: 0.1 }} className="order-1 md:order-2">
-            <div className="mb-3 inline-flex items-center gap-1.5 rounded-full border bg-background px-3 py-1 text-xs font-medium shadow-xs">
+            <div className="mb-3 inline-flex items-center gap-1.5 rounded-full border bg-background px-3 py-1 text-xs font-medium">
               <History className="h-3.5 w-3.5" /> Audit trail
             </div>
             <h2 className="text-3xl font-semibold tracking-tight">Show your work</h2>
@@ -302,7 +302,7 @@ export default function LandingPage() {
       <section className="px-4 pb-24 sm:px-6">
         <motion.div
           {...fadeUp}
-          className="relative mx-auto max-w-4xl overflow-hidden rounded-3xl border p-12 text-center shadow-md"
+          className="relative mx-auto max-w-4xl overflow-hidden rounded-lg border p-12 text-center"
         >
           <div aria-hidden className="absolute inset-0 -z-10 bg-gradient-brand opacity-[0.06]" />
           <FileSpreadsheet className="mx-auto mb-4 h-8 w-8 text-primary" />

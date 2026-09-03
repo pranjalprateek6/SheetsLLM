@@ -57,13 +57,13 @@ export default function HeroDemo() {
       {/* soft gradient glow behind the card */}
       <div className="absolute -inset-6 -z-10 rounded-[2rem] bg-gradient-brand opacity-[0.07] blur-2xl" />
 
-      <div className="overflow-hidden rounded-2xl border bg-card shadow-lg">
+      <div className="overflow-hidden rounded-lg border bg-card shadow-lg">
         {/* window chrome */}
         <div className="flex items-center gap-2 border-b bg-muted/50 px-4 py-2.5">
           <span className="h-2.5 w-2.5 rounded-full bg-border" />
           <span className="h-2.5 w-2.5 rounded-full bg-border" />
           <span className="h-2.5 w-2.5 rounded-full bg-border" />
-          <span className="ml-3 rounded-md bg-background px-2.5 py-1 font-mono text-[11px] text-muted-foreground shadow-xs">
+          <span className="ml-3 rounded-md bg-background px-2.5 py-1 font-mono text-[11px] text-muted-foreground">
             march_orders.csv
           </span>
           <AnimatePresence>
@@ -72,7 +72,7 @@ export default function HeroDemo() {
                 initial={{ opacity: 0, y: -4 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0 }}
-                className="ml-auto inline-flex items-center gap-1 rounded-full bg-success/10 px-2.5 py-1 text-[11px] font-medium text-success"
+                className="ml-auto inline-flex items-center gap-1 rounded-full bg-success/10 px-2.5 py-1 text-[11px] font-medium text-success-text"
               >
                 <Check className="h-3 w-3" /> 3 steps applied
               </motion.span>
@@ -99,11 +99,11 @@ export default function HeroDemo() {
                     key={r.id}
                     className={cn(
                       "grid grid-cols-[1fr_1.2fr_0.9fr_1fr] gap-x-3 border-b border-border/50 py-1.5 font-mono text-xs",
-                      r.dup && "bg-destructive/5 text-destructive/80"
+                      r.dup && "bg-destructive/5 text-destructive-text/80"
                     )}
                   >
                     <span>{r.a}</span>
-                    <span className={cn(r.bad && "text-warning")}>{r.b}</span>
+                    <span className={cn(r.bad && "text-warning-text")}>{r.b}</span>
                     <span>{r.c}</span>
                     <span className="text-right tabular-nums">{r.d}</span>
                   </div>
@@ -151,7 +151,7 @@ export default function HeroDemo() {
 
         {/* instruction bar */}
         <div className="border-t bg-muted/40 px-4 py-3">
-          <div className="flex items-center gap-2 rounded-lg border bg-background px-3 py-2 shadow-xs">
+          <div className="flex items-center gap-2 rounded-lg border bg-background px-3 py-2">
             <span className="min-h-[1rem] flex-1 text-xs text-foreground/80">
               {shown === "messy" ? (
                 <span className="text-muted-foreground">Describe your cleanup…</span>

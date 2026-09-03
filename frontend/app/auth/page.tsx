@@ -62,10 +62,15 @@ function AuthContent() {
     const desc =
       searchParams.get("error_description") || hash.get("error_description");
     if (desc) {
+      // Never render the raw parameter: it is attacker-controlled and would
+      // appear as a first-party SheetsLLM notice. Map what we recognise and
+      // fall back to a fixed string.
       setError(
         /provider is not enabled/i.test(desc)
           ? "Google sign-in isn't available yet. Use email and password for now."
-          : desc.replace(/\+/g, " ")
+          : /access.?denied|cancelled/i.test(desc)
+            ? "Sign-in was cancelled. Try again when you're ready."
+            : "Sign-in didn't complete. Try again, or use email and password."
       );
     }
   }, [searchParams]);
@@ -173,10 +178,10 @@ function AuthContent() {
           <span className="text-lg font-semibold tracking-tight">SheetsLLM</span>
         </Link>
 
-        <div className="rounded-2xl border bg-card p-8 shadow-sm">
+        <div className="rounded-lg border bg-card p-8">
           {confirmationSent ? (
             <div className="text-center">
-              <MailCheck className="mx-auto mb-3 h-8 w-8 text-success" />
+              <MailCheck className="mx-auto mb-3 h-8 w-8 text-success-text" />
               <h1 className="text-xl font-semibold tracking-tight">Check your email</h1>
               <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
                 We sent a confirmation link to <span className="font-medium text-foreground">{email}</span>.
@@ -193,14 +198,14 @@ function AuthContent() {
                 {mode === "signin" ? (
                   <>
                     New to SheetsLLM?{" "}
-                    <button onClick={() => switchMode("signup")} className="font-medium text-primary hover:underline">
+                    <button onClick={() => switchMode("signup")} className="font-medium text-primary-accent hover:underline">
                       Create an account
                     </button>
                   </>
                 ) : mode === "signup" ? (
                   <>
                     Describe a cleanup once, keep it forever.{" "}
-                    <button onClick={() => switchMode("signin")} className="font-medium text-primary hover:underline">
+                    <button onClick={() => switchMode("signin")} className="font-medium text-primary-accent hover:underline">
                       I have an account
                     </button>
                   </>
@@ -255,7 +260,7 @@ function AuthContent() {
                         <button
                           type="button"
                           onClick={() => switchMode("forgot")}
-                          className="text-xs font-medium text-primary hover:underline"
+                          className="text-xs font-medium text-primary-accent hover:underline"
                         >
                           Forgot password?
                         </button>
@@ -275,7 +280,7 @@ function AuthContent() {
                       <p
                         className={cn(
                           "flex items-center gap-1.5 text-xs transition-colors",
-                          passwordLongEnough ? "text-success" : "text-muted-foreground"
+                          passwordLongEnough ? "text-success-text" : "text-muted-foreground"
                         )}
                         aria-live="polite"
                       >
@@ -287,13 +292,13 @@ function AuthContent() {
                 )}
 
                 {error && (
-                  <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm text-destructive">
+                  <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm text-destructive-text">
                     <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
                     {error}
                   </div>
                 )}
                 {success && (
-                  <div className="flex items-start gap-2 rounded-lg border border-success/30 bg-success/5 px-3 py-2.5 text-sm text-success">
+                  <div className="flex items-start gap-2 rounded-lg border border-success/30 bg-success/5 px-3 py-2.5 text-sm text-success-text">
                     <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0" />
                     {success}
                   </div>

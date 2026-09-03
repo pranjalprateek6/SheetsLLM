@@ -8,7 +8,10 @@ import {
   MessageSquare,
   History,
   ArrowRight,
+  BookMarked,
   Command as CommandIcon,
+  FileSpreadsheet,
+  Pencil,
   Sparkles,
 } from "lucide-react";
 
@@ -28,9 +31,12 @@ export default function CommandPalette({
   onUpload,
   onUndo,
   onDownload,
+  onDownloadXlsx,
   onReset,
   onChat,
   onHistory,
+  onSaveRecipe,
+  onRename,
   fileId,
 }: {
   open: boolean;
@@ -38,9 +44,12 @@ export default function CommandPalette({
   onUpload: () => void;
   onUndo: () => void;
   onDownload: () => void;
+  onDownloadXlsx?: () => void;
   onReset: () => void;
   onChat: () => void;
   onHistory: () => void;
+  onSaveRecipe?: () => void;
+  onRename?: () => void;
   fileId?: string;
 }) {
   const router = useRouter();
@@ -81,8 +90,35 @@ export default function CommandPalette({
             onSelect={() => runCommand(onDownload)}
           >
             <Download />
-            <span>Download CSV</span>
+            <span>Export as CSV</span>
           </CommandItem>
+          {fileId && onDownloadXlsx && (
+            <CommandItem
+              keywords={["download", "export", "excel", "xlsx"]}
+              onSelect={() => runCommand(onDownloadXlsx)}
+            >
+              <FileSpreadsheet />
+              <span>Export as Excel</span>
+            </CommandItem>
+          )}
+          {fileId && onSaveRecipe && (
+            <CommandItem
+              keywords={["recipe", "save", "automate", "reuse"]}
+              onSelect={() => runCommand(onSaveRecipe)}
+            >
+              <BookMarked />
+              <span>Save as recipe</span>
+            </CommandItem>
+          )}
+          {fileId && onRename && (
+            <CommandItem
+              keywords={["rename", "name", "file"]}
+              onSelect={() => runCommand(onRename)}
+            >
+              <Pencil />
+              <span>Rename file</span>
+            </CommandItem>
+          )}
           <CommandItem
             keywords={["reset", "clear", "start over"]}
             onSelect={() => runCommand(onReset)}
@@ -91,11 +127,11 @@ export default function CommandPalette({
             <span>Reset file</span>
           </CommandItem>
           <CommandItem
-            keywords={["chat", "talk", "ask"]}
+            keywords={["chat", "talk", "ask", "chef"]}
             onSelect={() => runCommand(onChat)}
           >
             <MessageSquare />
-            <span>Open chat</span>
+            <span>Toggle Chef</span>
           </CommandItem>
           {fileId && (
             <CommandItem

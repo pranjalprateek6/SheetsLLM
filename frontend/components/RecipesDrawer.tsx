@@ -5,7 +5,11 @@ import { BookMarked, Pencil, Play, Trash2, Plus } from "lucide-react";
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
 import EmptyState from "@/components/EmptyState";
 import { markOnboardingStep } from "@/components/GettingStarted";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -197,6 +201,8 @@ export default function RecipesDrawer({
     }
   };
 
+  const [confirmDelete, setConfirmDelete] = useState<Recipe | null>(null);
+
   const deleteRecipe = async (recipe: Recipe) => {
     setError(null);
     try {
@@ -257,8 +263,8 @@ export default function RecipesDrawer({
                     autoFocus
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && saveRecipe()}
-                    placeholder="Recipe name, e.g. Monthly orders cleanup"
+                    onKeyDown={(e) => { if (e.key === "Escape") { e.stopPropagation(); setShowSave(false); } if (e.key === "Enter" && !saving) saveRecipe(); }}
+                    aria-label="Recipe name" placeholder="Recipe name, e.g. Monthly orders cleanup"
                     maxLength={120}
                     className="h-9"
                   />
@@ -306,7 +312,7 @@ export default function RecipesDrawer({
             </div>
           )}
           {error && (
-            <div className="rounded-md border border-destructive/30 bg-destructive/10 p-2.5 text-xs text-destructive">
+            <div className="rounded-md border border-destructive/30 bg-destructive/10 p-2.5 text-xs text-destructive-text">
               {error}
             </div>
           )}
@@ -342,7 +348,7 @@ export default function RecipesDrawer({
                     onChange={(e) => setRenameValue(e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === "Enter") renameRecipe(recipe);
-                      if (e.key === "Escape") setRenamingId(null);
+                      if (e.key === "Escape") { e.stopPropagation(); setRenamingId(null); }
                     }}
                     onBlur={() => !renameSaving && renameRecipe(recipe)}
                     maxLength={120}
@@ -392,8 +398,8 @@ export default function RecipesDrawer({
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
-                  onClick={() => deleteRecipe(recipe)}
+                  className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive-text"
+                  onClick={() => setConfirmDelete(recipe)}
                   aria-label={`Delete ${recipe.name}`}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
@@ -403,6 +409,30 @@ export default function RecipesDrawer({
             </div>
           ))}
         </div>
+        <AlertDialog open={!!confirmDelete} onOpenChange={(o) => !o && setConfirmDelete(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete &ldquo;{confirmDelete?.name}&rdquo;?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This recipe and its steps are removed for good. Files you already
+                transformed with it are not affected.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Keep it</AlertDialogCancel>
+              <AlertDialogAction
+                className={buttonVariants({ variant: "destructive" })}
+                onClick={() => {
+                  const r = confirmDelete;
+                  setConfirmDelete(null);
+                  if (r) deleteRecipe(r);
+                }}
+              >
+                Delete recipe
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </SheetContent>
     </Sheet>
   );

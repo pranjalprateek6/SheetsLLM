@@ -3,40 +3,52 @@
 @tailwind utilities;
 
 /* ── Design tokens (see DESIGN.md) ─────────────────────────────────────
-   Light is the default. `.dark` is defined for future use but not yet
-   exposed in the UI. All colors are HSL triplets for hsl(var(--x)). */
+   Light is `:root`, dark is `.dark`, and next-themes toggles the class
+   from the header. Both ship. All colors are HSL triplets for
+   hsl(var(--x)), except the chart ramp, which is hex because it is
+   validated as absolute colours rather than composed. */
 
 @layer base {
   :root {
-    /* neutrals — two-level light system (GitHub/Stripe pattern):
-       tinted cool-gray canvas + pure white raised surfaces.
-       Never white-on-white; separation comes from surface contrast
-       first, borders second. */
-    --background: 220 27% 97%;
-    --foreground: 224 25% 12%;
-    --muted: 220 20% 94%;
-    --muted-foreground: 220 10% 40%;
-    --card: 0 0% 100%;
-    --card-foreground: 224 25% 12%;
+    color-scheme: light;
+    /* neutrals — near-white canvas with white raised surfaces (v4 spec):
+       separation comes from hairline borders and soft shadows, not
+       surface tint. Grays are near-desaturated so the violet reads as
+       the only color in the chrome. */
+    --background: 40 20% 98%;
+    --foreground: 240 6% 10%;
+    --muted: 240 6% 96%;
+    --muted-foreground: 240 4% 44%;
+    --card: 40 25% 99%;
+    --card-foreground: 240 6% 10%;
     --popover: 0 0% 100%;
-    --popover-foreground: 224 25% 12%;
-    --border: 220 16% 88%;
-    --input: 220 16% 84%;
-    --ring: 254 75% 64%;
+    --popover-foreground: 240 6% 10%;
+    --border: 240 9% 94%;
+    --input: 240 8% 60%;
+    --ring: 254 75% 63%;
 
-    /* brand — violet, matches the logo mark (#7C5CE8) */
-    --primary: 254 75% 64%;
+    /* brand — violet, matches the logo mark (#7C5CE8); reserved for
+       primary actions and moments of change, not a theme */
+    --primary: 254 75% 63%;
+    /* accent used as text or icons on neutral surfaces; --primary is the
+       solid fill that white text sits on, and the two pull opposite ways */
+    --primary-accent: 254 75% 63%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 220 20% 94%;
-    --secondary-foreground: 224 25% 12%;
-    --accent: 220 18% 93%;
-    --accent-foreground: 224 25% 12%;
+    --secondary: 240 6% 96%;
+    --secondary-foreground: 240 6% 10%;
+    --accent: 240 6% 95%;
+    --accent-foreground: 240 6% 10%;
 
     /* semantic */
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
-    --success: 160 84% 33%;
+    --success: 160 84% 28%;
     --success-foreground: 0 0% 100%;
+    /* semantic hues used as text need their own step: the fill value is too
+       light to carry 4.5:1, and opacity on it only makes that worse */
+    --success-text: 160 84% 26%;
+    --warning-text: 38 92% 32%;
+    --destructive-text: 0 72% 42%;
     --warning: 38 92% 50%;
     --warning-foreground: 24 40% 15%;
 
@@ -45,39 +57,80 @@
     --gradient-via: 189 94% 43%;
     --gradient-to: 254 75% 64%;
 
-    --radius: 0.625rem;
+    /* Chart categorical ramp. Fixed order is the CVD-safety mechanism, so it
+       never changes and is never cycled. Validated with the dataviz skill's
+       checker against this surface: lightness band, chroma floor, CVD
+       separation, normal-vision floor, contrast. */
+    --chart-1: #2a78d6;
+    --chart-2: #eb6834;
+    --chart-3: #1baf7a;
+    --chart-4: #eda100;
+    --chart-5: #e87ba4;
+    --chart-6: #008300;
+    --chart-7: #4a3aa7;
+    --chart-8: #e34948;
+
+    --radius: 0.375rem;
 
     /* light-mode elevation — always pair with a border */
-    --shadow-xs: 0 1px 2px rgb(15 23 42 / 0.04);
-    --shadow-sm: 0 1px 2px rgb(15 23 42 / 0.06), 0 2px 8px rgb(15 23 42 / 0.04);
-    --shadow-md: 0 2px 4px rgb(15 23 42 / 0.06), 0 8px 24px rgb(15 23 42 / 0.08);
-    --shadow-lg: 0 4px 8px rgb(15 23 42 / 0.06), 0 20px 48px rgb(15 23 42 / 0.12);
+    /* Elevation is for things that genuinely float (menus, dialogs). Flat
+       surfaces are separated by a hairline, not a glow. */
+    --shadow-xs: 0 1px 0 rgb(10 10 11 / 0.04);
+    --shadow-sm: 0 1px 2px rgb(10 10 11 / 0.06);
+    --shadow-md: 0 4px 12px rgb(10 10 11 / 0.10), 0 1px 2px rgb(10 10 11 / 0.06);
+    --shadow-lg: 0 12px 32px rgb(10 10 11 / 0.16), 0 2px 6px rgb(10 10 11 / 0.08);
   }
 
   .dark {
-    --background: 224 30% 7%;
-    --foreground: 220 20% 96%;
-    --muted: 224 20% 13%;
-    --muted-foreground: 220 10% 62%;
-    --card: 224 28% 9%;
-    --card-foreground: 220 20% 96%;
-    --popover: 224 28% 9%;
-    --popover-foreground: 220 20% 96%;
-    --border: 224 18% 18%;
-    --input: 224 18% 22%;
-    --ring: 253 85% 69%;
-    --primary: 253 85% 69%;
+    color-scheme: dark;
+    /* neutral charcoal, no navy cast (v4 spec): surfaces step up in
+       lightness, hairlines stay barely-there */
+    --background: 240 8% 4%;
+    --foreground: 240 9% 93%;
+    --muted: 240 8% 11%;
+    --muted-foreground: 240 5% 56%;
+    --card: 240 7% 7%;
+    --card-foreground: 240 9% 93%;
+    --popover: 240 8% 9%;
+    --popover-foreground: 240 9% 93%;
+    --border: 240 8% 20%;
+    --input: 240 8% 40%;
+    --ring: 253 85% 65%;
+    --primary: 253 85% 65%;
+    --primary-accent: 253 85% 68%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 224 20% 13%;
-    --secondary-foreground: 220 20% 96%;
-    --accent: 224 20% 15%;
-    --accent-foreground: 220 20% 96%;
+    --secondary: 240 8% 11%;
+    --secondary-foreground: 240 9% 93%;
+    --accent: 240 8% 13%;
+    --accent-foreground: 240 9% 93%;
     --destructive: 0 66% 56%;
     --destructive-foreground: 0 0% 100%;
     --success: 160 70% 42%;
-    --success-foreground: 0 0% 100%;
+    --success-foreground: 160 40% 10%;
+    --success-text: 160 70% 45%;
+    --warning-text: 38 92% 60%;
+    --destructive-text: 0 66% 62%;
     --warning: 38 92% 56%;
     --warning-foreground: 24 40% 15%;
+
+    /* Dark is SELECTED, not flipped: the same hues re-stepped into the dark
+       lightness band and re-validated against the dark surface. A straight
+       reuse of the light steps failed the band on 4 of 8. */
+    --chart-1: #2a78d6;
+    --chart-2: #e05e29;
+    --chart-3: #15a572;
+    --chart-4: #ba7f10;
+    --chart-5: #ce648d;
+    --chart-6: #008300;
+    --chart-7: #6055c4;
+    --chart-8: #e34948;
+
+    /* Dark elevation: a black spread cannot separate near-black surfaces,
+       so each level also carries a light top rim. */
+    --shadow-xs: 0 1px 2px rgb(0 0 0 / 0.5), inset 0 1px 0 hsl(0 0% 100% / 0.04);
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.6), 0 2px 8px rgb(0 0 0 / 0.45), inset 0 1px 0 hsl(0 0% 100% / 0.05);
+    --shadow-md: 0 2px 4px rgb(0 0 0 / 0.6), 0 8px 24px rgb(0 0 0 / 0.5), inset 0 1px 0 hsl(0 0% 100% / 0.06);
+    --shadow-lg: 0 4px 8px rgb(0 0 0 / 0.6), 0 20px 48px rgb(0 0 0 / 0.55), inset 0 1px 0 hsl(0 0% 100% / 0.07);
   }
 
   * {
@@ -112,6 +165,16 @@
     );
   }
 
+  /* Windows High Contrast removes background images, so clipped-text
+     headlines need a real colour to fall back to. */
+  @media (forced-colors: active) {
+    .text-gradient {
+      background-image: none;
+      color: CanvasText;
+      -webkit-text-fill-color: CanvasText;
+    }
+  }
+
   .bg-gradient-brand {
     background-image: linear-gradient(
       100deg,
@@ -127,6 +190,228 @@
   }
 }
 
+/* Chart series colour: set `color` once and let fill/stroke inherit it. */
+.chart-s1 { color: var(--chart-1); }
+.chart-s2 { color: var(--chart-2); }
+.chart-s3 { color: var(--chart-3); }
+.chart-s4 { color: var(--chart-4); }
+.chart-s5 { color: var(--chart-5); }
+.chart-s6 { color: var(--chart-6); }
+.chart-s7 { color: var(--chart-7); }
+.chart-s8 { color: var(--chart-8); }
+/* Slot 9+ never invents a hue: overflow folds into a neutral "Other". */
+.chart-other { color: hsl(var(--muted-foreground)); }
+
+/* ── Workspace materials ──────────────────────────────────────────────
+   A data workspace is an instrument, not a surface to admire: separation
+   comes from hairlines, and the only thing allowed to glow is the thing
+   that just changed. Glass and ambient gradients were removed because
+   they sit between the reader and the numbers. */
+
+/* A cell that just changed: a brief violet wash that settles, so a
+   transform is visible without having to diff two screenshots. */
+@keyframes cell-settle {
+  from { background-color: hsl(var(--primary) / 0.22); }
+  to   { background-color: transparent; }
+}
+.cell-changed {
+  animation: cell-settle 1.4s var(--ease-smooth-out) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cell-changed { animation: none; background-color: hsl(var(--primary) / 0.08); }
+}
+
+/* ── Motion tokens (transitions.dev scale) ─────────────────────────────
+   Shared duration/easing/scale/blur values from the transitions-dev
+   skill's _root.css; every t-* pattern below reads from these. The
+   theme-colored variables from that file are omitted on purpose,
+   colors come from our own token system above. */
+:root {
+  /* Durations */
+  --duration-stagger: 40ms;
+  --duration-micro: 80ms;
+  --duration-quick: 150ms;
+  --duration-fast: 250ms;
+  --duration-medium: 350ms;
+  --duration-slow: 400ms;
+  --duration-very-slow: 500ms;
+  /* Easings */
+  --ease-smooth-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: ease-in-out;
+  --ease-out: ease-out;
+  --ease-linear: linear;
+  --ease-bounce: cubic-bezier(0.34, 1.36, 0.64, 1);
+  --ease-bounce-strong: cubic-bezier(0.34, 3.85, 0.64, 1);
+  /* Distances */
+  --distance-micro: 4px;
+  --distance-small: 6px;
+  --distance-base: 8px;
+  --distance-medium: 12px;
+  --distance-large: 30px;
+  /* Scales */
+  --scale-large: 0.96;
+  --scale-medium: 0.97;
+  --scale-small: 0.98;
+  --scale-tiny: 0.99;
+  /* Blur */
+  --blur-small: 2px;
+  --blur-medium: 3px;
+  --blur-large: 8px;
+
+  /* Menu dropdown */
+  --dropdown-open-dur: var(--duration-fast);
+  --dropdown-close-dur: var(--duration-quick);
+  --dropdown-pre-scale: var(--scale-medium);
+  --dropdown-closing-scale: var(--scale-tiny);
+  --dropdown-ease: var(--ease-smooth-out);
+  /* Modal open / close */
+  --modal-open-dur: var(--duration-fast);
+  --modal-close-dur: var(--duration-quick);
+  --modal-scale: var(--scale-large);
+  --modal-scale-close: var(--scale-large);
+  --modal-ease: var(--ease-smooth-out);
+  /* Icon swap */
+  --icon-swap-dur: var(--duration-fast);
+  --icon-swap-blur: var(--blur-small);
+  --icon-swap-start-scale: 0.25;
+  --icon-swap-ease: var(--ease-in-out);
+}
+
+/* transitions-dev 05: menu dropdown — grows from the trigger corner,
+   scale + fade only. Radix keeps a closing menu mounted only while a
+   CSS *animation* runs, so the skill's .is-open/.is-closing transition
+   pair is expressed as the same curves keyed on data-state. The
+   transform-origin comes from Radix per menu position (the skill's
+   data-origin equivalent), set via a class on the content element. */
+.t-dropdown {
+  /* no permanent will-change: a composited CSS animation gets its own layer
+     for the duration and the browser releases it afterwards */
+}
+.t-dropdown[data-state="open"] {
+  animation: t-dropdown-open var(--dropdown-open-dur) var(--dropdown-ease) both;
+}
+.t-dropdown[data-state="closed"] {
+  animation: t-dropdown-close var(--dropdown-close-dur) var(--dropdown-ease) both;
+}
+@keyframes t-dropdown-open {
+  from {
+    opacity: 0;
+    transform: scale(var(--dropdown-pre-scale));
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes t-dropdown-close {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(var(--dropdown-closing-scale));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .t-dropdown[data-state] {
+    animation: none !important;
+  }
+}
+
+/* transitions-dev 06: modal — scales up from center, quicker close.
+   The centering translate(-50%, -50%) is baked into the keyframes
+   because dialog surfaces are positioned at 50%/50%; the static
+   translate utilities still center the box when animations are off. */
+.t-modal {
+  /* see .t-dropdown: hinting a permanently-mounted surface costs memory
+     and rasterization quality for no gain */
+}
+.t-modal[data-state="open"] {
+  animation: t-modal-open var(--modal-open-dur) var(--modal-ease) both;
+}
+.t-modal[data-state="closed"] {
+  animation: t-modal-close var(--modal-close-dur) var(--modal-ease) both;
+}
+@keyframes t-modal-open {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(var(--modal-scale));
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+@keyframes t-modal-close {
+  from {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(var(--modal-scale-close));
+  }
+}
+/* Backdrop fades on the same clock so surface and overlay move together */
+.t-modal-overlay[data-state="open"] {
+  animation: t-fade-in var(--modal-open-dur) var(--modal-ease) both;
+}
+.t-modal-overlay[data-state="closed"] {
+  animation: t-fade-out var(--modal-close-dur) var(--modal-ease) both;
+}
+@keyframes t-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes t-fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .t-modal[data-state],
+  .t-modal-overlay[data-state] {
+    animation: none !important;
+  }
+}
+
+/* transitions-dev 09: icon swap — cross-fade + blur + scale in one
+   slot. Both icons stay in the DOM stacked in the same grid cell;
+   data-state="a" | "b" on the wrapper picks the visible one. */
+.t-icon-swap {
+  position: relative;
+  display: inline-grid;
+}
+.t-icon-swap .t-icon {
+  grid-area: 1 / 1;
+  /* !important so the swap outranks the *{transition:none!important}
+     that next-themes injects during a theme flip (disableTransitionOnChange):
+     the page snaps to the new theme but the sun/moon still cross-fade.
+     The reduced-motion guard below has equal specificity and comes
+     later, so it still wins when the OS asks for less motion. */
+  transition:
+    opacity var(--icon-swap-dur) var(--icon-swap-ease),
+    filter var(--icon-swap-dur) var(--icon-swap-ease),
+    transform var(--icon-swap-dur) var(--icon-swap-ease) !important;
+}
+.t-icon-swap[data-state="a"] .t-icon[data-icon="a"],
+.t-icon-swap[data-state="b"] .t-icon[data-icon="b"] {
+  opacity: 1;
+  filter: blur(0);
+  transform: scale(1);
+}
+.t-icon-swap[data-state="a"] .t-icon[data-icon="b"],
+.t-icon-swap[data-state="b"] .t-icon[data-icon="a"] {
+  opacity: 0;
+  filter: blur(var(--icon-swap-blur));
+  transform: scale(var(--icon-swap-start-scale));
+}
+@media (prefers-reduced-motion: reduce) {
+  .t-icon-swap .t-icon {
+    transition: none !important;
+  }
+}
+
 /* Respect user motion preferences */
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -138,7 +423,7 @@
   }
 }
 
-/* Scrollbar — quiet, light */
+/* Scrollbar — quiet, follows the active theme */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -155,6 +440,14 @@
 
 ::-webkit-scrollbar-thumb:hover {
   background: hsl(220 10% 72%);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: hsl(224 14% 26%);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: hsl(224 12% 36%);
 }
 
 /* Honor the OS reduce-motion preference: collapse CSS animations and

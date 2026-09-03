@@ -44,11 +44,11 @@ function AccountContent() {
         setTier(d.tier ?? "free");
         setBillingConfigured(d.billing_configured ?? false);
       })
-      .catch(() => setTier("free"));
+      .catch(() => setTier(null)); // unknown plan: render the loading state, never guess "free"
     fetchWithAuth("/api/settings")
       .then((r) => r.json())
       .then((d) => setPrivacyMode(!!d.privacy_mode))
-      .catch(() => setPrivacyMode(false));
+      .catch(() => setPrivacyMode(null)); // unknown, not "off"
   }, []);
 
   const togglePrivacy = async () => {
@@ -60,9 +60,13 @@ function AccountContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ privacy_mode: next }),
       });
-      if (!r.ok) setPrivacyMode(!next);
+      if (!r.ok) {
+        setPrivacyMode(!next);
+        toast.error("Couldn't save that. Strict privacy mode is unchanged.");
+      }
     } catch {
       setPrivacyMode(!next);
+      toast.error("Couldn't save that. Check your connection and try again.");
     }
   };
 
@@ -110,20 +114,20 @@ function AccountContent() {
       </p>
 
       {error && (
-        <div className="mt-4 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+        <div className="mt-4 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive-text">
           {error}
         </div>
       )}
       {notice && (
-        <div className="mt-4 rounded-lg border border-success/30 bg-success/5 p-3 text-sm text-success">
+        <div className="mt-4 rounded-lg border border-success/30 bg-success/5 p-3 text-sm text-success-text">
           {notice}
         </div>
       )}
 
       {/* Profile */}
       <section className="mt-8">
-        <h2 className="mb-3 text-sm font-medium text-muted-foreground">Profile</h2>
-        <div className="rounded-xl border bg-card p-5 shadow-xs">
+        <h2 className="mb-2.5 font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">Profile</h2>
+        <div className="rounded-md border bg-card p-5">
           <p className="text-xs text-muted-foreground">Email</p>
           <p className="mt-0.5 text-sm font-medium">{user?.email}</p>
         </div>
@@ -131,8 +135,8 @@ function AccountContent() {
 
       {/* Plan & usage */}
       <section className="mt-8">
-        <h2 className="mb-3 text-sm font-medium text-muted-foreground">Plan &amp; usage</h2>
-        <div className="rounded-xl border bg-card p-5 shadow-xs">
+        <h2 className="mb-2.5 font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">Plan &amp; usage</h2>
+        <div className="rounded-md border bg-card p-5">
           {tier === null ? (
             <div className="space-y-3">
               <Skeleton className="h-5 w-32" />
@@ -143,7 +147,7 @@ function AccountContent() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <p className="text-sm font-medium">{isPro ? "Pro" : "Free"} plan</p>
-              <Badge variant="secondary" className="capitalize">{tier ?? "…"}</Badge>
+              <Badge variant="secondary" className="font-mono text-[10px] uppercase tracking-wide">{tier ?? "…"}</Badge>
             </div>
             {isPro ? (
               <Button variant="outline" size="sm" onClick={() => setConfirmCancel(true)} disabled={busy}>
@@ -169,11 +173,11 @@ function AccountContent() {
 
       {/* Privacy */}
       <section className="mt-8">
-        <h2 className="mb-3 text-sm font-medium text-muted-foreground">Privacy</h2>
-        <div className="rounded-xl border bg-card p-5 shadow-xs">
+        <h2 className="mb-2.5 font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">Privacy</h2>
+        <div className="rounded-md border bg-card p-5">
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-start gap-3">
-              <ShieldCheck className={`mt-0.5 h-5 w-5 ${privacyMode ? "text-success" : "text-muted-foreground"}`} />
+              <ShieldCheck className={`mt-0.5 h-5 w-5 ${privacyMode ? "text-success-text" : "text-muted-foreground"}`} />
               <div>
                 <p className="text-sm font-medium">Strict privacy mode</p>
                 <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
@@ -195,8 +199,8 @@ function AccountContent() {
       {/* Preferences */}
       {checklistDismissed && (
         <section className="mt-8">
-          <h2 className="mb-3 text-sm font-medium text-muted-foreground">Preferences</h2>
-          <div className="flex items-center justify-between rounded-xl border bg-card p-5 shadow-xs">
+          <h2 className="mb-2.5 font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">Preferences</h2>
+          <div className="flex items-center justify-between rounded-md border bg-card p-5">
             <p className="text-sm text-muted-foreground">Getting-started checklist</p>
             <Button variant="outline" size="sm" onClick={restoreChecklist}>
               Show again
@@ -207,8 +211,8 @@ function AccountContent() {
 
       {/* Session */}
       <section className="mt-8">
-        <h2 className="mb-3 text-sm font-medium text-muted-foreground">Session</h2>
-        <div className="flex items-center justify-between rounded-xl border bg-card p-5 shadow-xs">
+        <h2 className="mb-2.5 font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">Session</h2>
+        <div className="flex items-center justify-between rounded-md border bg-card p-5">
           <p className="text-sm text-muted-foreground">Sign out of SheetsLLM on this device.</p>
           <Button variant="outline" size="sm" onClick={handleSignOut}>
             <LogOut className="mr-1.5 h-4 w-4" /> Sign out

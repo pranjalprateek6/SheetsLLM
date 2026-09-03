@@ -2,7 +2,8 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
-import { Bot, ChevronDown, Code2, Eraser, RotateCcw, Send, Sparkles, Square, Undo2, User } from "lucide-react";
+import { ChefHat, ChevronDown, Code2, Eraser, RotateCcw, Square, Undo2, User } from "lucide-react";
+import { SendIcon, type SendIconHandle } from "@/components/icons/send";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
@@ -28,10 +29,12 @@ type PreviewFn = (p: {
   rows: Record<string, unknown>[];
   totalRows?: number;
   totalColumns?: number;
+  stepNumber?: number;
+  instruction?: string;
 }) => void;
 
 export default function ChatPanel({
-  fileId, onPreview, open, fileName, onUndo, onReset, starterSuggestions,
+  fileId, onPreview, open, fileName, onUndo, onReset, starterSuggestions, prefill,
 }: {
   fileId?: string;
   onPreview: PreviewFn;
@@ -41,6 +44,9 @@ export default function ChatPanel({
   onReset?: () => void;
   /** Curated suggestions shown instantly instead of fetching LLM insights. */
   starterSuggestions?: string[] | null;
+  /** Externally-seeded input (e.g. "Ask Chef about this column"); nonce
+   *  forces re-application when the same text is sent twice. */
+  prefill?: { text: string; nonce: number } | null;
 }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -53,14 +59,21 @@ export default function ChatPanel({
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const sendIconRef = useRef<SendIconHandle>(null);
+  // Terminal-style recall: ArrowUp in an empty input restores the last
+  // prompt for quick "same thing, but…" iteration.
+  const lastSentRef = useRef<string>("");
 
-  // Staged progress while Sage works — honest labels for the real pipeline
-  // (generate -> validate -> execute), rotated on a timer.
-  const STAGES = ["Writing SQL…", "Validating…", "Running on your data…"];
+  // Staged progress while Chef works — honest labels for the real pipeline
+  // (generate -> validate -> execute), rotated on a timer. A late fourth
+  // stage reassures on the occasional 30s+ answer instead of looking hung.
+  const STAGES = ["Writing SQL…", "Validating…", "Running on your data…", "Taking longer than usual, still working…"];
   useEffect(() => {
     if (!sending) { setStage(0); return; }
-    const t = setInterval(() => setStage((v) => Math.min(v + 1, STAGES.length - 1)), 2600);
-    return () => clearInterval(t);
+    // Guard against the interval walking the late stage back down to 2.
+    const t = setInterval(() => setStage((v) => (v >= 3 ? v : Math.min(v + 1, 2))), 2600);
+    const late = setTimeout(() => setStage(3), 15000);
+    return () => { clearInterval(t); clearTimeout(late); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sending]);
 
@@ -73,12 +86,29 @@ export default function ChatPanel({
   }, [fileId, open]);
 
   useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    const el = scrollRef.current;
+    if (!el) return;
+    // Only follow the conversation if the reader is already at the bottom.
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    if (atBottom) el.scrollTop = el.scrollHeight;
   }, [messages]);
 
   useEffect(() => {
     if (open) setTimeout(() => inputRef.current?.focus(), 100);
   }, [open]);
+
+  // Seed the input from outside (grid column menu → "Ask Chef")
+  useEffect(() => {
+    if (!prefill?.text) return;
+    setInput(prefill.text);
+    setTimeout(() => {
+      const el = inputRef.current;
+      if (el) {
+        el.focus();
+        el.setSelectionRange(el.value.length, el.value.length);
+      }
+    }, 80);
+  }, [prefill]);
 
   useEffect(() => {
     if (!fileId || !open) return;
@@ -103,6 +133,7 @@ export default function ChatPanel({
       if (!msg || !fileId || sending) return;
 
       const userMsg: ChatMessage = { role: "user", content: msg };
+      lastSentRef.current = msg;
       setMessages((prev) => [...prev, userMsg]);
       setInput("");
       setSending(true);
@@ -128,7 +159,14 @@ export default function ChatPanel({
             message_type: "transform", metadata: { sql: data.sql, step_number: data.step_number },
           }]);
           if (data.preview) {
-            onPreview({ columns: data.preview.columns, rows: data.preview.rows, totalRows: data.preview.total_rows, totalColumns: data.preview.total_columns });
+            onPreview({
+              columns: data.preview.columns,
+              rows: data.preview.rows,
+              totalRows: data.preview.total_rows,
+              totalColumns: data.preview.total_columns,
+              stepNumber: data.step_number,
+              instruction: msg,
+            });
           }
         } else if (data.type === "clarification") {
           setMessages((prev) => [...prev, {
@@ -138,7 +176,14 @@ export default function ChatPanel({
         } else if (data.type === "insight") {
           setMessages((prev) => [...prev, { role: "assistant", content: data.message, message_type: "insight" }]);
         } else if (data.code) {
-          setMessages((prev) => [...prev, { role: "assistant", content: data.message || "Something went wrong.", message_type: "error" }]);
+          setMessages((prev) => [...prev, {
+            role: "assistant",
+            content:
+              data.code === "REQUEST_TIMEOUT"
+                ? "That took too long and was stopped. Try again, or ask something more specific."
+                : data.message || "I couldn't complete that. Try rephrasing it, or ask for something simpler.",
+            message_type: "error",
+          }]);
         } else {
           // Unrecognized response shape — never let "Thinking…" vanish silently.
           setMessages((prev) => [...prev, { role: "assistant", content: "I didn't get a usable response. Please try rephrasing.", message_type: "error" }]);
@@ -167,13 +212,13 @@ export default function ChatPanel({
   if (!open) return null;
 
   return (
-    <div className="flex h-full flex-col border-l bg-card">
+    <div className="ws-glass-panel flex h-full flex-col border-l border-border/70">
       {/* Header */}
       <div className="flex-shrink-0 border-b px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-primary" />
-            <h3 className="text-sm font-semibold">Sage</h3>
+            <ChefHat className="h-4 w-4 text-primary" />
+            <h3 className="text-sm font-semibold">Chef</h3>
           </div>
           <TooltipProvider>
             <div className="flex items-center gap-0.5">
@@ -222,8 +267,8 @@ export default function ChatPanel({
       {fileId && messages.length === 0 && (
         <div className="flex-shrink-0 space-y-4 border-b px-4 py-6">
           <div className="space-y-2 text-center">
-            <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-              <Sparkles className="h-5 w-5 text-primary" />
+            <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-md bg-primary/10">
+              <ChefHat className="h-5 w-5 text-primary" />
             </div>
             <div>
               <p className="text-sm font-medium">{fileName || "Your file"} is ready</p>
@@ -246,7 +291,7 @@ export default function ChatPanel({
                 <button
                   key={i}
                   onClick={() => sendMessage(s)}
-                  className="block w-full rounded-lg border bg-background px-3 py-2 text-left text-xs text-foreground/80 shadow-xs transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-foreground"
+                  className="block w-full rounded-lg border bg-background px-3 py-2 text-left text-xs text-foreground/80 transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-foreground"
                 >
                   {s}
                 </button>
@@ -273,24 +318,33 @@ export default function ChatPanel({
       )}
 
       {/* Messages */}
-      <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
+      {/* Announces the newest assistant turn and the working state. Kept
+          separate from the log so history is not re-read on mount. */}
+      <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
+        {sending
+          ? STAGES[stage]
+          : messages.length && messages[messages.length - 1].role === "assistant"
+            ? `Chef replied: ${messages[messages.length - 1].content}`
+            : ""}
+      </div>
+      <div ref={scrollRef} aria-busy={sending} className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
         {messages.map((msg, i) => (
           <div key={i} className={cn("flex gap-2", msg.role === "user" ? "justify-end" : "justify-start")}>
             {msg.role === "assistant" && (
               <div className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md bg-primary/10">
-                <Bot className="h-3 w-3 text-primary" />
+                <ChefHat className="h-3 w-3 text-primary" />
               </div>
             )}
             <div
               className={cn(
-                "max-w-[85%] rounded-xl px-3 py-2 text-[13px]",
+                "max-w-[85%] rounded-md px-3 py-2 text-[13px]",
                 msg.role === "user"
                   ? "bg-primary text-primary-foreground"
                   : msg.message_type === "error"
-                  ? "border border-destructive/30 bg-destructive/5 text-destructive"
+                  ? "border border-destructive/30 bg-destructive/5 text-destructive-text"
                   : msg.message_type === "transform"
                   ? "border border-primary/20 bg-primary/5"
-                  : "bg-muted"
+                  : "border border-border/60 bg-card/85"
               )}
             >
               <p className="whitespace-pre-wrap">{msg.content}</p>
@@ -299,13 +353,15 @@ export default function ChatPanel({
                 <div className="mt-1.5">
                   <button
                     onClick={() => setExpandedSql(expandedSql === String(i) ? null : String(i))}
-                    className="inline-flex items-center gap-1 text-[11px] font-medium text-primary/70 transition-colors hover:text-primary"
+                    aria-expanded={expandedSql === String(i)}
+                    aria-controls={`sql-${i}`}
+                    className="inline-flex min-h-6 items-center gap-1 text-[11px] font-medium text-primary-accent transition-colors hover:text-primary"
                   >
                     <Code2 className="h-3 w-3" /> SQL
                     <ChevronDown className={cn("h-3 w-3 transition-transform", expandedSql === String(i) && "rotate-180")} />
                   </button>
                   {expandedSql === String(i) && (
-                    <pre className="mt-1 overflow-x-auto rounded-md bg-muted p-2 font-mono text-[11px]">
+                    <pre id={`sql-${i}`} tabIndex={0} role="region" aria-label="Generated SQL" className="mt-1 overflow-x-auto rounded-md bg-muted p-2 font-mono text-[11px]">
                       {String(msg.metadata.sql)}
                     </pre>
                   )}
@@ -337,13 +393,13 @@ export default function ChatPanel({
         {sending && (
           <div className="flex gap-2">
             <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md bg-primary/10">
-              <Bot className="h-3 w-3 text-primary" />
+              <ChefHat className="h-3 w-3 text-primary" />
             </div>
-            <div className="flex items-center gap-2 rounded-xl bg-muted px-3 py-2">
+            <div className="flex items-center gap-2 rounded-md bg-muted px-3 py-2">
               <TextShimmer className="text-xs" duration={1}>{STAGES[stage]}</TextShimmer>
               <button
                 onClick={() => abortRef.current?.abort()}
-                className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground"
+                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card/70 px-2.5 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground"
                 aria-label="Stop"
               >
                 <Square className="h-2.5 w-2.5 fill-current" /> Stop
@@ -394,19 +450,29 @@ export default function ChatPanel({
                 e.preventDefault();
                 sendMessage();
               }
+              if (e.key === "ArrowUp" && input === "" && lastSentRef.current) {
+                e.preventDefault();
+                setInput(lastSentRef.current);
+                setTimeout(() => {
+                  const el = inputRef.current;
+                  if (el) el.setSelectionRange(el.value.length, el.value.length);
+                }, 0);
+              }
             }}
-            placeholder="Ask Sage anything…"
-            className="max-h-[100px] min-h-[40px] flex-1 resize-none rounded-lg border bg-background px-3 py-2 text-sm shadow-xs outline-none transition-shadow placeholder:text-muted-foreground focus:ring-2 focus:ring-ring/30"
+            aria-label="Ask Chef anything" placeholder="Ask Chef anything…"
+            className="max-h-[100px] min-h-[40px] flex-1 resize-none rounded-lg border bg-background px-3 py-2 text-sm outline-none transition-shadow placeholder:text-muted-foreground focus:ring-2 focus:ring-ring/30"
             disabled={sending}
             rows={1}
           />
           <Button
             size="icon"
             onClick={() => sendMessage()}
+            onMouseEnter={() => sendIconRef.current?.startAnimation()}
+            onMouseLeave={() => sendIconRef.current?.stopAnimation()}
             disabled={sending || !input.trim()}
             aria-label="Send"
           >
-            <Send className="h-4 w-4" />
+            <SendIcon ref={sendIconRef} size={16} />
           </Button>
         </div>
       </div>
