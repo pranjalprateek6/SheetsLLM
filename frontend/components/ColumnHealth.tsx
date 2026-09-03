@@ -32,11 +32,15 @@ function typeMark(dtype?: string): string {
  */
 export default function ColumnHealth({
   columns,
+  widths,
   changedCols,
   onSelect,
   className,
 }: {
   columns: HealthColumn[];
+  /** Effective grid width per column, so each segment sits proportionally
+   *  above the column it describes and the strip reads as a minimap. */
+  widths?: Record<string, number>;
   changedCols?: string[];
   onSelect?: (name: string) => void;
   className?: string;
@@ -51,7 +55,7 @@ export default function ColumnHealth({
 
   return (
     <TooltipProvider delayDuration={120}>
-      <div className={cn("flex items-end gap-px", className)} aria-hidden={false}>
+      <div className={cn("flex h-6 items-end gap-[2px]", className)} aria-hidden={false}>
         <span className="sr-only">
           {`${columns.length} columns, ${stats.dirty} with missing values, highest ${stats.worst}% null.`}
         </span>
@@ -66,7 +70,8 @@ export default function ColumnHealth({
                   type="button"
                   onClick={() => onSelect?.(col.name)}
                   aria-label={`${col.name}, ${col.dtype ?? "unknown type"}, ${nullPct}% missing`}
-                  className="group relative h-6 w-[7px] shrink-0 overflow-hidden rounded-[1px] bg-muted transition-colors hover:bg-muted-foreground/25 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  style={{ flexGrow: widths?.[col.name] ?? 140, flexBasis: 0, minWidth: 3 }}
+                  className="group relative h-full overflow-hidden rounded-[1px] bg-muted transition-colors hover:bg-muted-foreground/25 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 >
                   <span
                     aria-hidden

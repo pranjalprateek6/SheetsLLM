@@ -71,6 +71,7 @@ export default function DataGrid({
   onAskColumn,
   onAskChef,
   scrollToCol,
+  onColumnWidths,
 }: {
   columns: string[];
   rows: Record<string, unknown>[];
@@ -89,6 +90,8 @@ export default function DataGrid({
   onAskChef?: (text: string) => void;
   /** Scroll a column into view (schema panel jump); nonce re-triggers. */
   scrollToCol?: { name: string; nonce: number } | null;
+  /** Effective width per column, so a caller can align a strip to the grid. */
+  onColumnWidths?: (widths: Record<string, number>) => void;
 }) {
   const head = columns ?? [];
   const parentRef = useRef<HTMLDivElement>(null);
@@ -117,6 +120,32 @@ export default function DataGrid({
   }, []);
 
   const [filterQ, setFilterQ] = useState("");
+
+  // Publish the widths the grid actually RENDERS. The declared width is only a
+  // request: tableLayout:fixed with min-w-full redistributes any spare space,
+  // so a strip aligned to the declared value would not line up with the grid.
+  const headRowRef = useRef<HTMLTableRowElement>(null);
+  useEffect(() => {
+    if (!onColumnWidths) return;
+    const measure = () => {
+      const row = headRowRef.current;
+      if (!row) return;
+      // cell 0 is the row-number gutter; the rest map 1:1 onto head
+      const cells = Array.from(row.children).slice(1) as HTMLElement[];
+      const w: Record<string, number> = {};
+      cells.forEach((cell, i) => {
+        const name = head[i];
+        if (name) w[name] = cell.getBoundingClientRect().width;
+      });
+      if (Object.keys(w).length) onColumnWidths(w);
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    if (headRowRef.current) ro.observe(headRowRef.current);
+    if (parentRef.current) ro.observe(parentRef.current);
+    return () => ro.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [head.join("|"), colWidths, density, onColumnWidths]);
 
   // A column reads as numeric if its schema dtype says so, or (for
   // transform-created columns with no schema yet) its first value is a number.
@@ -288,7 +317,7 @@ export default function DataGrid({
               ))}
             </tr>
             {/* Column name row */}
-            <tr className="border-b bg-muted/50">
+            <tr ref={headRowRef} className="border-b bg-muted/50">
               <th className="w-[50px] min-w-[50px] sticky left-0 z-20 [background:linear-gradient(hsl(var(--muted)/.5),hsl(var(--muted)/.5)),hsl(var(--card))]">&nbsp;</th>
               {head.map((h) => {
                 const meta = columnMeta?.[h];

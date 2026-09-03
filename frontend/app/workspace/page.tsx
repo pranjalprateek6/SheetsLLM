@@ -118,6 +118,15 @@ function WorkspaceContent() {
   const [renameValue, setRenameValue] = useState("");
   // Schema panel → grid column jump
   const [gridJump, setGridJump] = useState<{ name: string; nonce: number } | null>(null);
+  // Grid column widths, so the fingerprint above the grid lines up with it.
+  const [gridWidths, setGridWidths] = useState<Record<string, number>>({});
+  const handleColumnWidths = useCallback((w: Record<string, number>) => {
+    setGridWidths((prev) => {
+      const keys = Object.keys(w);
+      if (keys.length === Object.keys(prev).length && keys.every((k) => prev[k] === w[k])) return prev;
+      return w;
+    });
+  }, []);
 
   const rememberLastFile = (id: string, name: string) => {
     try {
@@ -848,10 +857,12 @@ function WorkspaceContent() {
                   </span>
                   <ColumnHealth
                     columns={healthColumns}
+                    widths={gridWidths}
+                    className="flex-1"
                     changedCols={lastChange?.addedCols}
                     onSelect={(name) => setGridJump({ name, nonce: Date.now() })}
                   />
-                  <span className="ml-auto font-mono text-[10px] tabular-nums text-muted-foreground">
+                  <span className="shrink-0 font-mono text-[10px] tabular-nums text-muted-foreground">
                     {healthColumns.filter((c) => (c.null_pct ?? 0) > 0).length} with gaps
                   </span>
                 </div>
@@ -919,6 +930,7 @@ function WorkspaceContent() {
                   highlightCols={lastChange?.addedCols}
                   totalRows={rowCount}
                   stepCount={steps.length}
+                  onColumnWidths={handleColumnWidths}
                   onAskColumn={(col) => {
                     setChatOpen(true);
                     setChatPrefill({ text: `Tell me about the "${col}" column`, nonce: Date.now() });
