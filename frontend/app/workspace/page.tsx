@@ -120,6 +120,14 @@ function WorkspaceContent() {
   const [gridJump, setGridJump] = useState<{ name: string; nonce: number } | null>(null);
   // Grid column widths, so the fingerprint above the grid lines up with it.
   const [gridWidths, setGridWidths] = useState<Record<string, number>>({});
+  // Split once so the command bar can clip the stem and keep the extension.
+  const [fileStem, fileExt] = useMemo(() => {
+    const n = fileName || "";
+    const dot = n.lastIndexOf(".");
+    // treat it as an extension only if it is a real trailing suffix
+    return dot > 0 && dot > n.length - 8 ? [n.slice(0, dot), n.slice(dot)] : [n, ""];
+  }, [fileName]);
+
   const handleColumnWidths = useCallback((w: Record<string, number>) => {
     setGridWidths((prev) => {
       const keys = Object.keys(w);
@@ -752,10 +760,19 @@ function WorkspaceContent() {
                 <div className="flex min-w-0 flex-1 items-center gap-2">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <button className="flex min-w-0 items-center gap-2 rounded-md px-1.5 py-1 transition-colors hover:bg-accent">
-                        <FileSpreadsheet className="h-4 w-4 flex-shrink-0 text-primary" />
-                        <span className="truncate text-sm font-medium">{fileName || "Untitled"}</span>
-                        <ChevronDown className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" />
+                      <button
+                        title={fileName || "Untitled"}
+                        className="flex min-w-0 items-center gap-2 rounded-md px-1.5 py-1 transition-colors hover:bg-accent"
+                      >
+                        <FileSpreadsheet className="h-4 w-4 flex-shrink-0 text-primary" aria-hidden />
+                        {/* Clip the stem, never the extension: the format is the
+                            part that tells you what you are looking at, and a
+                            trailing ellipsis would eat it first. */}
+                        <span className="flex min-w-0 items-center text-sm font-medium">
+                          <span className="truncate">{fileStem || "Untitled"}</span>
+                          <span className="flex-shrink-0 text-muted-foreground">{fileExt}</span>
+                        </span>
+                        <ChevronDown className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" aria-hidden />
                       </button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="start">
@@ -769,9 +786,6 @@ function WorkspaceContent() {
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
-                  <Badge variant="secondary" className="flex-shrink-0 font-normal tabular-nums text-muted-foreground">
-                    {rowCount.toLocaleString()} × {columnCount.toLocaleString()}
-                  </Badge>
                 </div>
                 <TooltipProvider>
                   <div className="flex items-center gap-0.5">
