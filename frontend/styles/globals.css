@@ -55,6 +55,19 @@
     --gradient-via: 189 94% 43%;
     --gradient-to: 254 75% 64%;
 
+    /* Chart categorical ramp. Fixed order is the CVD-safety mechanism, so it
+       never changes and is never cycled. Validated with the dataviz skill's
+       checker against this surface: lightness band, chroma floor, CVD
+       separation, normal-vision floor, contrast. */
+    --chart-1: #2a78d6;
+    --chart-2: #eb6834;
+    --chart-3: #1baf7a;
+    --chart-4: #eda100;
+    --chart-5: #e87ba4;
+    --chart-6: #008300;
+    --chart-7: #4a3aa7;
+    --chart-8: #e34948;
+
     --radius: 0.375rem;
 
     /* light-mode elevation — always pair with a border */
@@ -97,6 +110,18 @@
     --destructive-text: 0 66% 62%;
     --warning: 38 92% 56%;
     --warning-foreground: 24 40% 15%;
+
+    /* Dark is SELECTED, not flipped: the same hues re-stepped into the dark
+       lightness band and re-validated against the dark surface. A straight
+       reuse of the light steps failed the band on 4 of 8. */
+    --chart-1: #2a78d6;
+    --chart-2: #e05e29;
+    --chart-3: #15a572;
+    --chart-4: #ba7f10;
+    --chart-5: #ce648d;
+    --chart-6: #008300;
+    --chart-7: #6055c4;
+    --chart-8: #e34948;
 
     /* Dark elevation: a black spread cannot separate near-black surfaces,
        so each level also carries a light top rim. */
@@ -162,6 +187,18 @@
     font-variant-numeric: tabular-nums;
   }
 }
+
+/* Chart series colour: set `color` once and let fill/stroke inherit it. */
+.chart-s1 { color: var(--chart-1); }
+.chart-s2 { color: var(--chart-2); }
+.chart-s3 { color: var(--chart-3); }
+.chart-s4 { color: var(--chart-4); }
+.chart-s5 { color: var(--chart-5); }
+.chart-s6 { color: var(--chart-6); }
+.chart-s7 { color: var(--chart-7); }
+.chart-s8 { color: var(--chart-8); }
+/* Slot 9+ never invents a hue: overflow folds into a neutral "Other". */
+.chart-other { color: hsl(var(--muted-foreground)); }
 
 /* ── Workspace materials ──────────────────────────────────────────────
    A data workspace is an instrument, not a surface to admire: separation
