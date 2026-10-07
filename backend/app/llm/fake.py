@@ -2,8 +2,11 @@
 
 Enabled with LLM_PROVIDER=fake. Replies come from a JSON file, by default
 app/llm/fake_replies.json, overridable with FAKE_LLM_REPLIES=<path>: a list of
-{"match": <substring>, "reply": <text>} rules tried in order against the
-lower-cased user message. Two sentinel replies stand in for provider behaviour
+{"match": <substring>, "reply": <text>} rules matched against the lower-cased
+user message. The route builds that message as the conversation history
+followed by the current instruction, so of all the rules that match, the one
+whose phrase occurs latest in the message is the one about this turn; earlier
+occurrences belong to history. Two sentinel replies stand in for provider behaviour
 the routes have to handle:
 
   "__quota__"    raises LlmError carrying the same "429 RESOURCE_EXHAUSTED"
@@ -69,11 +72,11 @@ class FakeLlm(LlmClient):
 
     def generate_sql(self, system_prompt: str, user_message: str) -> str:
         needle = user_message.lower()
-        reply, matched = NO_MATCH_REPLY, None
+        reply, matched, best = NO_MATCH_REPLY, None, -1
         for rule in self.rules:
-            if str(rule["match"]).lower() in needle:
-                reply, matched = str(rule["reply"]), rule["match"]
-                break
+            pos = needle.rfind(str(rule["match"]).lower())
+            if pos > best:
+                best, reply, matched = pos, str(rule["reply"]), rule["match"]
 
         # The user message is what the route built, schema block included, so
         # a test can also assert what was (not) sent. The system prompt is

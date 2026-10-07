@@ -84,6 +84,26 @@ def test_quota_sentinel_raises_what_gemini_would():
     assert len(fake.calls()) == 1, "a failed call is still a call"
 
 
+def test_the_match_latest_in_the_message_wins_over_history():
+    """The chat route sends the conversation history before the current
+    instruction, so a phrase from an earlier turn must not answer this one."""
+    llm = FakeLlm(RULES)
+    history_then_quota = (
+        "Previous conversation:\nUser: add column margin\n"
+        "Assistant: [executed SQL: SELECT ...]\n\nNew request:\nSchema ...\n__quota__"
+    )
+    with pytest.raises(LlmError):
+        llm.generate_sql("S", history_then_quota)
+    assert fake.calls()[-1]["matched"] == "__quota__"
+
+    history_then_margin = (
+        "Previous conversation:\nUser: __quota__\nAssistant: Chef is out of capacity\n\n"
+        "New request:\nSchema ...\nadd column margin"
+    )
+    assert llm.generate_sql("S", history_then_margin).startswith("SELECT *,")
+    assert fake.calls()[-1]["matched"] == "add column margin"
+
+
 def test_invalid_sentinel_is_not_a_select():
     reply = FakeLlm(RULES).generate_sql("S", "__invalid__")
     assert not reply.strip().upper().startswith("SELECT")
