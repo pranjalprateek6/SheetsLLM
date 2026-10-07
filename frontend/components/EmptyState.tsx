@@ -88,6 +88,7 @@ export default function EmptyState({
   description,
   action,
   compact = false,
+  titleAs: TitleTag = "h2",
   className,
 }: {
   variant: EmptyStateVariant;
@@ -96,12 +97,14 @@ export default function EmptyState({
   action?: React.ReactNode;
   /** Smaller illustration + tighter spacing, for drawers and panels */
   compact?: boolean;
+  /** Heading level for the title; /not-found needs an h1. */
+  titleAs?: "h1" | "h2" | "h3" | "p";
   className?: string;
 }) {
   return (
     <div className={cn("text-center", compact ? "py-6" : "py-12", className)}>
       <Illustration variant={variant} compact={compact} />
-      <p className={cn("font-medium", compact ? "mt-3 text-sm" : "mt-4")}>{title}</p>
+      <TitleTag className={cn("font-medium", compact ? "mt-3 text-sm" : "mt-4")}>{title}</TitleTag>
       {description && (
         <p
           className={cn(

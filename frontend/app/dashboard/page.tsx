@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import AuthGuard from "@/components/AuthGuard";
@@ -7,11 +8,11 @@ import EmptyState from "@/components/EmptyState";
 import UsageCard from "@/components/UsageCard";
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
 import {
-  ArrowDown, ArrowUp, Copy, Download, FileSpreadsheet, Grid3X3, List, MoreHorizontal, Pencil, Search, Trash2, Upload,
+  ArrowDown, ArrowUp, Copy, Download, FileSpreadsheet, Grid3X3, List, MoreHorizontal, Pencil, Search, Trash2,
 } from "lucide-react";
+import { UploadIcon, type UploadIconHandle } from "@/components/icons/upload";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -67,6 +68,8 @@ export default function DashboardPage() {
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [page, setPage] = useState(1);
   const [renamingId, setRenamingId] = useState<string | null>(null);
+  const uploadIconRef = useRef<UploadIconHandle>(null);
+  const emptyUploadIconRef = useRef<UploadIconHandle>(null);
   const [renameValue, setRenameValue] = useState("");
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<FileItem | null>(null);
@@ -209,13 +212,16 @@ export default function DashboardPage() {
       >
         <button
           type="button"
-          className={`inline-flex items-center gap-1 transition-colors hover:text-foreground ${active ? "text-foreground" : ""}`}
+          // Browsers set text-transform: none on form controls, so the heading's
+          // uppercase does not reach a button nested inside it. min-h-6 keeps a
+          // 10px label above the 24px target floor (2.5.8).
+          className={`inline-flex min-h-6 items-center gap-1 uppercase tracking-[0.08em] transition-colors hover:text-foreground ${active ? "text-foreground" : ""}`}
           onClick={() => handleSort(col)}
         >
           {label}
           {active && (sortDir === "asc"
-            ? <ArrowUp className="h-4 w-4" />
-            : <ArrowDown className="h-4 w-4" />)}
+            ? <ArrowUp className="h-3 w-3" />
+            : <ArrowDown className="h-3 w-3" />)}
         </button>
       </TableHead>
     );
@@ -227,10 +233,10 @@ export default function DashboardPage() {
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 text-muted-foreground"
+          className="h-7 w-7 text-muted-foreground"
           disabled={actionLoading === file.id}
           onClick={(e) => e.stopPropagation()}
-          aria-label="File actions"
+          aria-label={`File actions for ${file.name}`}
         >
           <MoreHorizontal className="h-4 w-4" />
         </Button>
@@ -263,7 +269,7 @@ export default function DashboardPage() {
         </DropdownMenuSub>
         <DropdownMenuSeparator />
         <DropdownMenuItem
-          className="text-destructive focus:text-destructive"
+          className="text-destructive-text focus:text-destructive-text"
           onClick={() => setDeleteTarget(file)}
         >
           <Trash2 className="mr-2 h-4 w-4" /> Delete
@@ -284,24 +290,34 @@ export default function DashboardPage() {
           if (e.key === "Escape") setRenamingId(null);
         }}
         onClick={(e) => e.stopPropagation()}
-        className="h-8 max-w-xs"
+        aria-label="File name" className="h-7 max-w-xs font-mono text-[13px]"
       />
     ) : (
-      <span className="font-medium">{file.name}</span>
+      <Link
+        href={`/workspace?file_id=${file.id}`}
+        onClick={(e) => e.stopPropagation()}
+        className="rounded-sm font-mono text-[13px] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      >
+        {file.name}
+      </Link>
     );
 
   return (
     <AuthGuard>
-      <div className="mx-auto max-w-6xl px-4 pb-16 pt-8 sm:px-6">
-        <div className="mb-6 flex items-center justify-between">
+      <div className="mx-auto max-w-7xl px-4 pb-16 pt-8 sm:px-6">
+        <div className="mb-6 flex items-end justify-between gap-4">
           <div>
             <h1 className="text-xl font-semibold tracking-tight">Files</h1>
-            <p className="mt-0.5 text-sm text-muted-foreground">
-              {total} file{total !== 1 ? "s" : ""}
+            <p className="mt-1 font-mono text-[11px] uppercase tracking-[0.08em] text-muted-foreground">
+              <span className="tabular-nums">{total.toLocaleString()}</span> file{total !== 1 ? "s" : ""}
             </p>
           </div>
-          <Button onClick={() => router.push("/workspace")}>
-            <Upload className="mr-2 h-4 w-4" /> Upload
+          <Button
+            onClick={() => router.push("/workspace")}
+            onMouseEnter={() => uploadIconRef.current?.startAnimation()}
+            onMouseLeave={() => uploadIconRef.current?.stopAnimation()}
+          >
+            <UploadIcon ref={uploadIconRef} size={16} className="mr-2" /> Upload
           </Button>
         </div>
 
@@ -314,7 +330,7 @@ export default function DashboardPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9"
-              placeholder="Search files…"
+              aria-label="Search files" placeholder="Search files…"
             />
           </div>
           <TooltipProvider>
@@ -343,8 +359,8 @@ export default function DashboardPage() {
         )}
 
         {!loading && loadError && (
-          <div className="rounded-xl border border-destructive/30 bg-destructive/5 py-12 text-center">
-            <p className="font-medium text-destructive">Couldn&apos;t load your files</p>
+          <div className="rounded-md border border-destructive/30 bg-destructive/5 py-12 text-center">
+            <p className="font-medium text-destructive-text">Couldn&apos;t load your files</p>
             <p className="mt-1 text-sm text-muted-foreground">Check your connection and try again.</p>
             <Button variant="outline" className="mt-4" onClick={fetchFiles}>
               Retry
@@ -353,7 +369,7 @@ export default function DashboardPage() {
         )}
 
         {!loading && !loadError && files.length === 0 && (
-          <div className="rounded-xl border border-dashed py-8">
+          <div className="rounded-md border border-dashed py-8">
             {search ? (
               <EmptyState
                 variant="search"
@@ -366,8 +382,12 @@ export default function DashboardPage() {
                 title="No files yet"
                 description="Upload a spreadsheet, or start from a sample dataset, and describe your cleanup in plain English."
                 action={
-                  <Button onClick={() => router.push("/workspace")}>
-                    <Upload className="mr-2 h-4 w-4" /> Upload your first file
+                  <Button
+                    onClick={() => router.push("/workspace")}
+                    onMouseEnter={() => emptyUploadIconRef.current?.startAnimation()}
+                    onMouseLeave={() => emptyUploadIconRef.current?.stopAnimation()}
+                  >
+                    <UploadIcon ref={emptyUploadIconRef} size={16} className="mr-2" /> Upload your first file
                   </Button>
                 }
               />
@@ -376,14 +396,15 @@ export default function DashboardPage() {
         )}
 
         {!loading && !loadError && files.length > 0 && view === "list" && (
-          <div className="overflow-hidden rounded-xl border bg-card shadow-xs">
+          <div className="overflow-hidden rounded-md border bg-card">
             <Table>
               <TableHeader>
                 <TableRow>
                   {sortableHead("Name", "name")}
-                  <TableHead className="w-24 text-right">Size</TableHead>
-                  {sortableHead("Rows", "row_count", "w-28 text-right")}
-                  {sortableHead("Created", "created_at", "w-32")}
+                  <TableHead className="hidden w-24 text-right sm:table-cell">Size</TableHead>
+                  {sortableHead("Rows", "row_count", "hidden w-24 text-right sm:table-cell")}
+                  <TableHead className="hidden w-20 text-right sm:table-cell">Cols</TableHead>
+                  {sortableHead("Created", "created_at", "hidden w-32 sm:table-cell")}
                   <TableHead className="w-12" />
                 </TableRow>
               </TableHeader>
@@ -394,20 +415,34 @@ export default function DashboardPage() {
                     className="cursor-pointer"
                     onClick={() => handleOpen(file.id)}
                   >
-                    <TableCell className="flex items-center gap-2.5">
-                      <FileSpreadsheet className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
-                      {nameCell(file)}
-                      <Badge variant="outline" className="uppercase text-[10px]">
-                        {file.original_format}
-                      </Badge>
+                    <TableCell>
+                      <div className="flex min-w-0 items-center gap-2.5">
+                        <FileSpreadsheet className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                        {nameCell(file)}
+                        {/* The format is a property of the file, not a status, so
+                            it wears the grid's type-mark treatment, not a pill. */}
+                        <span className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
+                          {file.original_format}
+                        </span>
+                      </div>
+                      {/* The columns those numbers live in are hidden below sm,
+                          so the row carries them itself. */}
+                      <p className="mt-1 pl-[26px] font-mono text-[11px] tabular-nums text-muted-foreground sm:hidden">
+                        {file.row_count.toLocaleString()} × {file.column_count.toLocaleString()} · {formatBytes(file.size_bytes)} · {formatDate(file.created_at)}
+                      </p>
                     </TableCell>
-                    <TableCell className="text-right tabular-nums text-muted-foreground">
+                    <TableCell className="hidden text-right font-mono text-xs tabular-nums text-muted-foreground sm:table-cell">
                       {formatBytes(file.size_bytes)}
                     </TableCell>
-                    <TableCell className="text-right tabular-nums text-muted-foreground">
+                    <TableCell className="hidden text-right font-mono text-xs tabular-nums text-muted-foreground sm:table-cell">
                       {file.row_count.toLocaleString()}
                     </TableCell>
-                    <TableCell className="text-muted-foreground">{formatDate(file.created_at)}</TableCell>
+                    <TableCell className="hidden text-right font-mono text-xs tabular-nums text-muted-foreground sm:table-cell">
+                      {file.column_count.toLocaleString()}
+                    </TableCell>
+                    <TableCell className="hidden text-xs tabular-nums text-muted-foreground sm:table-cell">
+                      {formatDate(file.created_at)}
+                    </TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>{rowActions(file)}</TableCell>
                   </TableRow>
                 ))}
@@ -421,25 +456,25 @@ export default function DashboardPage() {
             {gridFiles.map((file) => (
               <div
                 key={file.id}
-                className="group cursor-pointer rounded-xl border bg-card p-5 shadow-xs transition-shadow hover:shadow-md"
+                className="group cursor-pointer rounded-md border bg-card p-4 transition-colors hover:border-primary/40 hover:bg-accent/40"
                 onClick={() => handleOpen(file.id)}
               >
                 <div className="mb-3 flex items-start justify-between">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
-                    <FileSpreadsheet className="h-5 w-5 text-muted-foreground" />
+                  <div className="flex h-8 w-8 items-center justify-center rounded border bg-muted/60">
+                    <FileSpreadsheet className="h-4 w-4 text-muted-foreground" />
                   </div>
-                  <div className="flex items-center gap-1">
-                    <Badge variant="outline" className="uppercase text-[10px]">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
                       {file.original_format}
-                    </Badge>
+                    </span>
                     {rowActions(file)}
                   </div>
                 </div>
-                <div className="mb-1 truncate text-sm font-medium">{nameCell(file)}</div>
-                <p className="text-xs tabular-nums text-muted-foreground">
-                  {file.row_count.toLocaleString()} rows · {file.column_count.toLocaleString()} cols · {formatBytes(file.size_bytes)}
+                <div className="mb-1.5 truncate text-sm">{nameCell(file)}</div>
+                <p className="font-mono text-[11px] tabular-nums text-muted-foreground">
+                  {file.row_count.toLocaleString()} × {file.column_count.toLocaleString()} · {formatBytes(file.size_bytes)}
                 </p>
-                <p className="mt-0.5 text-xs text-muted-foreground">{formatDate(file.created_at)}</p>
+                <p className="mt-0.5 text-[11px] tabular-nums text-muted-foreground">{formatDate(file.created_at)}</p>
               </div>
             ))}
           </div>

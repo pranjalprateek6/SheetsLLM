@@ -23,9 +23,9 @@ export default function KeyboardShortcuts({
       const isInput = target.tagName === "INPUT" || target.tagName === "TEXTAREA";
 
       // Ctrl+Enter — Run transformation
-      if (ctrl && e.key === "Enter") {
+      if (ctrl && e.key === "Enter" && onRun) {
         e.preventDefault();
-        onRun?.();
+        onRun();
         return;
       }
 
@@ -43,7 +43,7 @@ export default function KeyboardShortcuts({
         return;
       }
 
-      // "/" — Focus the Sage input (only when not already typing in a field;
+      // "/" — Focus the Chef input (only when not already typing in a field;
       // Ctrl+K is reserved for the command palette in the workspace)
       if (e.key === "/" && !ctrl && !isInput) {
         e.preventDefault();

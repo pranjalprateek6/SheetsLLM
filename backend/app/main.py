@@ -25,11 +25,16 @@ logging.basicConfig(
 logger = logging.getLogger("sheetsllm")
 
 # ── Per-route timeout map (seconds) ──────────────────────────────────
+# LLM routes must be able to outlast their worst legitimate case: one
+# 40s Gemini call, a 2s backoff, and one retry (see llm/adapter.py and
+# the 40s client timeout in gemini_client.py) — otherwise the middleware
+# kills requests that are still working and the user sees a generic
+# timeout instead of an answer.
 _ROUTE_TIMEOUTS = {
     "/upload": 120,
-    "/transform": 30,
+    "/transform": 90,
     "/download": 60,
-    "/chat": 30,
+    "/chat": 90,
 }
 _DEFAULT_TIMEOUT = 10
 

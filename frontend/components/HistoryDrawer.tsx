@@ -86,7 +86,7 @@ export default function HistoryDrawer({
 
           {!loading && loadError && (
             <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-center text-sm">
-              <p className="text-destructive">Couldn&apos;t load history.</p>
+              <p className="text-destructive-text">Couldn&apos;t load history.</p>
               <button onClick={fetchHistory} className="mt-2 font-medium text-primary hover:underline">
                 Retry
               </button>

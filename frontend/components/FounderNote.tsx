@@ -29,7 +29,7 @@ export default function FounderNote() {
   };
 
   return (
-    <div className="relative rounded-2xl border bg-muted/30 px-5 py-4">
+    <div className="relative rounded-md border bg-muted/30 px-5 py-4">
       <button
         onClick={dismiss}
         className="absolute right-3 top-3 rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"

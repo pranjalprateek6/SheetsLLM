@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { IconSwap } from "@/components/ui/icon-swap";
 import { Switch } from "@/components/ui/switch";
 import {
   DropdownMenu,
@@ -16,6 +17,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ChevronDown, LogOut, Menu, Moon, ShieldCheck, Sun, User, X } from "lucide-react";
+import { toast } from "sonner";
 import { useTheme } from "next-themes";
 import FeedbackWidget from "@/components/FeedbackWidget";
 
@@ -45,7 +47,11 @@ function ThemeToggle() {
       onClick={() => setTheme(dark ? "light" : "dark")}
       aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
     >
-      {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+      <IconSwap
+        state={dark ? "a" : "b"}
+        a={<Sun className="h-4 w-4" />}
+        b={<Moon className="h-4 w-4" />}
+      />
     </Button>
   );
 }
@@ -64,7 +70,7 @@ export default function Header() {
       fetchWithAuth("/api/settings")
         .then((r) => r.json())
         .then((d) => setPrivacyMode(!!d.privacy_mode))
-        .catch(() => setPrivacyMode(false));
+        .catch(() => setPrivacyMode(null)); // unknown, not "off"
     }
   }, [menuOpen, privacyMode, user]);
 
@@ -85,47 +91,95 @@ export default function Header() {
         body: JSON.stringify({ privacy_mode: next }),
       });
       // On failure, reset to unknown so the next open refetches the truth.
-      if (!r.ok) setPrivacyMode(null);
+      if (!r.ok) {
+        setPrivacyMode(null);
+        toast.error("Couldn't save that. Strict privacy mode is unchanged.");
+      }
     } catch {
       setPrivacyMode(null);
+      toast.error("Couldn't save that. Check your connection and try again.");
     }
   };
 
   const handleSignOut = async () => {
-    await signOut();
-    router.push("/");
+    try {
+      await signOut();
+    } catch {
+      toast.error("Couldn't sign you out. Check your connection and try again.");
+      return;
+    }
+    router.replace("/");
   };
 
   const links = user ? APP_LINKS : MARKETING_LINKS;
+  // The workspace is a full-bleed working surface; a centered max-width nav
+  // above it reads as a misaligned island. Marketing/app pages keep the
+  // centered container.
+  const fullBleed = pathname.startsWith("/workspace");
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-card/85 backdrop-blur-md">
-      <div className="relative mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:px-6">
+      <div
+        className={cn(
+          "relative flex h-14 items-center justify-between px-4",
+          fullBleed ? "w-full" : "mx-auto max-w-6xl sm:px-6"
+        )}
+      >
         {/* Logo — home for prospects, dashboard for signed-in users */}
-        <Link href={user ? "/dashboard" : "/"} className="flex items-center gap-2">
-          {/* eslint-disable-next-line @next/next/no-img-element -- static SVG, no optimizer needed */}
-          <img src="/logo.svg" alt="" width={26} height={26} className="h-[26px] w-[26px]" />
-          <span className="text-[15px] font-semibold tracking-tight">SheetsLLM</span>
-        </Link>
+        <div className="flex min-w-0 items-center">
+          <Link href={user ? "/dashboard" : "/"} className="flex items-center gap-2">
+            {/* eslint-disable-next-line @next/next/no-img-element -- static SVG, no optimizer needed */}
+            <img src="/logo.svg" alt="" width={26} height={26} className="h-[26px] w-[26px]" />
+            <span className="text-[15px] font-semibold tracking-tight">SheetsLLM</span>
+          </Link>
 
-        {/* Desktop nav — absolutely centered so it aligns with the page's
-            center axis regardless of the logo/menu widths on either side */}
-        <nav className="absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 items-center gap-1 md:flex">
-          {links.map((l) => (
-            <Link
-              key={l.href}
-              href={l.href}
-              className={cn(
-                "rounded-md px-3 py-1.5 text-sm transition-colors",
-                pathname === l.href
-                  ? "text-foreground"
-                  : "text-muted-foreground hover:bg-accent hover:text-foreground"
-              )}
-            >
-              {l.label}
-            </Link>
-          ))}
-        </nav>
+          {/* Signed in, the nav is a location rather than a menu, so it sits
+              beside the mark and marks the current place with a surface. */}
+          {user && (
+            <>
+              <span className="mx-3 hidden h-4 w-px bg-border md:block" aria-hidden />
+              <nav className="hidden items-center gap-0.5 md:flex">
+                {links.map((l) => (
+                  <Link
+                    key={l.href}
+                    href={l.href}
+                    aria-current={pathname === l.href ? "page" : undefined}
+                    className={cn(
+                      "rounded-md px-2.5 py-1 text-sm transition-colors",
+                      pathname === l.href
+                        ? "bg-accent text-foreground"
+                        : "text-muted-foreground hover:bg-accent/60 hover:text-foreground"
+                    )}
+                  >
+                    {l.label}
+                  </Link>
+                ))}
+              </nav>
+            </>
+          )}
+        </div>
+
+        {/* Signed out, the nav is a menu: centered on the page's axis regardless
+            of the logo and account widths on either side */}
+        {!user && (
+          <nav className="pointer-events-none absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 items-center gap-1 md:flex [&>a]:pointer-events-auto">
+            {links.map((l) => (
+              <Link
+                key={l.href}
+                href={l.href}
+                aria-current={pathname === l.href ? "page" : undefined}
+                className={cn(
+                  "rounded-md px-3 py-1.5 text-sm transition-colors",
+                  pathname === l.href
+                    ? "text-foreground"
+                    : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                )}
+              >
+                {l.label}
+              </Link>
+            ))}
+          </nav>
+        )}
 
         {/* Right side */}
         <div className="hidden items-center gap-2 md:flex">
@@ -149,14 +203,14 @@ export default function Header() {
                 <DropdownMenuItem
                   className="items-start gap-2.5"
                   role="menuitemcheckbox"
-                  aria-checked={!!privacyMode}
+                  aria-checked={privacyMode === null ? "mixed" : privacyMode}
                   onSelect={(e) => {
                     e.preventDefault(); // keep the menu open while toggling
                     togglePrivacy();
                   }}
                 >
                   <ShieldCheck
-                    className={cn("mt-0.5 h-4 w-4", privacyMode ? "text-success" : "text-muted-foreground")}
+                    className={cn("mt-0.5 h-4 w-4", privacyMode ? "text-success-text" : "text-muted-foreground")}
                   />
                   <div className="flex-1">
                     <p className="text-sm">Strict privacy mode</p>
@@ -164,7 +218,7 @@ export default function Header() {
                       The AI sees column names and types only, never your data.
                     </p>
                   </div>
-                  <Switch checked={!!privacyMode} className="pointer-events-none mt-0.5" />
+                  <Switch checked={!!privacyMode} aria-hidden tabIndex={-1} className="pointer-events-none mt-0.5" />
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
@@ -172,7 +226,7 @@ export default function Header() {
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={handleSignOut}
-                  className="text-destructive focus:text-destructive"
+                  className="text-destructive-text focus:text-destructive-text"
                 >
                   <LogOut className="mr-2 h-4 w-4" />
                   Sign out
@@ -198,15 +252,21 @@ export default function Header() {
           onClick={() => setMobileOpen(!mobileOpen)}
           className="rounded-md p-2 text-muted-foreground hover:bg-accent"
           aria-label="Toggle menu"
+          aria-expanded={mobileOpen}
+          aria-controls="mobile-nav"
         >
-          {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          <IconSwap
+            state={mobileOpen ? "a" : "b"}
+            a={<X className="h-5 w-5" />}
+            b={<Menu className="h-5 w-5" />}
+          />
         </button>
         </div>
       </div>
 
       {/* Mobile nav */}
       {mobileOpen && (
-        <div className="border-t border-border bg-background px-4 py-3 md:hidden">
+        <div id="mobile-nav" className="border-t border-border bg-background px-4 py-3 md:hidden">
           <nav className="flex flex-col gap-1">
             {links.map((l) => (
               <Link
@@ -217,6 +277,14 @@ export default function Header() {
                 {l.label}
               </Link>
             ))}
+            {!loading && user && (
+              <Link
+                href="/account"
+                className="rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
+              >
+                Account &amp; billing
+              </Link>
+            )}
             <div className="px-1 pt-1">
               <FeedbackWidget variant="outline" />
             </div>
@@ -233,7 +301,7 @@ export default function Header() {
             {!loading && user && (
               <button
                 onClick={handleSignOut}
-                className="mt-2 flex items-center gap-2 rounded-md border-t border-border px-3 pb-1 pt-3 text-sm text-destructive"
+                className="mt-2 flex items-center gap-2 rounded-md border-t border-border px-3 pb-1 pt-3 text-sm text-destructive-text"
               >
                 <LogOut className="h-4 w-4" /> Sign out
               </button>

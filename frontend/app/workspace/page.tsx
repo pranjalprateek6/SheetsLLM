@@ -1,34 +1,41 @@
 "use client";
-import { Suspense, useState, useEffect, useCallback } from "react";
+import dynamic from "next/dynamic";
+import { Suspense, useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import {
-  BarChart3, BookMarked, Columns3, Download, FileSpreadsheet, History, Lightbulb, MessageSquare, Undo2, Upload,
+  BarChart3, BookMarked, Check, ChevronDown, Columns3, FileSpreadsheet, History, Lightbulb, MessageSquare, Pencil, Undo2, Upload,
 } from "lucide-react";
+import { DownloadIcon, type DownloadIconHandle } from "@/components/icons/download";
+import ColumnHealth, { type HealthColumn } from "@/components/ColumnHealth";
+import PipelineSpine from "@/components/PipelineSpine";
 import DropZone from "@/components/DropZone";
 import DataGrid from "@/components/DataGrid";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import SheetSelector from "@/components/SheetSelector";
-import HistoryDrawer from "@/components/HistoryDrawer";
-import RecipesDrawer, { type RecipeApplyResult } from "@/components/RecipesDrawer";
+const HistoryDrawer = dynamic(() => import("@/components/HistoryDrawer"));
+import { type RecipeApplyResult } from "@/components/RecipesDrawer";
+const RecipesDrawer = dynamic(() => import("@/components/RecipesDrawer"));
 import ChatPanel from "@/components/ChatPanel";
-import SchemaPanel, { type SchemaColumn } from "@/components/SchemaPanel";
-import ChartPanel from "@/components/ChartPanel";
-import CommandPalette from "@/components/CommandPalette";
+import { type SchemaColumn } from "@/components/SchemaPanel";
+const SchemaPanel = dynamic(() => import("@/components/SchemaPanel"));
+const ChartPanel = dynamic(() => import("@/components/ChartPanel"));
+const CommandPalette = dynamic(() => import("@/components/CommandPalette"));
 import FounderNote from "@/components/FounderNote";
 import GettingStarted, { markOnboardingStep, ONBOARDING_FLAGS } from "@/components/GettingStarted";
 import OnboardingIntent, { INTENT_LABELS, loadIntents, type Intent } from "@/components/OnboardingIntent";
-import KeyboardShortcuts from "@/components/KeyboardShortcuts";
+const KeyboardShortcuts = dynamic(() => import("@/components/KeyboardShortcuts"));
 import ErrorBoundary from "@/components/ErrorBoundary";
 import AuthGuard from "@/components/AuthGuard";
 import { toast } from "sonner";
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
-import { useModKey } from "@/lib/platform";
 import { SAMPLE_DATASETS } from "@/lib/samples";
 import { TextShimmer } from "@/components/ui/text-shimmer";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
@@ -61,7 +68,6 @@ const INTENT_TO_SAMPLE: Partial<Record<Intent, string>> = {
 function WorkspaceContent() {
   const searchParams = useSearchParams();
   const urlFileId = searchParams.get("file_id");
-  const modKey = useModKey();
 
   const [fileReady, setFileReady] = useState(false);
   const [showTransform, setShowTransform] = useState(false);
@@ -81,13 +87,134 @@ function WorkspaceContent() {
   const [pendingUploadId, setPendingUploadId] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [recipesOpen, setRecipesOpen] = useState(false);
-  const [chatOpen, setChatOpen] = useState(true);
+  // Below lg the chat is a 65vh bottom sheet rather than a side rail, so
+  // defaulting it open there buried the grid under it on arrival. Read once at
+  // mount: the transform view is not rendered during hydration, so the server
+  // and client values are never both on screen.
+  const [chatOpen, setChatOpen] = useState(
+    () => typeof window === "undefined" || window.matchMedia("(min-width: 1024px)").matches
+  );
   const [chartOpen, setChartOpen] = useState(false);
   const [schemaOpen, setSchemaOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [sampleSuggestions, setSampleSuggestions] = useState<string[] | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [fileLoadError, setFileLoadError] = useState(false);
+  // The step chain, kept visible as the pipeline strip. Source of truth is
+  // the backend history; mutations update it optimistically.
+  const [steps, setSteps] = useState<{ step_number: number; instruction: string }[]>([]);
+  // What the last transform changed, surfaced in the change bar so the
+  // grid never silently swaps under the user.
+  const [lastChange, setLastChange] = useState<{
+    stepNumber?: number;
+    label: string;
+    rowsBefore: number;
+    rowsAfter: number;
+    addedCols: string[];
+    removedCols: string[];
+  } | null>(null);
+  const [chatPrefill, setChatPrefill] = useState<{ text: string; nonce: number } | null>(null);
+  // Step to confirm-revert to from the pipeline strip (0 = original file)
+  const [confirmRevert, setConfirmRevert] = useState<number | null>(null);
+  // The wedge, walking up to you: fresh file + you own recipes = offer one
+  const [recipeHint, setRecipeHint] = useState<{ name: string } | null>(null);
+  // Re-entry shortcut on the upload screen
+  const [lastFile, setLastFile] = useState<{ id: string; name: string } | null>(null);
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [renameValue, setRenameValue] = useState("");
+  // Schema panel → grid column jump
+  const [gridJump, setGridJump] = useState<{ name: string; nonce: number } | null>(null);
+  // Grid column widths, so the fingerprint above the grid lines up with it.
+  const [gridWidths, setGridWidths] = useState<Record<string, number>>({});
+  // Split once so the command bar can clip the stem and keep the extension.
+  const [fileStem, fileExt] = useMemo(() => {
+    const n = fileName || "";
+    const dot = n.lastIndexOf(".");
+    // treat it as an extension only if it is a real trailing suffix
+    return dot > 0 && dot > n.length - 8 ? [n.slice(0, dot), n.slice(dot)] : [n, ""];
+  }, [fileName]);
+
+  const handleColumnWidths = useCallback((w: Record<string, number>) => {
+    setGridWidths((prev) => {
+      const keys = Object.keys(w);
+      if (keys.length === Object.keys(prev).length && keys.every((k) => prev[k] === w[k])) return prev;
+      return w;
+    });
+  }, []);
+
+  const rememberLastFile = (id: string, name: string) => {
+    try {
+      localStorage.setItem("sllm_last_file", JSON.stringify({ id, name }));
+    } catch {}
+  };
+
+  const handleRenameSubmit = async () => {
+    const name = renameValue.trim();
+    setRenameOpen(false);
+    if (!fileId || !name || name === fileName) return;
+    try {
+      const r = await fetchWithAuth(`/api/files/${fileId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      setFileName(name);
+      rememberLastFile(fileId, name);
+      toast.success("File renamed");
+    } catch (e) {
+      console.error("Rename failed:", e);
+      toast.error("Couldn't rename the file. Please try again.");
+    }
+  };
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("sllm_last_file");
+      if (raw) setLastFile(JSON.parse(raw));
+    } catch {}
+  }, []);
+
+  // Offer a recipe when a file is opened fresh (no steps yet)
+  useEffect(() => {
+    if (!fileReady || !showTransform || !fileId || steps.length > 0) {
+      setRecipeHint(null);
+      return;
+    }
+    let alive = true;
+    fetchWithAuth("/api/recipes")
+      .then((r) => r.json())
+      .then((d) => {
+        if (alive && Array.isArray(d.recipes) && d.recipes.length > 0) {
+          setRecipeHint({ name: d.recipes[0].name });
+        }
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [fileReady, showTransform, fileId, steps.length]);
+  // Previous grid shape, for computing what a transform changed
+  const prevGridRef = useRef<{ columns: string[]; rowCount: number }>({ columns: [], rowCount: 0 });
+  const exportIconRef = useRef<DownloadIconHandle>(null);
+  useEffect(() => {
+    prevGridRef.current = { columns, rowCount };
+  }, [columns, rowCount]);
+
+  const refreshSteps = useCallback(async (id: string) => {
+    try {
+      const r = await fetchWithAuth(`/api/files/${id}/history`);
+      const d = await r.json();
+      if (r.ok) {
+        setSteps(
+          (d.steps ?? []).map((s: { step_number: number; instruction: string }) => ({
+            step_number: s.step_number,
+            instruction: s.instruction,
+          }))
+        );
+      }
+    } catch {}
+  }, []);
   // null = question not yet answered; [] = skipped
   const [intents, setIntents] = useState<Intent[] | null>(null);
   const [intentsLoaded, setIntentsLoaded] = useState(false);
@@ -104,6 +231,25 @@ function WorkspaceContent() {
     setIntents(chosen);
     if (chosen.length > 0) setJustAnswered(true);
   };
+
+  // Per-column dtype/null stats for the grid headers (from the upload-time
+  // schema; columns created by later transforms simply have no meta yet).
+  const columnMetaMap = useMemo(() => {
+    const map: Record<string, { dtype?: string; null_pct?: number; unique_count?: number }> = {};
+    for (const c of schema?.columns ?? []) {
+      if (c?.name) map[c.name] = { dtype: c.dtype, null_pct: c.null_pct, unique_count: c.unique_count };
+    }
+    return map;
+  }, [schema]);
+
+  // The fingerprint follows the GRID, not the upload-time schema: a transform
+  // that adds a column must show up immediately, and the schema is only
+  // fetched on load, so driving the strip from it left the new column missing
+  // and its "just changed" cap unable to fire.
+  const healthColumns = useMemo<HealthColumn[]>(() => {
+    const meta = new Map((schema?.columns ?? []).map((c) => [c.name, c] as const));
+    return columns.map((name) => meta.get(name) ?? { name });
+  }, [columns, schema]);
 
   // Answers unlock something visible: matching samples float to the top
   // and the starter prompts speak the user's domain.
@@ -166,6 +312,8 @@ function WorkspaceContent() {
       setColumnCount(file.column_count || 0);
       setFileReady(true);
       setShowUpload(false);
+      setLastChange(null);
+      refreshSteps(file.id);
 
       setShowTransform(true); // the grid is the file view — no interstitial
 
@@ -229,6 +377,8 @@ function WorkspaceContent() {
         setRows(data.preview.rows);
         setRowCount(data.preview.total_rows ?? data.preview.rows?.length ?? 0);
         setColumnCount(data.preview.total_columns ?? data.preview.columns?.length ?? 0);
+        setSteps([]);
+        setLastChange(null);
         setFileId(data.file_id);
         setFileName(file.name);
         setSchema(data.schema);
@@ -310,6 +460,8 @@ function WorkspaceContent() {
         setRows(data.preview?.rows ?? data.preview ?? []);
         setRowCount(data.preview?.total_rows ?? data.total_rows ?? rows.length);
         setColumnCount(data.preview?.total_columns ?? data.total_columns ?? columns.length);
+        setSteps((s) => s.slice(0, -1));
+        setLastChange(null);
         toast.success("Last step undone");
       } else if (data.code === "NOTHING_TO_UNDO") {
         toast.info("Nothing to undo. You're at the original file.");
@@ -339,6 +491,8 @@ function WorkspaceContent() {
         setRows(data.preview?.rows ?? data.preview ?? []);
         setRowCount(data.preview?.total_rows ?? data.total_rows ?? 0);
         setColumnCount(data.preview?.total_columns ?? data.total_columns ?? 0);
+        setSteps([]);
+        setLastChange(null);
         toast.success("All steps reset. You're back to the original file");
       } else {
         toast.error(data.message || "Reset failed. Please try again.");
@@ -383,6 +537,8 @@ function WorkspaceContent() {
         setRows(data.preview.rows);
         setRowCount(data.preview.total_rows);
         setColumnCount(data.preview.total_columns);
+        setSteps((s) => s.filter((x) => x.step_number <= stepNum));
+        setLastChange(null);
         toast.success(`Reverted to step ${stepNum}`);
       } else {
         toast.error(data.message || "Revert failed. Please try again.");
@@ -396,7 +552,33 @@ function WorkspaceContent() {
     }
   };
 
-  const previewHandler = useCallback((p: { columns: string[]; rows: Record<string, unknown>[]; totalRows?: number; totalColumns?: number }) => {
+  const previewHandler = useCallback((p: {
+    columns: string[];
+    rows: Record<string, unknown>[];
+    totalRows?: number;
+    totalColumns?: number;
+    stepNumber?: number;
+    instruction?: string;
+  }) => {
+    // Diff against the outgoing grid BEFORE swapping it, so the change
+    // bar can say exactly what this transform did.
+    const prev = prevGridRef.current;
+    const added = p.columns.filter((c) => !prev.columns.includes(c));
+    const removed = prev.columns.filter((c) => !p.columns.includes(c));
+    setLastChange({
+      stepNumber: p.stepNumber,
+      label: p.instruction ?? "Transform",
+      rowsBefore: prev.rowCount,
+      rowsAfter: p.totalRows ?? p.rows.length,
+      addedCols: added,
+      removedCols: removed,
+    });
+    if (typeof p.stepNumber === "number" && p.instruction) {
+      const stepNumber = p.stepNumber;
+      const instruction = p.instruction;
+      setSteps((s) => [...s.filter((x) => x.step_number < stepNumber), { step_number: stepNumber, instruction }]);
+    }
+
     setColumns(p.columns);
     setRows(p.rows);
     if (typeof p.totalRows === "number") setRowCount(p.totalRows);
@@ -429,7 +611,7 @@ function WorkspaceContent() {
             onDownload={handleDownload}
             onUndo={handleUndo}
             onFocusInput={() => {
-              const input = document.querySelector<HTMLTextAreaElement>('textarea[placeholder*="Sage"]');
+              const input = document.querySelector<HTMLTextAreaElement>('textarea[placeholder*="Chef"]');
               input?.focus();
             }}
             onEscape={() => { setHistoryOpen(false); setChartOpen(false); }}
@@ -446,7 +628,7 @@ function WorkspaceContent() {
         {/* Bad ?file_id= — dead-end recovery */}
         {fileLoadError && !fileReady && (
           <div className="flex min-h-[calc(100vh-56px)] items-center justify-center px-4">
-            <div className="w-full max-w-md rounded-2xl border bg-card p-8 text-center shadow-sm">
+            <div className="w-full max-w-md rounded-md border bg-card p-8 text-center shadow-sm">
               {/* eslint-disable-next-line @next/next/no-img-element -- static SVG */}
               <img src="/logo.svg" className="mx-auto mb-3 h-10 w-10 opacity-50" alt="" />
               <h2 className="text-lg font-semibold tracking-tight">This file couldn&apos;t be loaded</h2>
@@ -468,12 +650,22 @@ function WorkspaceContent() {
         {/* Phase 1: Upload */}
         {showUpload && !fileReady && !fileLoadError && !(loading && urlFileId) && (
           <div className="min-h-[calc(100vh-56px)] animate-fade-in-up">
-            <div className="mx-auto max-w-4xl space-y-5 px-4 pb-12 pt-12 sm:px-6">
+            {/* The header runs full width here, so a centered island below it
+                shares no edge with anything. The same status bar the loaded
+                workspace uses gives this phase the left edge instead, and says
+                which of the two states you are looking at. */}
+            <div className="flex h-9 items-center gap-3 border-b bg-card px-4 sm:px-6">
+              <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
+                Workspace
+              </span>
+              <span className="text-xs text-muted-foreground">No file open</span>
+            </div>
+            <div className="max-w-5xl space-y-5 px-4 pb-12 pt-8 sm:px-6">
               {intentsLoaded && intents === null && (
                 <OnboardingIntent onDone={handleIntentsDone} />
               )}
               {justAnswered && intents && intents.length > 0 && (
-                <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-primary/30 bg-primary/5 px-5 py-3.5">
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-primary/30 bg-primary/5 px-5 py-3.5">
                   <p className="text-sm">
                     <span className="font-medium">
                       Set up for {intents.map((i) => INTENT_LABELS[i]).join(" + ")}.
@@ -494,11 +686,11 @@ function WorkspaceContent() {
                 </div>
               )}
               <div className="grid gap-5 md:grid-cols-2">
-                <div className="rounded-2xl border bg-card p-6 shadow-xs">
+                <div className="rounded-md border bg-card p-6">
                   <h2 className="mb-4 text-lg font-semibold tracking-tight">Upload a spreadsheet</h2>
                   <DropZone disabled={loading} onDropFile={onUpload} />
                   {uploadError && (
-                    <div className="mt-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm text-destructive">
+                    <div className="mt-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm text-destructive-text">
                       {uploadError}
                     </div>
                   )}
@@ -516,7 +708,7 @@ function WorkspaceContent() {
                             key={sample.id}
                             onClick={() => loadSample(sample.id)}
                             disabled={loading}
-                            className={`w-full rounded-lg border px-3 py-2 text-left shadow-xs transition-colors hover:border-primary/40 hover:bg-primary/[0.03] disabled:opacity-50 ${
+                            className={`w-full rounded-lg border px-3 py-2 text-left transition-colors hover:border-primary/40 hover:bg-primary/[0.03] disabled:opacity-50 ${
                               picked ? "border-primary/40 bg-primary/[0.04]" : "bg-background"
                             }`}
                           >
@@ -537,7 +729,7 @@ function WorkspaceContent() {
                 </div>
                 <div className="space-y-4">
                   <GettingStarted />
-                  <div className="rounded-2xl border bg-card p-5 shadow-xs">
+                  <div className="rounded-md border bg-card p-5">
                     <div className="flex items-start gap-3">
                       <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-primary/10">
                         <Lightbulb className="h-4 w-4 text-primary" />
@@ -562,19 +754,66 @@ function WorkspaceContent() {
           </div>
         )}
 
-        {/* Phase 3: Transform with Sage sidebar */}
+        {/* Phase 3: Transform with Chef sidebar */}
         {fileReady && showTransform && (
-          <div className="flex h-[calc(100vh-56px)] animate-fade-in-up">
+          <div className="flex h-[calc(100dvh-56px)] animate-fade-in-up">
+            {/* The chain is the product, so it gets a permanent rail rather
+                than a strip that scrolls its own history off-screen. */}
+            <PipelineSpine
+              steps={steps}
+              onRevertTo={(n) => setConfirmRevert(n)}
+              onAddStep={() => {
+                setChatOpen(true);
+                setChatPrefill({ text: "", nonce: Date.now() });
+              }}
+              className="hidden lg:flex"
+            />
             {/* Main content area */}
-            <div className="flex min-w-0 flex-1 flex-col">
-              {/* Compact toolbar */}
-              <div className="flex flex-shrink-0 items-center gap-2 border-b bg-card px-4 py-2">
+            <div className="relative flex min-w-0 flex-1 flex-col">
+              <h1 className="sr-only">{fileName || "Workspace"}</h1>
+              {/* Toolbar: file identity + view tools + labeled primary actions */}
+              <div className="flex h-12 flex-shrink-0 items-center gap-3 border-b bg-card px-3">
                 <div className="flex min-w-0 flex-1 items-center gap-2">
-                  <FileSpreadsheet className="h-4 w-4 flex-shrink-0 text-primary" />
-                  <span className="truncate text-sm font-medium">{fileName || "Untitled"}</span>
-                  <Badge variant="secondary" className="flex-shrink-0 font-normal tabular-nums text-muted-foreground">
-                    {rowCount.toLocaleString()} × {columnCount.toLocaleString()}
-                  </Badge>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        title={fileName || "Untitled"}
+                        className="flex min-w-0 items-center gap-2 rounded-md px-1.5 py-1 transition-colors hover:bg-accent"
+                      >
+                        <FileSpreadsheet className="h-4 w-4 flex-shrink-0 text-primary" aria-hidden />
+                        {/* Clip the stem, never the extension: the format is the
+                            part that tells you what you are looking at, and a
+                            trailing ellipsis would eat it first. */}
+                        <span className="flex min-w-0 items-center text-sm font-medium">
+                          <span className="truncate">{fileStem || "Untitled"}</span>
+                          <span className="flex-shrink-0 text-muted-foreground">{fileExt}</span>
+                        </span>
+                        <ChevronDown className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" aria-hidden />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start">
+                      <DropdownMenuItem onClick={handleResetClick}>
+                        <Upload className="mr-2 h-4 w-4" /> Upload a new file
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <a href="/dashboard">
+                          <FileSpreadsheet className="mr-2 h-4 w-4" /> Go to Files
+                        </a>
+                      </DropdownMenuItem>
+                      {/* Narrow screens have no room for these in the bar, and
+                          the command palette is not reachable without a keyboard. */}
+                      <DropdownMenuSeparator className="sm:hidden" />
+                      <DropdownMenuItem className="sm:hidden" onClick={() => setChartOpen(true)}>
+                        <BarChart3 className="mr-2 h-4 w-4" /> Quick chart
+                      </DropdownMenuItem>
+                      <DropdownMenuItem className="sm:hidden" onClick={() => setSchemaOpen(true)}>
+                        <Columns3 className="mr-2 h-4 w-4" /> Schema
+                      </DropdownMenuItem>
+                      <DropdownMenuItem className="sm:hidden" onClick={() => setHistoryOpen(true)}>
+                        <History className="mr-2 h-4 w-4" /> History &amp; SQL
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
                 <TooltipProvider>
                   <div className="flex items-center gap-0.5">
@@ -585,24 +824,16 @@ function WorkspaceContent() {
                           size="icon"
                           className={chatOpen ? "h-8 w-8 text-primary" : "h-8 w-8 text-muted-foreground"}
                           onClick={() => setChatOpen((v) => !v)}
-                          aria-label={chatOpen ? "Hide Sage chat panel" : "Show Sage chat panel"}
+                          aria-label={chatOpen ? "Hide Chef chat panel" : "Show Chef chat panel"}
                         >
                           <MessageSquare className="h-4 w-4" />
                         </Button>
                       </TooltipTrigger>
-                      <TooltipContent>{chatOpen ? "Hide Sage" : "Show Sage"}</TooltipContent>
+                      <TooltipContent>{chatOpen ? "Hide Chef" : "Show Chef"}</TooltipContent>
                     </Tooltip>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={handleUndo} aria-label="Undo last step">
-                          <Undo2 className="h-4 w-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Undo ({modKey}+Z)</TooltipContent>
-                    </Tooltip>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => setChartOpen(true)} aria-label="Quick chart">
+                        <Button variant="ghost" size="icon" className="hidden h-8 w-8 text-muted-foreground sm:inline-flex" onClick={() => setChartOpen(true)} aria-label="Quick chart">
                           <BarChart3 className="h-4 w-4" />
                         </Button>
                       </TooltipTrigger>
@@ -610,7 +841,7 @@ function WorkspaceContent() {
                     </Tooltip>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => setSchemaOpen(true)} aria-label="View schema">
+                        <Button variant="ghost" size="icon" className="hidden h-8 w-8 text-muted-foreground sm:inline-flex" onClick={() => setSchemaOpen(true)} aria-label="View schema">
                           <Columns3 className="h-4 w-4" />
                         </Button>
                       </TooltipTrigger>
@@ -618,31 +849,38 @@ function WorkspaceContent() {
                     </Tooltip>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => setHistoryOpen(true)} aria-label="History">
+                        <Button variant="ghost" size="icon" className="hidden h-8 w-8 text-muted-foreground sm:inline-flex" onClick={() => setHistoryOpen(true)} aria-label="History and SQL detail">
                           <History className="h-4 w-4" />
                         </Button>
                       </TooltipTrigger>
-                      <TooltipContent>History</TooltipContent>
+                      <TooltipContent>History &amp; SQL</TooltipContent>
                     </Tooltip>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => setRecipesOpen(true)} aria-label="Recipes">
-                          <BookMarked className="h-4 w-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Recipes</TooltipContent>
-                    </Tooltip>
+                    <div className="mx-1.5 h-5 w-px bg-border" aria-hidden />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 gap-1.5 px-2 sm:px-3"
+                      onClick={() => setRecipesOpen(true)}
+                      aria-label={steps.length > 0 ? "Save recipe" : "Recipes"}
+                    >
+                      <BookMarked className="h-3.5 w-3.5" />
+                      <span className="hidden sm:inline">
+                        {steps.length > 0 ? "Save recipe" : "Recipes"}
+                      </span>
+                    </Button>
                     <DropdownMenu>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" aria-label="Download">
-                              <Download className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                        </TooltipTrigger>
-                        <TooltipContent>Download ({modKey}+S = CSV)</TooltipContent>
-                      </Tooltip>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          size="sm"
+                          className="h-8 gap-1.5"
+                          aria-label="Export"
+                          onMouseEnter={() => exportIconRef.current?.startAnimation()}
+                          onMouseLeave={() => exportIconRef.current?.stopAnimation()}
+                        >
+                          <DownloadIcon ref={exportIconRef} size={14} />
+                          Export
+                        </Button>
+                      </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => handleDownload("csv")}>CSV</DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleDownload("xlsx")}>Excel (.xlsx)</DropdownMenuItem>
@@ -651,27 +889,117 @@ function WorkspaceContent() {
                         <DropdownMenuItem onClick={() => handleDownload("parquet")}>Parquet</DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={handleResetClick} aria-label="Upload new file">
-                          <Upload className="h-4 w-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Upload new file</TooltipContent>
-                    </Tooltip>
                   </div>
                 </TooltipProvider>
               </div>
 
+              {/* Column fingerprint: one segment per column, filled by how
+                  complete it is. Nulls read as the gap and drain as you clean. */}
+              {healthColumns.length > 0 && (
+                <div className="flex h-9 flex-shrink-0 items-center gap-3 border-b bg-card px-3">
+                  <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
+                    Columns
+                  </span>
+                  <ColumnHealth
+                    columns={healthColumns}
+                    widths={gridWidths}
+                    className="hidden flex-1 sm:flex"
+                    changedCols={lastChange?.addedCols}
+                    onSelect={(name) => setGridJump({ name, nonce: Date.now() })}
+                  />
+                  {/* The segments are proportional to column width, so on a
+                      phone the narrow ones compress to 14px: too small to read
+                      and too small to tap. The row states the count instead. */}
+                  <span className="flex-1 font-mono text-[10px] tabular-nums text-muted-foreground sm:hidden">
+                    {healthColumns.length}
+                  </span>
+                  <span className="shrink-0 font-mono text-[10px] tabular-nums text-muted-foreground">
+                    {healthColumns.filter((c) => (c.null_pct ?? 0) > 0).length} with gaps
+                  </span>
+                </div>
+              )}
+
+              {/* Change bar: what the last transform actually did */}
+              {lastChange && (
+                <div
+                  className={`flex flex-shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b px-4 py-1.5 text-xs ${
+                    lastChange.rowsAfter === 0
+                      ? "border-warning/30 bg-warning/10"
+                      : "border-success/25 bg-success/[0.07]"
+                  }`}
+                >
+                  {lastChange.rowsAfter > 0 && <Check className="h-3.5 w-3.5 flex-shrink-0 text-success-text" />}
+                  <span className="font-medium">
+                    {typeof lastChange.stepNumber === "number"
+                      ? `Step ${lastChange.stepNumber} applied`
+                      : lastChange.label}
+                  </span>
+                  <span className="tabular-nums text-muted-foreground">
+                    {lastChange.rowsAfter === 0
+                      ? `Every row was removed (${lastChange.rowsBefore.toLocaleString()} → 0)`
+                      : lastChange.rowsAfter === lastChange.rowsBefore
+                        ? `${lastChange.rowsAfter.toLocaleString()} rows (unchanged)`
+                        : `${lastChange.rowsBefore.toLocaleString()} → ${lastChange.rowsAfter.toLocaleString()} rows (${
+                            lastChange.rowsAfter > lastChange.rowsBefore ? "+" : "−"
+                          }${Math.abs(lastChange.rowsAfter - lastChange.rowsBefore).toLocaleString()})`}
+                  </span>
+                  {lastChange.addedCols.length > 0 && (
+                    <span className="text-muted-foreground">
+                      added <span className="font-medium text-foreground">{lastChange.addedCols.join(", ")}</span>
+                    </span>
+                  )}
+                  {lastChange.removedCols.length > 0 && (
+                    <span className="text-muted-foreground">
+                      removed <span className="font-medium text-foreground">{lastChange.removedCols.join(", ")}</span>
+                    </span>
+                  )}
+                  <div className="ml-auto flex items-center gap-2">
+                    <button
+                      onClick={handleUndo}
+                      className="inline-flex items-center gap-1 font-medium text-primary underline-offset-2 hover:underline"
+                    >
+                      <Undo2 className="h-3 w-3" /> Undo
+                    </button>
+                    <button
+                      onClick={() => setLastChange(null)}
+                      className="text-muted-foreground hover:text-foreground"
+                      aria-label="Dismiss change summary"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Data grid */}
-              <div className="flex-1 overflow-hidden p-2">
-                <DataGrid columns={columns} rows={rows} loading={loading} />
+              <div className="flex-1 overflow-hidden">
+                <DataGrid
+                  columns={columns}
+                  rows={rows}
+                  loading={loading}
+                  columnMeta={columnMetaMap}
+                  highlightCols={lastChange?.addedCols}
+                  totalRows={rowCount}
+                  stepCount={steps.length}
+                  onColumnWidths={handleColumnWidths}
+                  onAskColumn={(col) => {
+                    setChatOpen(true);
+                    setChatPrefill({ text: `Tell me about the "${col}" column`, nonce: Date.now() });
+                  }}
+                  onAskChef={(text) => {
+                    setChatOpen(true);
+                    setChatPrefill({ text, nonce: Date.now() });
+                  }}
+                  scrollToCol={gridJump}
+                />
               </div>
             </div>
 
-            {/* Sage — desktop column (collapsible), mobile bottom sheet */}
+            {/* Chef — one instance; the wrapper is an in-flow column at lg
+                and a bottom sheet below it. Rendering it twice mounted two
+                panels with separate state and doubled every fetch. */}
             {chatOpen && (
-              <div className="hidden w-80 flex-shrink-0 lg:block xl:w-96">
+              <div className="fixed inset-x-0 bottom-0 z-40 h-[65vh] overflow-hidden rounded-t-lg border-t bg-card shadow-lg lg:static lg:z-auto lg:h-auto lg:w-[340px] lg:flex-shrink-0 lg:rounded-none lg:border-l lg:border-t-0 lg:shadow-none xl:w-[380px]">
                 <ChatPanel
                   fileId={fileId}
                   open={chatOpen}
@@ -680,43 +1008,104 @@ function WorkspaceContent() {
                   onUndo={handleUndo}
                   onReset={handleReset}
                   starterSuggestions={sampleSuggestions}
-                />
-              </div>
-            )}
-            {chatOpen && (
-              <div className="fixed inset-x-0 bottom-0 z-40 h-[65vh] overflow-hidden rounded-t-2xl border-t bg-card shadow-lg lg:hidden">
-                <ChatPanel
-                  fileId={fileId}
-                  open={chatOpen}
-                  onPreview={previewHandler}
-                  fileName={fileName}
-                  onUndo={handleUndo}
-                  onReset={handleReset}
-                  starterSuggestions={sampleSuggestions}
+                  prefill={chatPrefill}
                 />
               </div>
             )}
           </div>
         )}
 
-        <SchemaPanel open={schemaOpen} onClose={() => setSchemaOpen(false)} columns={schema?.columns ?? []} fileName={fileName} />
-        <HistoryDrawer open={historyOpen} onClose={() => setHistoryOpen(false)} fileId={fileId} onRevert={handleRevert} />
+        <SchemaPanel
+          open={schemaOpen}
+          onClose={() => setSchemaOpen(false)}
+          columns={schema?.columns ?? []}
+          fileName={fileName}
+          onJumpToColumn={(name) => {
+            setSchemaOpen(false);
+            setGridJump({ name, nonce: Date.now() });
+          }}
+        />
+        <HistoryDrawer open={historyOpen} onClose={() => setHistoryOpen(false)} fileId={fileId} onRevert={(n) => { setHistoryOpen(false); setConfirmRevert(n); }} />
         <RecipesDrawer
           open={recipesOpen}
           onClose={() => setRecipesOpen(false)}
           fileId={fileId}
           fileName={fileName}
           onApplied={(result: RecipeApplyResult) => {
+            // A recipe apply is a transform too: same change-bar treatment
+            const prev = prevGridRef.current;
+            setLastChange({
+              label: `Recipe applied (${result.steps_added} step${result.steps_added === 1 ? "" : "s"})`,
+              rowsBefore: prev.rowCount,
+              rowsAfter: result.preview.total_rows,
+              addedCols: result.preview.columns.filter((c) => !prev.columns.includes(c)),
+              removedCols: prev.columns.filter((c) => !result.preview.columns.includes(c)),
+            });
             setColumns(result.preview.columns);
             setRows(result.preview.rows);
             setRowCount(result.preview.total_rows);
             setColumnCount(result.preview.total_columns);
+            if (fileId) refreshSteps(fileId);
           }}
         />
         <ConfirmDialog isOpen={showResetDialog} onConfirm={handleFullReset} onCancel={() => setShowResetDialog(false)} title="Are you sure you want to reset?" message="This will clear your current work and return to the upload screen." confirmText="Reset" cancelText="Cancel" items={["Clear your current file and all transformations", "Return to the upload screen"]} />
+        <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
+          <DialogContent className="sm:max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Rename file</DialogTitle>
+            </DialogHeader>
+            <Input
+              autoFocus
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleRenameSubmit();
+              }}
+              maxLength={200}
+              aria-label="File name"
+            />
+            <Button onClick={handleRenameSubmit} disabled={!renameValue.trim()}>
+              Save
+            </Button>
+          </DialogContent>
+        </Dialog>
+        <ConfirmDialog
+          isOpen={confirmRevert !== null}
+          onConfirm={() => {
+            const target = confirmRevert;
+            setConfirmRevert(null);
+            if (target === 0) handleReset();
+            else if (target !== null) handleRevert(target);
+          }}
+          onCancel={() => setConfirmRevert(null)}
+          title={confirmRevert === 0 ? "Back to the original file?" : `Go back to step ${confirmRevert}?`}
+          message={
+            confirmRevert === 0
+              ? "All steps will be removed. Your original data is untouched and you can re-run any instruction."
+              : "Steps after this point will be removed. Your original data is untouched and you can re-run any instruction."
+          }
+          confirmText={confirmRevert === 0 ? "Reset steps" : "Go back"}
+          cancelText="Cancel"
+        />
         <SheetSelector isOpen={showSheetSelector} sheets={availableSheets} onSelect={handleSheetSelect} onCancel={() => { setShowSheetSelector(false); setPendingFile(null); setPendingUploadId(null); setLoading(false); }} />
         <ChartPanel columns={columns} rows={rows} open={chartOpen} onClose={() => setChartOpen(false)} />
-        <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} onUpload={handleFullReset} onUndo={handleUndo} onDownload={handleDownload} onReset={handleResetClick} onChat={() => setChatOpen(true)} onHistory={() => setHistoryOpen(true)} fileId={fileId} />
+        <CommandPalette
+          open={paletteOpen}
+          onClose={() => setPaletteOpen(false)}
+          onUpload={handleResetClick}
+          onUndo={handleUndo}
+          onDownload={handleDownload}
+          onDownloadXlsx={() => handleDownload("xlsx")}
+          onReset={handleResetClick}
+          onChat={() => setChatOpen((v) => !v)}
+          onHistory={() => setHistoryOpen(true)}
+          onSaveRecipe={() => setRecipesOpen(true)}
+          onRename={() => {
+            setRenameValue(fileName);
+            setRenameOpen(true);
+          }}
+          fileId={fileId}
+        />
       </div>
     </ErrorBoundary>
   );

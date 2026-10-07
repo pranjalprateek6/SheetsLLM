@@ -40,9 +40,12 @@ function resetDate(month: string) {
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" });
 }
 
+/* The fill is a non-text indicator, so it needs 3:1 against the track it sits
+   in. The --warning and --destructive fills are mixed for white text on top and
+   only reach ~1.9:1 on --muted; the text steps are solved for contrast. */
 function barColor(pct: number) {
-  if (pct >= 1) return "bg-destructive";
-  if (pct >= NUDGE_THRESHOLD) return "bg-warning";
+  if (pct >= 1) return "bg-[hsl(var(--destructive-text))]";
+  if (pct >= NUDGE_THRESHOLD) return "bg-[hsl(var(--warning-text))]";
   return "bg-primary";
 }
 
@@ -65,7 +68,7 @@ export default function UsageCard({ embedded = false }: { embedded?: boolean }) 
 
   if (state === "loading") {
     return (
-      <div className={cn(!embedded && "mb-6 rounded-xl border bg-card p-5 shadow-xs")}>
+      <div className={cn(!embedded && "mb-6 rounded-md border bg-card p-4")}>
         <Skeleton className="mb-4 h-4 w-40" />
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Skeleton className="h-8" />
@@ -107,9 +110,9 @@ export default function UsageCard({ embedded = false }: { embedded?: boolean }) 
         <div className="flex items-center gap-2">
           <Gauge className="h-4 w-4 text-muted-foreground" />
           <h2 className="text-sm font-medium">Usage this month</h2>
-          <Badge variant="secondary" className="capitalize">{usage.tier}</Badge>
+          <Badge variant="secondary" className="font-mono text-[10px] uppercase tracking-wide">{usage.tier}</Badge>
         </div>
-        <span className="text-xs text-muted-foreground">Resets {resetDate(usage.month)}</span>
+        <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">Resets {resetDate(usage.month)}</span>
       </div>
 
       {/* The numbers say what you used; this line says what it got you. */}
@@ -136,8 +139,8 @@ export default function UsageCard({ embedded = false }: { embedded?: boolean }) 
         {meters.map((m) => (
           <div key={m.key}>
             <div className="mb-1.5 flex items-baseline justify-between">
-              <span className="text-xs text-muted-foreground">{m.label}</span>
-              <span className="text-xs font-medium tabular-nums">
+              <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">{m.label}</span>
+              <span className="font-mono text-[11px] font-medium tabular-nums">
                 {m.used.toLocaleString()}
                 {m.limit > 0 ? (
                   <span className="text-muted-foreground"> / {m.limit.toLocaleString()}</span>
@@ -145,14 +148,14 @@ export default function UsageCard({ embedded = false }: { embedded?: boolean }) 
               </span>
             </div>
             {m.limit > 0 ? (
-              <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+              <div className="h-1.5 overflow-hidden rounded-full border border-border/60 bg-muted">
                 <div
-                  className={cn("h-full rounded-full transition-all", barColor(m.pct))}
+                  className={cn("h-full rounded-full transition-[width] duration-500 ease-out", barColor(m.pct))}
                   style={{ width: `${m.pct * 100}%` }}
                 />
               </div>
             ) : (
-              <p className="text-xs text-muted-foreground">Unlimited</p>
+              <p className="font-mono text-[11px] text-muted-foreground">Unlimited</p>
             )}
           </div>
         ))}
