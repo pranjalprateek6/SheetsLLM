@@ -60,7 +60,7 @@ Effort: half a day.
 
 ## Phase 1: promises the code does not keep
 
-Ten defects. Each is a strict improvement regardless of product direction. Ship them as five PRs, grouped by the file they share.
+Eleven defects. Each is a strict improvement regardless of product direction. Ship them as six PRs, grouped by the file they share.
 
 ### PR 1a: privacy default and cache key (backend, highest stakes)
 
@@ -130,6 +130,16 @@ Effort: 1 day. Backend: none.
 - Tests: `CommandPalette.test.tsx` asserts the item label and that it calls the close handler; `ChatPanel.test.tsx` asserts the aria-label.
 
 Effort: 1.5 days. Backend: half a day.
+
+### PR 1f: a bad file id is a 404, not a crash (backend)
+
+**A11. Non-UUID ids produce plain-text 500s.** Found during the #48 verification: `GET /files/{id}/history`, `GET /insights/{id}` and `GET /download?file_id=` answer `500 Internal Server Error` as text when the id is not a UUID (for example the string `undefined`, which a UI bug can easily send). The Next proxies then fail to parse the body as JSON and log a second error.
+
+- Backend: validate the id shape at the route boundary and return `404 {"code": "FILE_NOT_FOUND"}`; a `db` lookup that raises on a malformed id is caught in one place, not per route.
+- Tests (pytest): parametrised over the three routes with `undefined`, `""` and a random UUID that does not exist: all three return 404 JSON.
+- Acceptance: the proxies never see a non-JSON error body from these routes.
+
+Effort: half a day. Backend only.
 
 ### PR 1e: export naming and the download proxy (frontend)
 
