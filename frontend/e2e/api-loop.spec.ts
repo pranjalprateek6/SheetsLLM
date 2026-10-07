@@ -14,7 +14,9 @@ import { expect, test } from "@playwright/test";
 const BACKEND = process.env.E2E_BACKEND_URL || "http://localhost:8000";
 const fixtures = join(__dirname, "fixtures");
 
-test.skip(!process.env.E2E_BACKEND, "set E2E_BACKEND=1 with a fake-LLM backend on :8000");
+// "0" and "false" must mean off, so this is an allow-list, not a truthiness check.
+const backendOn = /^(1|true|yes)$/i.test(process.env.E2E_BACKEND ?? "");
+test.skip(!backendOn, "set E2E_BACKEND=1 with a fake-LLM backend on :8000");
 
 test("upload, transform, undo, recipe, apply, export", async ({ request }) => {
   const csv = readFileSync(join(fixtures, "orders_oct.csv"));

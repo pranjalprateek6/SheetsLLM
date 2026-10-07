@@ -14,6 +14,8 @@ const channel = process.env.PW_CHANNEL;
 
 export default defineConfig({
   testDir: "e2e",
+  // Regenerates e2e/fixtures/*.csv before every run; nothing generated is committed.
+  globalSetup: "./e2e/global-setup.ts",
   timeout: 60_000,
   expect: { timeout: 10_000 },
   fullyParallel: false,
