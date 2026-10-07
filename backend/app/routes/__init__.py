@@ -2,6 +2,8 @@
 
 from fastapi import FastAPI
 
+from app.config import LLM_PROVIDER
+
 from .audit import router as audit_router
 from .download import router as download_router
 from .files import router as files_router
@@ -37,3 +39,6 @@ def register_routes(app: FastAPI) -> None:
     app.include_router(settings_router)
     app.include_router(billing_router)
     app.include_router(feedback_router)
+    if LLM_PROVIDER == "fake":
+        from .fake_llm import router as fake_llm_router
+        app.include_router(fake_llm_router)
