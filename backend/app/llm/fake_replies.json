@@ -1,0 +1,38 @@
+[
+  {
+    "match": "add column margin",
+    "reply": "SELECT *, \"MRP\" - \"Landing Cost\" AS \"Margin\" FROM data"
+  },
+  {
+    "match": "add column profit",
+    "reply": "SELECT *, \"Revenue\" - \"Cost\" AS \"Profit\" FROM data"
+  },
+  {
+    "match": "remove duplicate",
+    "reply": "SELECT DISTINCT * FROM data"
+  },
+  {
+    "match": "remove rows with null",
+    "reply": "SELECT * FROM data WHERE \"Region\" IS NOT NULL AND \"Region\" <> ''"
+  },
+  {
+    "match": "sort by date",
+    "reply": "SELECT * FROM data ORDER BY \"Order Date\" DESC"
+  },
+  {
+    "match": "which column has the most nulls",
+    "reply": "{\"insight\": \"Region has the most empty cells, 23% of rows.\"}"
+  },
+  {
+    "match": "tell me what i can do",
+    "reply": "{\"insight\": \"You can remove duplicates, drop rows with empty Region, add a Margin column, or sort by date.\"}"
+  },
+  {
+    "match": "__quota__",
+    "reply": "__quota__"
+  },
+  {
+    "match": "__invalid__",
+    "reply": "__invalid__"
+  }
+]
