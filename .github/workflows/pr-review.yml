@@ -28,14 +28,31 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
+          # Lockfiles are verified by tooling in the next step, not read by the
+          # model. A bare "package-lock.json" pathspec only matched the repo
+          # root, so the frontend/ lockfile used to reach the reviewer.
           git diff "$BASE_SHA...$HEAD_SHA" \
             -- . \
-            ':(exclude)package-lock.json' \
-            ':(exclude)*.lock' \
-            ':(exclude)*.min.js' \
-            ':(exclude)*.min.css' \
+            ':(exclude)**/package-lock.json' \
+            ':(exclude)**/pnpm-lock.yaml' \
+            ':(exclude)**/*.lock' \
+            ':(exclude)**/*.min.js' \
+            ':(exclude)**/*.min.css' \
             > pr.diff
           echo "Diff size: $(wc -c < pr.diff) bytes, $(grep -c '^+++' pr.diff || true) files"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Verify dependency changes against the npm registry
+        # Registry state is outside any model's knowledge, so the reviewer is
+        # handed the facts: which changed versions exist, where the lockfile
+        # resolves them from, and whether the integrity hashes match.
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: python3 .github/scripts/registry_facts.py
 
       - name: Gemini review
         env:
@@ -50,7 +67,10 @@ jobs:
           MAX_DIFF_CHARS = 250_000
 
           diff = open("pr.diff", encoding="utf-8", errors="replace").read()
-          if not diff.strip():
+          registry = ""
+          if os.path.exists("registry.md"):
+              registry = open("registry.md", encoding="utf-8").read().strip()
+          if not diff.strip() and not registry:
               open("review.md", "w").write("No reviewable changes in this diff.")
               sys.exit(0)
           truncated = len(diff) > MAX_DIFF_CHARS
@@ -82,9 +102,23 @@ jobs:
 
           Rules: cite file paths and line hints from the diff. Be specific, not generic.
           Do not invent issues to fill sections. Severity-order findings. Keep the whole review under 600 words.
-          Style: professional and plain text - no emojis or decorative symbols anywhere in the review."""
+          Style: professional and plain text - no emojis or decorative symbols anywhere in the review.
 
-          user = f"PR title: {os.environ.get('PR_TITLE','')}\n\nPR description:\n{os.environ.get('PR_BODY','') or '(none)'}\n\nDiff{' (truncated)' if truncated else ''}:\n```diff\n{diff}\n```"
+          Package registries are outside your knowledge. Never state that a package version does not
+          exist, is unpublished, or is suspicious because of the release history you remember; that
+          history is out of date. The only admissible evidence about registry state is the "Registry
+          facts" block, which tooling produced from the live registry when this review ran. Flag a
+          dependency as a supply-chain concern only when that block marks it NOT FOUND, resolved from a
+          host other than registry.npmjs.org, or an integrity mismatch. If a dependency change has no
+          entry there, say it was not verified rather than guessing."""
+
+          preface = (registry + "\n\n") if registry else ""
+          user = (
+              f"PR title: {os.environ.get('PR_TITLE','')}\n\n"
+              f"PR description:\n{os.environ.get('PR_BODY','') or '(none)'}\n\n"
+              f"{preface}"
+              f"Diff{' (truncated)' if truncated else ''}:\n```diff\n{diff}\n```"
+          )
 
           payload = json.dumps({
               "system_instruction": {"parts": [{"text": system}]},
