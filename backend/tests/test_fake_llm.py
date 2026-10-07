@@ -104,6 +104,27 @@ def test_the_match_latest_in_the_message_wins_over_history():
     assert fake.calls()[-1]["matched"] == "add column margin"
 
 
+def test_history_never_answers_an_unscripted_current_turn():
+    """With the chat route's marker present, only the current turn is matched:
+    a scripted phrase in the history must not turn an unscripted instruction
+    into SQL. This is the case the first live run tripped on."""
+    llm = FakeLlm(RULES)
+    msg = (
+        "Previous conversation:\nUser: add column margin\n"
+        "Assistant: [executed SQL: SELECT ...]\n\nNew request:\nSchema ...\n"
+        "do something nobody scripted"
+    )
+    parsed = json.loads(llm.generate_sql("S", msg))
+    assert parsed["needs_clarification"] is True
+    assert fake.calls()[-1]["matched"] is None
+
+
+def test_without_the_marker_the_whole_message_is_matched():
+    """The transform route sends no history and no marker."""
+    reply = FakeLlm(RULES).generate_sql("S", "Schema ...\nadd column margin")
+    assert reply.startswith("SELECT *,")
+
+
 def test_invalid_sentinel_is_not_a_select():
     reply = FakeLlm(RULES).generate_sql("S", "__invalid__")
     assert not reply.strip().upper().startswith("SELECT")
