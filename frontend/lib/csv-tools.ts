@@ -170,7 +170,10 @@ export async function toCsvAsync(
   onProgress?: Progress
 ): Promise<string> {
   const width = table.headers.length;
-  const parts = [Papa.unparse({ fields: table.headers, data: [] })];
+  // Papa.unparse ends a header-only table with a line break, and the join
+  // below adds its own, which put an empty line after every header until
+  // the first unit test for this module caught it.
+  const parts = [Papa.unparse({ fields: table.headers, data: [] }).replace(/\r?\n$/, "")];
 
   await inSlices(
     table.rows.length,
