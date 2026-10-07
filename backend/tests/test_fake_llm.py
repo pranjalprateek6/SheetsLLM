@@ -116,10 +116,12 @@ def test_calls_endpoint_lists_and_clears():
     assert client.get("/__fake_llm/calls").json()["count"] == 0
 
 
-@pytest.mark.parametrize("provider,expected", [("fake", True), ("gemini", False), ("openai", False)])
+@pytest.mark.parametrize("provider,expected", [("fake", 200), ("gemini", 404), ("openai", 404)])
 def test_fake_router_is_registered_only_for_the_fake_provider(monkeypatch, provider, expected):
     monkeypatch.setattr(routes_module, "LLM_PROVIDER", provider)
     app = FastAPI()
     routes_module.register_routes(app)
-    paths = {getattr(r, "path", None) for r in app.routes}
-    assert ("/__fake_llm/calls" in paths) is expected
+    # Ask the app, not its route table: Starlette 1.7 stopped exposing .path
+    # on included routes, which is how an earlier version of this test read
+    # an empty set and failed in CI while passing locally.
+    assert TestClient(app).get("/__fake_llm/calls").status_code == expected
