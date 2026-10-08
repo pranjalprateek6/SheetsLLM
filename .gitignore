@@ -22,3 +22,7 @@ backend/audits/
 
 # local test datasets (never commit data files)
 datasets/
+
+# playwright output
+frontend/test-results/
+frontend/playwright-report/
