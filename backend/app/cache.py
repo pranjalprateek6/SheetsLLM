@@ -14,16 +14,18 @@ from app import storage
 logger = logging.getLogger("sheetsllm.cache")
 
 # ── LLM Response Cache ────────────────────────────────────────────────
-# Same instruction + same schema → same SQL.  Keyed by SHA-256.
+# Same user + same instruction + same schema → same SQL.  Keyed by SHA-256.
+# The user id is part of the key because generated SQL can carry literals
+# lifted from that user's sample rows; it must never be served to another.
 
 _sql_cache: dict[str, tuple[str, float]] = {}  # key → (sql, expires_at)
 _SQL_TTL = 86_400  # 24 hours
 _sql_lock = threading.Lock()
 
 
-def sql_cache_key(instruction: str, schema_hash: str) -> str:
-    """Deterministic cache key from instruction + schema fingerprint."""
-    raw = f"{instruction.strip().lower()}:{schema_hash}"
+def sql_cache_key(user_id: str, instruction: str, schema_hash: str) -> str:
+    """Deterministic cache key from user + instruction + schema fingerprint."""
+    raw = f"{user_id}:{instruction.strip().lower()}:{schema_hash}"
     return hashlib.sha256(raw.encode()).hexdigest()
 
 

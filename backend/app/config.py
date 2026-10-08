@@ -39,6 +39,14 @@ DUCKDB_QUERY_TIMEOUT: int = int(os.getenv("DUCKDB_QUERY_TIMEOUT", "30"))
 # instead of re-running the whole chain from base (0 disables).
 CHECKPOINT_EVERY_N_STEPS: int = int(os.getenv("CHECKPOINT_EVERY_N_STEPS", "10"))
 
+# ── Privacy ──────────────────────────────────────────────────────────
+# What a user who never chose a privacy mode gets. "strict" (the default)
+# sends the LLM the schema only, which is what the landing page promises;
+# "off" also sends sample values and rows. An explicit choice always wins.
+PRIVACY_DEFAULT_STRICT: bool = (
+    (os.getenv("PRIVACY_DEFAULT") or "strict").strip().lower() != "off"
+)
+
 # ── Usage limits (0 = unlimited) ────────────────────────────────────
 # Free-tier caps act as a circuit breaker so one user cannot exhaust the
 # shared LLM quota. Pro caps are generous headroom, not a real ceiling.

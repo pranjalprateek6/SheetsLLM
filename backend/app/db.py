@@ -9,7 +9,7 @@ from uuid import UUID
 
 from supabase import Client, create_client
 
-from app.config import SUPABASE_SERVICE_KEY, SUPABASE_URL
+from app.config import PRIVACY_DEFAULT_STRICT, SUPABASE_SERVICE_KEY, SUPABASE_URL
 
 logger = logging.getLogger("sheetsllm.db")
 
@@ -256,18 +256,33 @@ def upsert_user_settings(user_id: str, **settings) -> dict:
     return resp.data[0]
 
 
-def get_privacy_mode(user_id: str) -> bool:
-    """Whether the user opted into schema-only LLM prompts.
+def privacy_mode_from_row(row: dict | None) -> bool:
+    """The effective privacy mode for a user_settings row.
 
-    Fails to False (the default behavior) on any lookup error so a settings
-    hiccup never blocks the data path.
+    No row, or a row with no value, means the user never chose, so they get
+    PRIVACY_DEFAULT_STRICT. An explicit true or false is kept as set.
+    """
+    value = row.get("privacy_mode") if row else None
+    if value is None:
+        return PRIVACY_DEFAULT_STRICT
+    return bool(value)
+
+
+def get_privacy_mode(user_id: str) -> bool:
+    """Whether this user's LLM prompts are schema-only.
+
+    Fails to the default (strict unless PRIVACY_DEFAULT=off) on any lookup
+    error, so a settings hiccup never blocks the data path and never sends
+    data the user may have opted out of sending.
     """
     try:
-        row = get_user_settings(user_id)
-        return bool(row and row.get("privacy_mode"))
+        return privacy_mode_from_row(get_user_settings(user_id))
     except Exception:
-        logger.warning("privacy_mode lookup failed for %s; defaulting to off", user_id)
-        return False
+        logger.warning(
+            "privacy_mode lookup failed for %s; using the default (strict=%s)",
+            user_id, PRIVACY_DEFAULT_STRICT,
+        )
+        return PRIVACY_DEFAULT_STRICT
 
 
 # ── Subscriptions ────────────────────────────────────────────────────

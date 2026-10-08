@@ -97,3 +97,41 @@ def test_retry_message_carries_redacted_error_only():
     safe = sanitize_error_for_llm(DUCKDB_ERROR, privacy_mode=True)
     msg = build_retry_message("cast email to number", "SELECT 1", safe)
     assert "jane@acme.com" not in msg
+
+
+# ── The default: strict unless the user chose otherwise ──────────────
+
+from app import db  # noqa: E402
+
+
+def test_default_is_strict_when_unset(monkeypatch):
+    monkeypatch.setattr(db, "get_user_settings", lambda uid: None)
+    assert db.get_privacy_mode("u1") is True
+
+
+def test_null_value_counts_as_unset(monkeypatch):
+    monkeypatch.setattr(db, "get_user_settings", lambda uid: {"privacy_mode": None})
+    assert db.get_privacy_mode("u1") is True
+
+
+def test_explicit_off_is_respected(monkeypatch):
+    monkeypatch.setattr(db, "get_user_settings", lambda uid: {"privacy_mode": False})
+    assert db.get_privacy_mode("u1") is False
+
+
+def test_explicit_on_is_respected(monkeypatch):
+    monkeypatch.setattr(db, "get_user_settings", lambda uid: {"privacy_mode": True})
+    assert db.get_privacy_mode("u1") is True
+
+
+def test_lookup_error_fails_strict(monkeypatch):
+    def boom(uid):
+        raise RuntimeError("supabase down")
+    monkeypatch.setattr(db, "get_user_settings", boom)
+    assert db.get_privacy_mode("u1") is True
+
+
+def test_environment_can_restore_the_old_default(monkeypatch):
+    monkeypatch.setattr(db, "PRIVACY_DEFAULT_STRICT", False)
+    monkeypatch.setattr(db, "get_user_settings", lambda uid: None)
+    assert db.get_privacy_mode("u1") is False
