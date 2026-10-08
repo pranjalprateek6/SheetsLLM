@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/tooltip";
 import { TextShimmer } from "@/components/ui/text-shimmer";
 import { cn } from "@/lib/utils";
+import { toSuggestions, type Suggestion } from "@/lib/suggestions";
 
 type ChatMessage = {
   id?: string;
@@ -33,8 +34,21 @@ type PreviewFn = (p: {
   instruction?: string;
 }) => void;
 
+/** A step the server saved after the browser stopped waiting for it. */
+export type LateStep = {
+  stepNumber: number;
+  instruction: string;
+  totalRows?: number;
+  totalColumns?: number;
+};
+
+// After Stop, look for a step that finished on the server anyway. The chat
+// route can run for ~30s, so check a few times rather than once.
+export const LATE_STEP_CHECKS_MS = [1500, 5000, 15000, 30000];
+
 export default function ChatPanel({
-  fileId, onPreview, open, fileName, onUndo, onReset, starterSuggestions, prefill,
+  fileId, onPreview, open, fileName, onUndo, onReset, starterSuggestions, initialInsights,
+  latestStep, onLateStep, prefill,
 }: {
   fileId?: string;
   onPreview: PreviewFn;
@@ -44,6 +58,13 @@ export default function ChatPanel({
   onReset?: () => void;
   /** Curated suggestions shown instantly instead of fetching LLM insights. */
   starterSuggestions?: string[] | null;
+  /** Insights the upload response already carried, so the first render
+   *  needs no refetch. Any shape toSuggestions accepts. */
+  initialInsights?: unknown;
+  /** Highest step number the workspace knows about (0 = original file). */
+  latestStep?: number;
+  /** Called when a stopped request turns out to have saved a step anyway. */
+  onLateStep?: (step: LateStep) => void;
   /** Externally-seeded input (e.g. "Ask Chef about this column"); nonce
    *  forces re-application when the same text is sent twice. */
   prefill?: { text: string; nonce: number } | null;
@@ -52,8 +73,11 @@ export default function ChatPanel({
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [expandedSql, setExpandedSql] = useState<string | null>(null);
-  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  // True once a fetch has answered, so an empty answer says so instead of
+  // silently showing the button again.
+  const [suggestionsChecked, setSuggestionsChecked] = useState(false);
   const [stage, setStage] = useState(0);
   const [confirmClear, setConfirmClear] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -63,6 +87,16 @@ export default function ChatPanel({
   // Terminal-style recall: ArrowUp in an empty input restores the last
   // prompt for quick "same thing, but…" iteration.
   const lastSentRef = useRef<string>("");
+  // Late-step checks after Stop: the latest step when the request was sent,
+  // and the pending timers (cleared by the next send or a file change).
+  const latestStepRef = useRef(latestStep ?? 0);
+  latestStepRef.current = latestStep ?? 0;
+  const lateTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const clearLateChecks = useCallback(() => {
+    lateTimersRef.current.forEach(clearTimeout);
+    lateTimersRef.current = [];
+  }, []);
+  useEffect(() => clearLateChecks, [fileId, clearLateChecks]);
 
   // Staged progress while Chef works — honest labels for the real pipeline
   // (generate -> validate -> execute), rotated on a timer. A late fourth
@@ -110,22 +144,69 @@ export default function ChatPanel({
     }, 80);
   }, [prefill]);
 
-  useEffect(() => {
-    if (!fileId || !open) return;
-    if (starterSuggestions && starterSuggestions.length > 0) {
-      setSuggestions(starterSuggestions.slice(0, 6));
-      return;
-    }
+  const fetchSuggestions = useCallback(() => {
+    if (!fileId) return;
     setLoadingSuggestions(true);
     fetchWithAuth(`/api/insights/${fileId}`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.suggestions) setSuggestions(data.suggestions.slice(0, 6));
-        else setSuggestions([]);
-      })
+      .then((r) => (r.ok ? r.json() : null))
+      // Replace, never append: each answer describes the file as it is now.
+      .then((data) => setSuggestions(toSuggestions(data)))
       .catch(() => setSuggestions([]))
-      .finally(() => setLoadingSuggestions(false));
-  }, [fileId, open, starterSuggestions]);
+      .finally(() => {
+        setSuggestionsChecked(true);
+        setLoadingSuggestions(false);
+      });
+  }, [fileId]);
+
+  useEffect(() => {
+    if (!fileId || !open) return;
+    setSuggestionsChecked(false);
+    const seeded = toSuggestions(starterSuggestions?.length ? starterSuggestions : initialInsights);
+    if (seeded.length > 0) {
+      setSuggestions(seeded);
+      return;
+    }
+    fetchSuggestions();
+  }, [fileId, open, starterSuggestions, initialInsights, fetchSuggestions]);
+
+  // A stopped request may still save its step. Watch history for a step
+  // past the one we started from, and hand it to the workspace.
+  const watchForLateStep = useCallback((baseline: number) => {
+    if (!fileId || !onLateStep) return;
+    clearLateChecks();
+    let found = false;
+    lateTimersRef.current = LATE_STEP_CHECKS_MS.map((ms) =>
+      setTimeout(async () => {
+        if (found) return;
+        try {
+          const r = await fetchWithAuth(`/api/files/${fileId}/history`);
+          if (!r.ok) return;
+          const d = await r.json();
+          const steps: {
+            step_number: number; instruction: string;
+            row_count_after?: number; column_count_after?: number;
+          }[] = d.steps ?? [];
+          const last = steps.reduce<(typeof steps)[number] | null>(
+            (a, b) => (!a || b.step_number > a.step_number ? b : a), null,
+          );
+          if (found || !last || last.step_number <= baseline) return;
+          found = true;
+          clearLateChecks();
+          setMessages((prev) => [...prev, {
+            role: "assistant",
+            content: `That finished on the server after you stopped it, as step ${last.step_number}. Undo removes it.`,
+            message_type: "transform",
+          }]);
+          onLateStep({
+            stepNumber: last.step_number,
+            instruction: last.instruction,
+            totalRows: last.row_count_after,
+            totalColumns: last.column_count_after,
+          });
+        } catch {}
+      }, ms),
+    );
+  }, [fileId, onLateStep, clearLateChecks]);
 
   const sendMessage = useCallback(
     async (text?: string) => {
@@ -143,6 +224,8 @@ export default function ChatPanel({
 
       const controller = new AbortController();
       abortRef.current = controller;
+      clearLateChecks();
+      const baseline = latestStepRef.current;
 
       try {
         const res = await fetchWithAuth("/api/chat", {
@@ -189,8 +272,11 @@ export default function ChatPanel({
           setMessages((prev) => [...prev, { role: "assistant", content: "I didn't get a usable response. Please try rephrasing.", message_type: "error" }]);
         }
       } catch (err) {
-        if (err instanceof DOMException && err.name === "AbortError") {
-          setMessages((prev) => [...prev, { role: "assistant", content: "Stopped. (The request may still finish on the server.)", message_type: "error" }]);
+        // Ask the signal, not the error's class: the abort error's
+        // constructor differs between runtimes.
+        if (controller.signal.aborted) {
+          setMessages((prev) => [...prev, { role: "assistant", content: "Stopped.", message_type: "error" }]);
+          watchForLateStep(baseline);
         } else {
           setMessages((prev) => [...prev, { role: "assistant", content: "Failed to send message. Please try again.", message_type: "error" }]);
         }
@@ -199,7 +285,7 @@ export default function ChatPanel({
         setSending(false);
       }
     },
-    [input, fileId, sending, onPreview]
+    [input, fileId, sending, onPreview, clearLateChecks, watchForLateStep]
   );
 
   // Auto-resize textarea
@@ -290,29 +376,22 @@ export default function ChatPanel({
               {suggestions.map((s, i) => (
                 <button
                   key={i}
-                  onClick={() => sendMessage(s)}
+                  onClick={() => sendMessage(s.instruction)}
                   className="block w-full rounded-lg border bg-background px-3 py-2 text-left text-xs text-foreground/80 transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-foreground"
                 >
-                  {s}
+                  {s.text}
                 </button>
               ))}
             </div>
           ) : (
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full"
-              onClick={() => {
-                setLoadingSuggestions(true);
-                fetchWithAuth(`/api/insights/${fileId}`)
-                  .then((r) => r.json())
-                  .then((data) => { if (data.suggestions) setSuggestions(data.suggestions.slice(0, 6)); })
-                  .catch(() => {})
-                  .finally(() => setLoadingSuggestions(false));
-              }}
-            >
-              Suggest next steps
-            </Button>
+            <div className="space-y-1.5">
+              {suggestionsChecked && (
+                <p className="text-center text-xs text-muted-foreground">Nothing to suggest yet.</p>
+              )}
+              <Button variant="outline" size="sm" className="w-full" onClick={fetchSuggestions}>
+                Suggest next steps
+              </Button>
+            </div>
           )}
         </div>
       )}

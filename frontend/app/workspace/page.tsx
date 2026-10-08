@@ -15,7 +15,7 @@ import SheetSelector from "@/components/SheetSelector";
 const HistoryDrawer = dynamic(() => import("@/components/HistoryDrawer"));
 import { type RecipeApplyResult } from "@/components/RecipesDrawer";
 const RecipesDrawer = dynamic(() => import("@/components/RecipesDrawer"));
-import ChatPanel from "@/components/ChatPanel";
+import ChatPanel, { type LateStep } from "@/components/ChatPanel";
 import { type SchemaColumn } from "@/components/SchemaPanel";
 const SchemaPanel = dynamic(() => import("@/components/SchemaPanel"));
 const ChartPanel = dynamic(() => import("@/components/ChartPanel"));
@@ -98,6 +98,9 @@ function WorkspaceContent() {
   const [schemaOpen, setSchemaOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [sampleSuggestions, setSampleSuggestions] = useState<string[] | null>(null);
+  // The insights the upload response carried, handed to Chef so its first
+  // suggestions need no second request.
+  const [uploadInsights, setUploadInsights] = useState<unknown>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [fileLoadError, setFileLoadError] = useState(false);
   // The step chain, kept visible as the pipeline strip. Source of truth is
@@ -112,6 +115,7 @@ function WorkspaceContent() {
     rowsAfter: number;
     addedCols: string[];
     removedCols: string[];
+    note?: string;
   } | null>(null);
   const [chatPrefill, setChatPrefill] = useState<{ text: string; nonce: number } | null>(null);
   // Step to confirm-revert to from the pipeline strip (0 = original file)
@@ -306,6 +310,7 @@ function WorkspaceContent() {
       }
 
       setFileId(file.id);
+      setUploadInsights(null);
       setFileName(file.name);
       setSchema(file.schema_json);
       setRowCount(file.row_count || 0);
@@ -336,6 +341,7 @@ function WorkspaceContent() {
   const onUpload = async (file: File, sheetName?: string, suggestions?: string[], pendingId?: string | null) => {
     setLoading(true);
     setSampleSuggestions(suggestions ?? null);
+    setUploadInsights(null);
     setUploadError(null);
     try {
       const params = new URLSearchParams();
@@ -380,6 +386,7 @@ function WorkspaceContent() {
         setSteps([]);
         setLastChange(null);
         setFileId(data.file_id);
+        setUploadInsights(data.insights ?? null);
         setFileName(file.name);
         setSchema(data.schema);
         setFileReady(true);
@@ -518,6 +525,7 @@ function WorkspaceContent() {
     setFileName("");
     setSchema(undefined);
     setSampleSuggestions(null);
+    setUploadInsights(null);
     setShowUpload(true);
     setShowResetDialog(false);
   };
@@ -559,6 +567,7 @@ function WorkspaceContent() {
     totalColumns?: number;
     stepNumber?: number;
     instruction?: string;
+    note?: string;
   }) => {
     // Diff against the outgoing grid BEFORE swapping it, so the change
     // bar can say exactly what this transform did.
@@ -572,6 +581,7 @@ function WorkspaceContent() {
       rowsAfter: p.totalRows ?? p.rows.length,
       addedCols: added,
       removedCols: removed,
+      note: p.note,
     });
     if (typeof p.stepNumber === "number" && p.instruction) {
       const stepNumber = p.stepNumber;
@@ -602,6 +612,31 @@ function WorkspaceContent() {
       });
     }
   }, []);
+
+  // Chef was stopped, but the server saved the step anyway: load the grid
+  // as it now is and say so in the change bar, with Undo beside it.
+  const handleLateStep = useCallback(async (step: LateStep) => {
+    if (!fileId) return;
+    try {
+      const res = await fetchWithAuth(`/api/download?file_id=${fileId}&format=json`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (!Array.isArray(data)) return;
+      previewHandler({
+        columns: data.length > 0 ? Object.keys(data[0]) : [],
+        rows: data.slice(0, 500),
+        totalRows: step.totalRows ?? data.length,
+        totalColumns: step.totalColumns,
+        stepNumber: step.stepNumber,
+        instruction: step.instruction,
+        note: "That finished on the server after you stopped it",
+      });
+    } catch (e) {
+      console.error("Late step refresh failed:", e);
+    }
+  }, [fileId, previewHandler]);
+
+  const latestStep = steps.reduce((n, s) => Math.max(n, s.step_number), 0);
 
   return (
     <ErrorBoundary>
@@ -934,6 +969,7 @@ function WorkspaceContent() {
                       ? `Step ${lastChange.stepNumber} applied`
                       : lastChange.label}
                   </span>
+                  {lastChange.note && <span className="text-muted-foreground">{lastChange.note}</span>}
                   <span className="tabular-nums text-muted-foreground">
                     {lastChange.rowsAfter === 0
                       ? `Every row was removed (${lastChange.rowsBefore.toLocaleString()} → 0)`
@@ -1008,6 +1044,9 @@ function WorkspaceContent() {
                   onUndo={handleUndo}
                   onReset={handleReset}
                   starterSuggestions={sampleSuggestions}
+                  initialInsights={uploadInsights}
+                  latestStep={latestStep}
+                  onLateStep={handleLateStep}
                   prefill={chatPrefill}
                 />
               </div>
