@@ -71,14 +71,14 @@ def _is_clarification(raw: str) -> dict | None:
 
 
 def _generate_or_cache_sql(
-    instruction: str, schema: dict, *, privacy_mode: bool = False
+    user_id: str, instruction: str, schema: dict, *, privacy_mode: bool = False
 ) -> str | dict:
     """
     Get SQL from cache or generate via LLM.
     Returns SQL string on success, or clarification dict if LLM needs more info.
     """
     s_hash = schema_fingerprint(schema)
-    cache_key = sql_cache_key(instruction, s_hash)
+    cache_key = sql_cache_key(user_id, instruction, s_hash)
 
     cached = get_cached_sql(cache_key)
     if cached is not None:
@@ -291,7 +291,8 @@ async def transform(request: Request, background_tasks: BackgroundTasks):
     privacy_mode = db.get_privacy_mode(user_id)
     try:
         sql_or_clarification = await asyncio.to_thread(
-            _generate_or_cache_sql, instruction, schema, privacy_mode=privacy_mode
+            _generate_or_cache_sql, user_id, instruction, schema,
+            privacy_mode=privacy_mode,
         )
     except SQLValidationError as exc:
         return _json_response(

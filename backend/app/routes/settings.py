@@ -25,7 +25,7 @@ def _json_response(status: int, code: str, message: str, **extra) -> Response:
 def get_settings(request: Request):
     user_id = getattr(request.state, "user_id", "anonymous")
     row = db.get_user_settings(user_id)
-    return {"privacy_mode": bool(row and row.get("privacy_mode"))}
+    return {"privacy_mode": db.privacy_mode_from_row(row)}
 
 
 @router.patch("/settings")
@@ -45,4 +45,4 @@ async def update_settings(request: Request):
 
     row = db.upsert_user_settings(user_id, privacy_mode=privacy_mode)
     logger.info("settings updated user=%s privacy_mode=%s", user_id, privacy_mode)
-    return {"privacy_mode": bool(row.get("privacy_mode"))}
+    return {"privacy_mode": db.privacy_mode_from_row(row)}

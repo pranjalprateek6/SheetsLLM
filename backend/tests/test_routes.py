@@ -17,7 +17,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 import app.main as main_module
-from app import cache, jobs
+from app import cache, db, jobs
 from app.main import app
 from app.routes import chat as chat_module
 from app.routes import transform as transform_module
@@ -34,6 +34,9 @@ class FakeLLM:
     def generate_sql(self, system_prompt: str, user_message: str) -> str:
         self.calls.append((system_prompt, user_message))
         return self.responses.pop(0)
+
+
+_real_get_privacy_mode = db.get_privacy_mode
 
 
 @pytest.fixture
@@ -119,6 +122,53 @@ def transform_seams(monkeypatch, source_parquet):
 
 def _use_llm(monkeypatch, module, llm: FakeLLM):
     monkeypatch.setattr(module, "get_llm", lambda: llm)
+
+
+# ── What reaches the LLM, and what the SQL cache shares ──────────────
+
+
+class TestPrivacyAndCache:
+    def _transform(self, client, monkeypatch, settings_row, llm):
+        # The real lookup, so the default under test is the one routes get
+        monkeypatch.setattr(db, "get_privacy_mode", _real_get_privacy_mode)
+        monkeypatch.setattr(db, "get_user_settings", lambda uid: settings_row)
+        _use_llm(monkeypatch, transform_module, llm)
+        return client.post("/transform", json={"file_id": "f1", "instruction": "keep a > 1"})
+
+    def test_prompt_has_no_sample_rows_when_strict(self, client, transform_seams, monkeypatch):
+        llm = FakeLLM("SELECT * FROM data WHERE a > 1")
+        resp = self._transform(client, monkeypatch, None, llm)
+        assert resp.status_code == 200, resp.text
+        prompt = llm.calls[0][1]
+        assert "a (INTEGER)" in prompt and "b (VARCHAR)" in prompt
+        assert "Sample rows:" not in prompt
+        assert "e.g.:" not in prompt
+        for value in ("x", "y", "z"):
+            assert f"'{value}'" not in prompt and f" {value}," not in prompt
+
+    def test_prompt_has_samples_when_off(self, client, transform_seams, monkeypatch):
+        llm = FakeLLM("SELECT * FROM data WHERE a > 1")
+        resp = self._transform(client, monkeypatch, {"privacy_mode": False}, llm)
+        assert resp.status_code == 200, resp.text
+        assert "Sample rows:" in llm.calls[0][1]
+
+    def test_same_user_hits(self):
+        k1 = cache.sql_cache_key("u1", "keep a > 1", "abc")
+        k2 = cache.sql_cache_key("u1", "  Keep A > 1 ", "abc")
+        assert k1 == k2
+
+    def test_same_instruction_different_user_misses(self):
+        assert cache.sql_cache_key("u1", "keep a > 1", "abc") != cache.sql_cache_key(
+            "u2", "keep a > 1", "abc"
+        )
+
+    def test_two_users_each_cost_one_llm_call(self, transform_seams, monkeypatch):
+        llm = FakeLLM("SELECT * FROM data WHERE a > 1", "SELECT * FROM data WHERE a > 1")
+        _use_llm(monkeypatch, transform_module, llm)
+        schema = {"columns": [{"name": "a", "dtype": "BIGINT"}]}
+        for user in ("u1", "u2", "u1", "u2"):
+            transform_module._generate_or_cache_sql(user, "keep a > 1", schema)
+        assert len(llm.calls) == 2
 
 
 # ── /transform ────────────────────────────────────────────────────────
