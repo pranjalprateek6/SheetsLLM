@@ -29,7 +29,10 @@ test("upload, transform, undo, recipe, apply, export", async ({ request }) => {
   const up = await upload("orders_oct.csv");
   expect(up.file_id).toBeTruthy();
   expect(up.preview.total_rows).toBe(1012);
-  expect(Array.isArray(up.insights?.suggestions)).toBe(true);
+  expect(up.insights?.suggestions).toContainEqual({
+    text: "Remove 12 duplicate rows",
+    instruction: "remove duplicate rows",
+  });
 
   const insights = await (await request.get(`/api/insights/${up.file_id}`)).json();
   expect(Array.isArray(insights.insights?.suggestions)).toBe(true);

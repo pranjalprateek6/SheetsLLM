@@ -61,10 +61,13 @@ def generate_insights(local_path: str | Path) -> dict[str, Any]:
             except Exception:
                 pass
 
-        # Duplicate row count
+        # Duplicate row count. SELECT DISTINCT * treats NULLs as equal, the
+        # same rows "remove duplicate rows" drops. (COUNT(DISTINCT *) is a
+        # binder error in DuckDB, which this used to swallow into 0.)
         try:
             dup_result = con.execute(
-                "SELECT COUNT(*) - COUNT(DISTINCT *) FROM data"
+                "SELECT (SELECT COUNT(*) FROM data)"
+                " - (SELECT COUNT(*) FROM (SELECT DISTINCT * FROM data))"
             ).fetchone()
             if dup_result:
                 insights["duplicate_rows"] = int(dup_result[0])
