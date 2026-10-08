@@ -267,3 +267,43 @@ def test_patch_blank_description_clears_it(monkeypatch):
         recipes_route.update_recipe(_patch_request({"description": "  "}), "r1")
     )
     assert captured["description"] is None
+
+
+# ── POST /recipes/{id}/apply records where the apply came from ───────
+
+
+@pytest.mark.parametrize(
+    "source, expected",
+    [
+        ("hint", ["recipe_applied", "recipe_hint_applied"]),
+        ("drawer", ["recipe_applied"]),
+        (None, ["recipe_applied"]),
+        ("somewhere-else", ["recipe_applied"]),
+    ],
+)
+def test_apply_records_its_source(monkeypatch, source_and_target, source, expected):
+    _, tgt = source_and_target
+    recorded: list[tuple[str, dict]] = []
+    monkeypatch.setattr(recipes_route.events, "record",
+                        lambda uid, name, **props: recorded.append((name, props)))
+    monkeypatch.setattr(recipes_route.usage, "record", lambda *a, **kw: None)
+    monkeypatch.setattr(recipes_route.db, "get_recipe", lambda rid, uid: {
+        "id": rid, "name": "Monthly cleanup",
+        "steps": [{"step_number": 1, "instruction": "keep age > 28",
+                   "sql_query": "SELECT * FROM data WHERE age > 28"}],
+    })
+    monkeypatch.setattr(recipes_route.db, "get_file", lambda fid, uid: {"id": fid, "r2_key": "k"})
+    monkeypatch.setattr(recipes_route.db, "get_transformations", lambda fid: [])
+    monkeypatch.setattr(recipes_route.db, "create_transformation", lambda **kw: {})
+    monkeypatch.setattr(recipes_route.db, "update_file", lambda *a, **kw: {})
+    monkeypatch.setattr(recipes_route.db, "create_audit_entry", lambda **kw: {})
+    monkeypatch.setattr(recipes_route, "get_local_parquet", lambda key: tgt)
+
+    body = {"file_id": "f1", **({"from": source} if source else {})}
+    resp = asyncio.run(recipes_route.apply_recipe(_patch_request(body), "r1"))
+
+    assert resp["steps_added"] == 1
+    assert [name for name, _ in recorded] == expected
+    applied = recorded[0][1]
+    assert applied["recipe_id"] == "r1" and applied["steps"] == 1
+    assert applied.get("from") == (source if source in ("hint", "drawer") else None)
