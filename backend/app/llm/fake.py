@@ -8,8 +8,10 @@ followed by the history, then "New request:" followed by the current turn.
 When that marker is present only the text after its last occurrence is
 matched, so a phrase from an earlier turn never answers this one; without the
 marker (the transform route) the whole message is. Among the rules that match,
-the one whose phrase occurs latest wins. Two sentinel replies stand in for provider behaviour
-the routes have to handle:
+the one whose phrase occurs latest wins. A rule may also set "delay_ms" to
+answer that long after the call, for exercising Stop and slow-request paths.
+Two sentinel replies stand in for provider behaviour the routes have to
+handle:
 
   "__quota__"    raises LlmError carrying the same "429 RESOURCE_EXHAUSTED"
                  text Gemini produces once the daily pool is gone
@@ -25,6 +27,7 @@ from __future__ import annotations
 import json
 import os
 import threading
+import time
 from collections import deque
 from pathlib import Path
 
@@ -81,11 +84,12 @@ class FakeLlm(LlmClient):
         marker = needle.rfind(CURRENT_TURN_MARKER)
         if marker >= 0:
             needle = needle[marker + len(CURRENT_TURN_MARKER):]
-        reply, matched, best = NO_MATCH_REPLY, None, -1
+        reply, matched, best, delay_ms = NO_MATCH_REPLY, None, -1, 0
         for rule in self.rules:
             pos = needle.rfind(str(rule["match"]).lower())
             if pos > best:
                 best, reply, matched = pos, str(rule["reply"]), rule["match"]
+                delay_ms = int(rule.get("delay_ms") or 0)
 
         # The user message is what the route built, schema block included, so
         # a test can also assert what was (not) sent. The system prompt is
@@ -98,6 +102,8 @@ class FakeLlm(LlmClient):
                 "reply": reply,
             })
 
+        if delay_ms > 0:
+            time.sleep(delay_ms / 1000)
         if reply == QUOTA:
             raise LlmError("Fake request failed: 429 RESOURCE_EXHAUSTED: daily quota exceeded")
         if reply == INVALID:
