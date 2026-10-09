@@ -332,7 +332,7 @@ function PricingContent() {
 
         {/* Pro */}
         <div className="relative flex flex-col rounded-xl border border-primary bg-card p-7 shadow-md ring-1 ring-primary/25">
-          <Badge className="absolute -top-3 left-6">Recommended</Badge>
+          <Badge className="absolute -top-2.5 left-6 border-primary/30 bg-card py-1 shadow-xs">Recommended</Badge>
           <h2 className="font-medium">Pro</h2>
           <p className="mt-2 text-4xl font-semibold tracking-tight">
             ₹499<span className="text-base font-normal text-muted-foreground">/mo</span>

@@ -114,7 +114,8 @@ export default function UsageCard({ embedded = false }: { embedded?: boolean }) 
         <div className="flex items-center gap-2">
           <Gauge className="h-4 w-4 text-muted-foreground" />
           <h2 className="text-sm font-medium">Usage this month</h2>
-          <Badge variant="secondary" className="capitalize">{usage.tier}</Badge>
+          {/* Embedded, the plan is already named right above */}
+          {!embedded && <Badge variant="secondary" className="capitalize">{usage.tier}</Badge>}
         </div>
         <span className="text-xs font-medium text-muted-foreground">Resets {resetDate(usage.month)}</span>
       </div>
@@ -122,7 +123,7 @@ export default function UsageCard({ embedded = false }: { embedded?: boolean }) 
       {/* The numbers say what you used; this line says what it got you. */}
       {(usage.used.rows_processed > 0 || (usage.recipe_applies ?? 0) > 0) && (
         <p className="mb-4 text-sm">
-          <Sparkles className="mr-1.5 inline h-3.5 w-3.5 text-primary" aria-hidden />
+          <Sparkles className="mr-1.5 inline h-3.5 w-3.5 text-muted-foreground" aria-hidden />
           This month you cleaned{" "}
           <span className="font-medium tabular-nums">
             {usage.used.rows_processed.toLocaleString()}

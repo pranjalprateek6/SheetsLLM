@@ -102,7 +102,7 @@ export function PrivacySlice() {
     <Frame className="p-5">
       <div className="flex items-center justify-between">
         <p className="text-[13px] font-medium">Sent to Chef</p>
-        <span className="inline-flex items-center gap-1 rounded-full border border-success/30 bg-success/[0.07] px-2 py-0.5 text-[11px] font-medium text-success-text">
+        <span className="inline-flex items-center gap-1 rounded-full border bg-card px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
           <Lock className="h-3 w-3" /> Schema only
         </span>
       </div>

@@ -234,7 +234,7 @@ export default function Header() {
                   }}
                 >
                   <ShieldCheck
-                    className={cn("mt-0.5 h-4 w-4", privacyMode ? "text-success-text" : "text-muted-foreground")}
+                    className={cn("mt-0.5 h-4 w-4", privacyMode === false ? "text-warning-text" : "text-muted-foreground")}
                   />
                   <div className="flex-1">
                     <p className="text-sm">Strict privacy mode</p>
@@ -311,7 +311,7 @@ export default function Header() {
                   onClick={togglePrivacy}
                   className="flex items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-60"
                 >
-                  <ShieldCheck className={cn("h-4 w-4", privacyMode ? "text-success-text" : "")} aria-hidden />
+                  <ShieldCheck className={cn("h-4 w-4", privacyMode === false && "text-warning-text")} aria-hidden />
                   <span className="flex-1">
                     Strict privacy mode
                     <span className="block text-xs">

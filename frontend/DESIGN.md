@@ -141,6 +141,28 @@ One motion is load-bearing: `.cell-changed` washes a changed cell in violet and
 settles. Under reduced motion it becomes a static tint, because the information
 still has to arrive.
 
+## Scanning rules
+
+Nobody reads a screen; people arrive with one question and hunt for the answer.
+Every layout decision serves that hunt.
+
+- **Edges.** Text holds a hard left edge and numbers a hard right edge, like a
+  receipt. Every element sits on at least two edges; when one is missing, make
+  it with a single line rather than a new container.
+- **Measure.** Prose never runs the full width of the screen. Settings and
+  reading surfaces cap at a readable column.
+- **Differentiate, don't pad.** Density is fine when content is grouped and
+  varied (sections, avatars, chips, type marks). More whitespace is not the fix
+  for an undifferentiated list.
+- **Show, don't tell.** Prefer an instantly recognisable icon, chip or position
+  over another label or tooltip.
+- **Emphasis is relative.** Default states are quiet and grey; only a value that
+  differs from its default earns colour. Strict privacy (the default) is a grey
+  chip; sending sample rows (the exception) is amber.
+- **Lines before cards.** No borders on borders or stacked radii. Settings are
+  rows separated by one hairline each, with the label on the left edge and the
+  control on the right (see Account).
+
 ## Component layer
 
 shadcn/ui primitives, vendored into `components/ui/*` and restyled with the
@@ -177,7 +199,7 @@ rather than filled.
   as three ruled steps, the recipe call to action on `--canvas`. The index is a
   list, not a wall of icon tiles.
 - **Pricing.** Two cards; Pro carries `border-primary`, a ring and `shadow-md`.
-- **Account.** Narrow column of 12px panels with sans section headings.
+- **Account.** Hairline-separated rows, label and description on the left edge, controls on the right; no cards.
 
 ## Accessibility bar
 
