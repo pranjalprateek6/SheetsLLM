@@ -75,6 +75,20 @@ describe("RecipeHint", () => {
     expect(screen.queryByRole("region", { name: "Recipe suggestion" })).not.toBeInTheDocument();
   });
 
+  it("asks again when re-enabled, so a recipe deleted meanwhile is not offered", async () => {
+    // The workspace disables the hint while the recipes drawer is open
+    server.use(recipes(RECIPES));
+    const { rerender } = render(<RecipeHint fileId="f1" enabled onApplied={vi.fn()} />);
+    await screen.findByRole("region", { name: "Recipe suggestion" });
+
+    rerender(<RecipeHint fileId="f1" enabled={false} onApplied={vi.fn()} />);
+    server.use(recipes({ recipes: [RECIPES.recipes[1]], total: 1 }));
+    rerender(<RecipeHint fileId="f1" enabled onApplied={vi.fn()} />);
+
+    const hint = await screen.findByRole("region", { name: "Recipe suggestion" });
+    expect(hint).toHaveTextContent("Apply ‘Old one’ (1 step)?");
+  });
+
   it("Apply posts to the apply route, tagged as the hint, and hands back the result", async () => {
     let posted: { url: string; body: unknown } | null = null;
     server.use(

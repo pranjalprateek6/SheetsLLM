@@ -951,13 +951,16 @@ function WorkspaceContent() {
                 </div>
               )}
 
-              {/* Change bar: what the last transform actually did */}
+              {/* Recipe hint. Off while the recipes drawer is open, so closing
+                  it refetches and a recipe deleted or renamed there is never
+                  offered stale. */}
               <RecipeHint
                 fileId={fileId}
-                enabled={fileReady && showTransform && steps.length === 0 && !lastChange}
+                enabled={fileReady && showTransform && steps.length === 0 && !lastChange && !recipesOpen}
                 onApplied={handleRecipeApplied}
               />
 
+              {/* Change bar: what the last transform actually did */}
               {lastChange && (
                 <div
                   className={`flex flex-shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b px-4 py-1.5 text-xs ${
