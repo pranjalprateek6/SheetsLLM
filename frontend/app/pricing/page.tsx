@@ -17,7 +17,7 @@ import {
 
 const FREE_FEATURES = [
   "50 uploads / month",
-  "200 AI transforms / month",
+  "200 AI requests / month",
   "Up to 1M rows per file",
   "Chat, insights & charts",
   "Full history, undo & revert",
@@ -28,7 +28,7 @@ const FREE_FEATURES = [
 const PRO_FEATURES = [
   "Unlimited saved recipes to automate every recurring export",
   "1,000 uploads / month",
-  "5,000 AI transforms / month",
+  "5,000 AI requests / month",
   "Priority email support",
   "Everything in Free",
 ];
@@ -36,8 +36,7 @@ const PRO_FEATURES = [
 // Honest values mirrored from backend config — update together.
 const COMPARISON: { label: string; free: string; pro: string }[] = [
   { label: "Uploads / month", free: "50", pro: "1,000" },
-  { label: "AI transforms / month", free: "200", pro: "5,000" },
-  { label: "Chat messages / month", free: "200", pro: "5,000" },
+  { label: "AI requests / month", free: "200", pro: "5,000" },
   { label: "Saved recipes", free: "1", pro: "Unlimited" },
   { label: "Rows per file", free: "1M", pro: "1M" },
   { label: "History, undo & revert", free: "✓", pro: "✓" },
@@ -49,17 +48,13 @@ const COMPARISON: { label: string; free: string; pro: string }[] = [
 // the cap the user just hit, so the page opens mid-conversation instead
 // of cold ("a paywall is a flow, not a screen").
 const REASONS: Record<string, { headline: string; sub: string }> = {
-  transforms: {
-    headline: "You've used this month's 200 AI transforms",
-    sub: "Pro lifts the cap to 5,000. Upgrade and pick up right where you stopped.",
-  },
   uploads: {
     headline: "You've used this month's 50 uploads",
     sub: "Pro lifts the cap to 1,000. Upgrade and keep the files coming.",
   },
   chat_requests: {
-    headline: "You've used this month's 200 chat messages",
-    sub: "Pro lifts the cap to 5,000. Upgrade and keep the conversation going.",
+    headline: "You've used this month's 200 AI requests",
+    sub: "Pro lifts the cap to 5,000. Upgrade and pick up right where you stopped.",
   },
   recipes: {
     headline: "The Free plan holds one saved recipe",
@@ -78,7 +73,7 @@ const FAQ = [
   },
   {
     q: "What happens when I hit a Free limit?",
-    a: "Nothing is lost. Your files and history stay intact; uploads and transforms simply pause until the monthly reset, or resume immediately when you upgrade.",
+    a: "Nothing is lost. Your files and history stay intact; uploads and AI requests simply pause until the monthly reset, or resume immediately when you upgrade.",
   },
   {
     q: "Do I lose my recipes if I move back to Free?",

@@ -157,10 +157,17 @@ def summary(user_id: str) -> dict:
         )
     except Exception:
         recipe_applies = 0
+    # Saved recipes are a running total, not a monthly count. None when the
+    # count is unavailable, so the UI can leave the line out rather than lie.
+    try:
+        recipes_saved: int | None = len(db.list_recipes(user_id))
+    except Exception:
+        recipes_saved = None
     return {
         "tier": tier,
         "month": month_key(),
         "used": {k: int(row.get(k, 0)) for k in ("uploads", "transforms", "chat_requests", "rows_processed")},
         "recipe_applies": recipe_applies,
         "limits": limits,
+        "recipes": {"saved": recipes_saved, "limit": RECIPE_LIMITS.get(tier, FREE_MAX_RECIPES)},
     }

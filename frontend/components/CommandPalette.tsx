@@ -4,7 +4,7 @@ import {
   Upload,
   Undo2,
   Download,
-  RotateCcw,
+  X,
   MessageSquare,
   History,
   ArrowRight,
@@ -32,7 +32,7 @@ export default function CommandPalette({
   onUndo,
   onDownload,
   onDownloadXlsx,
-  onReset,
+  onCloseFile,
   onChat,
   onHistory,
   onSaveRecipe,
@@ -45,7 +45,8 @@ export default function CommandPalette({
   onUndo: () => void;
   onDownload: () => void;
   onDownloadXlsx?: () => void;
-  onReset: () => void;
+  /** Closes the open file (it stays in Files) and returns to upload. */
+  onCloseFile: () => void;
   onChat: () => void;
   onHistory: () => void;
   onSaveRecipe?: () => void;
@@ -119,13 +120,15 @@ export default function CommandPalette({
               <span>Rename file</span>
             </CommandItem>
           )}
-          <CommandItem
-            keywords={["reset", "clear", "start over"]}
-            onSelect={() => runCommand(onReset)}
-          >
-            <RotateCcw />
-            <span>Reset file</span>
-          </CommandItem>
+          {fileId && (
+            <CommandItem
+              keywords={["close", "new file", "start over", "reset", "clear"]}
+              onSelect={() => runCommand(onCloseFile)}
+            >
+              <X />
+              <span>Close file</span>
+            </CommandItem>
+          )}
           <CommandItem
             keywords={["chat", "talk", "ask", "chef"]}
             onSelect={() => runCommand(onChat)}

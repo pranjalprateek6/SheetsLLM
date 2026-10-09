@@ -161,8 +161,8 @@ function AccountContent() {
           </div>
           <p className="mt-1.5 text-xs text-muted-foreground">
             {isPro
-              ? "1,000 uploads, 5,000 transforms, and unlimited recipes per month."
-              : "50 uploads, 200 transforms, and 1 saved recipe per month."}
+              ? "1,000 uploads and 5,000 AI requests a month, and unlimited saved recipes."
+              : "50 uploads and 200 AI requests a month, and 1 saved recipe."}
           </p>
           <Separator className="my-4" />
           <UsageCard embedded />

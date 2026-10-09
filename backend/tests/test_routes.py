@@ -257,6 +257,26 @@ class TestChat:
         assert body["type"] == "transform"
         assert body["preview"]["total_rows"] == 2
 
+    def test_chat_transform_records_transforms_and_rows(self, client, transform_seams, monkeypatch):
+        from app import usage
+
+        recorded: list[dict] = []
+        monkeypatch.setattr(usage, "record", lambda uid, **counters: recorded.append(counters))
+        _use_llm(monkeypatch, chat_module, FakeLLM("SELECT * FROM data WHERE a > 1"))
+        resp = client.post("/chat", json={"file_id": "f1", "message": "keep a > 1"})
+        assert resp.status_code == 200
+        assert {"chat_requests": 1} in recorded
+        assert {"transforms": 1, "rows_processed": 2} in recorded
+
+    def test_chat_answer_without_a_step_is_not_a_transform(self, client, transform_seams, monkeypatch):
+        from app import usage
+
+        recorded: list[dict] = []
+        monkeypatch.setattr(usage, "record", lambda uid, **counters: recorded.append(counters))
+        _use_llm(monkeypatch, chat_module, FakeLLM('{"insight": "Column a has 3 distinct values."}'))
+        client.post("/chat", json={"file_id": "f1", "message": "how many?"})
+        assert recorded == [{"chat_requests": 1}]
+
     def test_insight_message_returns_text(self, client, transform_seams, monkeypatch):
         _use_llm(monkeypatch, chat_module, FakeLLM(
             '{"insight": "Column a has 3 distinct values."}'
