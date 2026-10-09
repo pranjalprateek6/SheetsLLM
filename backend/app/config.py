@@ -39,6 +39,13 @@ DUCKDB_QUERY_TIMEOUT: int = int(os.getenv("DUCKDB_QUERY_TIMEOUT", "30"))
 # instead of re-running the whole chain from base (0 disables).
 CHECKPOINT_EVERY_N_STEPS: int = int(os.getenv("CHECKPOINT_EVERY_N_STEPS", "10"))
 
+# ── Admin ────────────────────────────────────────────────────────────
+# Who may read /admin/metrics: comma-separated sign-in emails. Unset means
+# nobody, so the numbers are never public by accident.
+ADMIN_EMAILS: frozenset[str] = frozenset(
+    e.strip().lower() for e in (os.getenv("ADMIN_EMAILS") or "").split(",") if e.strip()
+)
+
 # ── Privacy ──────────────────────────────────────────────────────────
 # What a user who never chose a privacy mode gets. "strict" (the default)
 # sends the LLM the schema only, which is what the landing page promises;

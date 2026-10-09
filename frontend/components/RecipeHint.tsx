@@ -1,9 +1,10 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { BookOpen } from "lucide-react";
 
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
+import { track } from "@/lib/track";
 import type { RecipeApplyResult } from "@/components/RecipesDrawer";
 
 type HintRecipe = { id: string; name: string; steps: number };
@@ -36,6 +37,13 @@ export default function RecipeHint({
 }) {
   const [recipe, setRecipe] = useState<HintRecipe | null>(null);
   const [applying, setApplying] = useState(false);
+  // Counted once per file, however often the hint re-renders
+  const shownFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!recipe || !fileId || shownFor.current === fileId) return;
+    shownFor.current = fileId;
+    track("recipe_hint_shown", { recipe_id: recipe.id });
+  }, [recipe, fileId]);
 
   useEffect(() => {
     setRecipe(null);

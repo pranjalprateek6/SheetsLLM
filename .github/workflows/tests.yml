@@ -94,3 +94,76 @@ jobs:
           name: playwright-report
           path: frontend/test-results
           retention-days: 7
+
+  e2e-signed-in:
+    name: End to end (signed in, fake LLM)
+    runs-on: ubuntu-latest
+    # Runs only once a dedicated test account exists. Secrets: E2E_EMAIL,
+    # E2E_PASSWORD, SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_KEY.
+    # Without them the job passes with a notice, so PRs are never blocked.
+    env:
+      E2E_EMAIL: ${{ secrets.E2E_EMAIL }}
+      E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      LLM_PROVIDER: fake
+      ALLOW_ANONYMOUS: "false"
+      # This backend is only for the test account: no monthly caps (0 = none),
+      # so repeated runs never lock it out of uploading.
+      FREE_MAX_UPLOADS_PER_MONTH: "0"
+      FREE_MAX_CHAT_PER_MONTH: "0"
+      FREE_MAX_TRANSFORMS_PER_MONTH: "0"
+      E2E_SIGNED_IN: "1"
+    steps:
+      - name: Check for the test account
+        id: gate
+        run: |
+          if [ -n "$E2E_EMAIL" ] && [ -n "$E2E_PASSWORD" ] && [ -n "$SUPABASE_URL" ] && [ -n "$SUPABASE_ANON_KEY" ] && [ -n "$SUPABASE_SERVICE_KEY" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::Signed-in e2e skipped: add E2E_EMAIL, E2E_PASSWORD, SUPABASE_URL, SUPABASE_ANON_KEY and SUPABASE_SERVICE_KEY secrets to run it."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.gate.outputs.run == 'true'
+
+      - uses: actions/setup-python@v5
+        if: steps.gate.outputs.run == 'true'
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Start the backend (fake LLM)
+        if: steps.gate.outputs.run == 'true'
+        working-directory: backend
+        run: |
+          pip install -r requirements.txt
+          nohup python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 > ../backend.log 2>&1 &
+          for i in $(seq 1 30); do curl -fs http://127.0.0.1:8000/health && break; sleep 1; done
+
+      - uses: actions/setup-node@v4
+        if: steps.gate.outputs.run == 'true'
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        if: steps.gate.outputs.run == 'true'
+        working-directory: frontend
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Run the signed-in spec
+        if: steps.gate.outputs.run == 'true'
+        working-directory: frontend
+        run: npx playwright test e2e/signed-in.spec.ts
+
+      - name: Backend log
+        if: failure() && steps.gate.outputs.run == 'true'
+        run: tail -100 backend.log

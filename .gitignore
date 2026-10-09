@@ -26,3 +26,6 @@ datasets/
 # playwright output
 frontend/test-results/
 frontend/playwright-report/
+
+# Local admin helper: signs in with the Supabase service key. Never commit.
+frontend/scripts/magic-link.mjs
