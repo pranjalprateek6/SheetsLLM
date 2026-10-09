@@ -153,7 +153,7 @@ export default function RecipesDrawer({
       const res = await fetchWithAuth(`/api/recipes/${recipe.id}/apply`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ file_id: fileId }),
+        body: JSON.stringify({ file_id: fileId, from: "drawer" }),
       });
       const data = await res.json();
       if (!res.ok) {

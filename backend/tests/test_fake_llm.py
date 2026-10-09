@@ -166,3 +166,21 @@ def test_fake_router_is_registered_only_for_the_fake_provider(monkeypatch, provi
     # on included routes, which is how an earlier version of this test read
     # an empty set and failed in CI while passing locally.
     assert TestClient(app).get("/__fake_llm/calls").status_code == expected
+
+
+def test_a_rule_can_answer_slowly(monkeypatch):
+    slept: list[float] = []
+    monkeypatch.setattr(fake.time, "sleep", slept.append)
+    llm = FakeLlm([
+        {"match": "slow sort", "delay_ms": 1500, "reply": "SELECT * FROM data ORDER BY 1"},
+        {"match": "keep all", "reply": "SELECT * FROM data"},
+    ])
+    assert llm.generate_sql("sys", "slow sort please") == "SELECT * FROM data ORDER BY 1"
+    assert slept == [1.5]
+    # The delay belongs to the rule that answered, not to any rule that matched
+    llm.generate_sql("sys", "keep all rows")
+    assert slept == [1.5]
+
+
+def test_shipped_rules_include_a_slow_one():
+    assert any(r.get("delay_ms") for r in fake.load_rules())

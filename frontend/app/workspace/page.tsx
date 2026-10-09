@@ -1,7 +1,6 @@
 "use client";
 import dynamic from "next/dynamic";
 import { Suspense, useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { useSearchParams } from "next/navigation";
 import {
   BarChart3, BookMarked, Check, ChevronDown, Columns3, FileSpreadsheet, History, Lightbulb, MessageSquare, Pencil, Undo2, Upload,
 } from "lucide-react";
@@ -16,6 +15,8 @@ const HistoryDrawer = dynamic(() => import("@/components/HistoryDrawer"));
 import { type RecipeApplyResult } from "@/components/RecipesDrawer";
 const RecipesDrawer = dynamic(() => import("@/components/RecipesDrawer"));
 import ChatPanel, { type LateStep } from "@/components/ChatPanel";
+import RecipeHint from "@/components/RecipeHint";
+import { useOpenFileUrl } from "@/lib/use-open-file-url";
 import { type SchemaColumn } from "@/components/SchemaPanel";
 const SchemaPanel = dynamic(() => import("@/components/SchemaPanel"));
 const ChartPanel = dynamic(() => import("@/components/ChartPanel"));
@@ -66,8 +67,8 @@ const INTENT_TO_SAMPLE: Partial<Record<Intent, string>> = {
 };
 
 function WorkspaceContent() {
-  const searchParams = useSearchParams();
-  const urlFileId = searchParams.get("file_id");
+  // The open file lives in the URL; a URL naming another file opens it.
+  const { urlFileId, showFileInUrl } = useOpenFileUrl((id) => loadFileById(id));
 
   const [fileReady, setFileReady] = useState(false);
   const [showTransform, setShowTransform] = useState(false);
@@ -120,8 +121,6 @@ function WorkspaceContent() {
   const [chatPrefill, setChatPrefill] = useState<{ text: string; nonce: number } | null>(null);
   // Step to confirm-revert to from the pipeline strip (0 = original file)
   const [confirmRevert, setConfirmRevert] = useState<number | null>(null);
-  // The wedge, walking up to you: fresh file + you own recipes = offer one
-  const [recipeHint, setRecipeHint] = useState<{ name: string } | null>(null);
   // Re-entry shortcut on the upload screen
   const [lastFile, setLastFile] = useState<{ id: string; name: string } | null>(null);
   const [renameOpen, setRenameOpen] = useState(false);
@@ -179,25 +178,6 @@ function WorkspaceContent() {
     } catch {}
   }, []);
 
-  // Offer a recipe when a file is opened fresh (no steps yet)
-  useEffect(() => {
-    if (!fileReady || !showTransform || !fileId || steps.length > 0) {
-      setRecipeHint(null);
-      return;
-    }
-    let alive = true;
-    fetchWithAuth("/api/recipes")
-      .then((r) => r.json())
-      .then((d) => {
-        if (alive && Array.isArray(d.recipes) && d.recipes.length > 0) {
-          setRecipeHint({ name: d.recipes[0].name });
-        }
-      })
-      .catch(() => {});
-    return () => {
-      alive = false;
-    };
-  }, [fileReady, showTransform, fileId, steps.length]);
   // Previous grid shape, for computing what a transform changed
   const prevGridRef = useRef<{ columns: string[]; rowCount: number }>({ columns: [], rowCount: 0 });
   const exportIconRef = useRef<DownloadIconHandle>(null);
@@ -289,10 +269,6 @@ function WorkspaceContent() {
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
-  useEffect(() => {
-    if (urlFileId) loadFileById(urlFileId);
-  }, [urlFileId]);
-
   const loadFileById = async (id: string) => {
     setLoading(true);
     setFileLoadError(false);
@@ -311,6 +287,7 @@ function WorkspaceContent() {
 
       setFileId(file.id);
       setUploadInsights(null);
+      showFileInUrl(file.id);
       setFileName(file.name);
       setSchema(file.schema_json);
       setRowCount(file.row_count || 0);
@@ -387,6 +364,7 @@ function WorkspaceContent() {
         setLastChange(null);
         setFileId(data.file_id);
         setUploadInsights(data.insights ?? null);
+        showFileInUrl(data.file_id);
         setFileName(file.name);
         setSchema(data.schema);
         setFileReady(true);
@@ -528,6 +506,7 @@ function WorkspaceContent() {
     setUploadInsights(null);
     setShowUpload(true);
     setShowResetDialog(false);
+    showFileInUrl(undefined);
   };
 
   const handleRevert = async (stepNum: number) => {
@@ -635,6 +614,24 @@ function WorkspaceContent() {
       console.error("Late step refresh failed:", e);
     }
   }, [fileId, previewHandler]);
+
+  // A recipe apply is a transform too: same change-bar treatment, wherever
+  // it was applied from (the drawer, or the hint over the grid).
+  const handleRecipeApplied = useCallback((result: RecipeApplyResult) => {
+    const prev = prevGridRef.current;
+    setLastChange({
+      label: `Recipe applied: ${result.steps_added} step${result.steps_added === 1 ? "" : "s"}`,
+      rowsBefore: prev.rowCount,
+      rowsAfter: result.preview.total_rows,
+      addedCols: result.preview.columns.filter((c) => !prev.columns.includes(c)),
+      removedCols: prev.columns.filter((c) => !result.preview.columns.includes(c)),
+    });
+    setColumns(result.preview.columns);
+    setRows(result.preview.rows);
+    setRowCount(result.preview.total_rows);
+    setColumnCount(result.preview.total_columns);
+    if (fileId) refreshSteps(fileId);
+  }, [fileId, refreshSteps]);
 
   const latestStep = steps.reduce((n, s) => Math.max(n, s.step_number), 0);
 
@@ -827,7 +824,7 @@ function WorkspaceContent() {
                       </button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="start">
-                      <DropdownMenuItem onClick={handleResetClick}>
+                      <DropdownMenuItem onClick={handleFullReset}>
                         <Upload className="mr-2 h-4 w-4" /> Upload a new file
                       </DropdownMenuItem>
                       <DropdownMenuItem asChild>
@@ -954,6 +951,15 @@ function WorkspaceContent() {
                 </div>
               )}
 
+              {/* Recipe hint. Off while the recipes drawer is open, so closing
+                  it refetches and a recipe deleted or renamed there is never
+                  offered stale. */}
+              <RecipeHint
+                fileId={fileId}
+                enabled={fileReady && showTransform && steps.length === 0 && !lastChange && !recipesOpen}
+                onApplied={handleRecipeApplied}
+              />
+
               {/* Change bar: what the last transform actually did */}
               {lastChange && (
                 <div
@@ -1070,22 +1076,7 @@ function WorkspaceContent() {
           onClose={() => setRecipesOpen(false)}
           fileId={fileId}
           fileName={fileName}
-          onApplied={(result: RecipeApplyResult) => {
-            // A recipe apply is a transform too: same change-bar treatment
-            const prev = prevGridRef.current;
-            setLastChange({
-              label: `Recipe applied (${result.steps_added} step${result.steps_added === 1 ? "" : "s"})`,
-              rowsBefore: prev.rowCount,
-              rowsAfter: result.preview.total_rows,
-              addedCols: result.preview.columns.filter((c) => !prev.columns.includes(c)),
-              removedCols: prev.columns.filter((c) => !result.preview.columns.includes(c)),
-            });
-            setColumns(result.preview.columns);
-            setRows(result.preview.rows);
-            setRowCount(result.preview.total_rows);
-            setColumnCount(result.preview.total_columns);
-            if (fileId) refreshSteps(fileId);
-          }}
+          onApplied={handleRecipeApplied}
         />
         <ConfirmDialog isOpen={showResetDialog} onConfirm={handleFullReset} onCancel={() => setShowResetDialog(false)} title="Are you sure you want to reset?" message="This will clear your current work and return to the upload screen." confirmText="Reset" cancelText="Cancel" items={["Clear your current file and all transformations", "Return to the upload screen"]} />
         <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
@@ -1131,7 +1122,7 @@ function WorkspaceContent() {
         <CommandPalette
           open={paletteOpen}
           onClose={() => setPaletteOpen(false)}
-          onUpload={handleResetClick}
+          onUpload={handleFullReset}
           onUndo={handleUndo}
           onDownload={handleDownload}
           onDownloadXlsx={() => handleDownload("xlsx")}

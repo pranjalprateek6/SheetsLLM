@@ -287,6 +287,14 @@ async def apply_recipe(request: Request, recipe_id: str):
         return _json_response(500, "DB_FAILED", "Failed to save recipe steps")
 
     usage.record(user_id, rows_processed=result["total_rows"])
+    # Where the apply came from: the hint over a fresh file, or the drawer
+    source = body.get("from") if body.get("from") in ("hint", "drawer") else None
+    events.record(
+        user_id, "recipe_applied", recipe_id=recipe_id, steps=len(new_steps),
+        **({"from": source} if source else {}),
+    )
+    if source == "hint":
+        events.record(user_id, "recipe_hint_applied", recipe_id=recipe_id)
     try:
         db.create_audit_entry(
             user_id=user_id, file_id=file_id, action="recipe_apply",

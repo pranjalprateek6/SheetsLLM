@@ -34,5 +34,10 @@
   {
     "match": "__invalid__",
     "reply": "__invalid__"
+  },
+  {
+    "match": "slow sort",
+    "delay_ms": 4000,
+    "reply": "SELECT * FROM data ORDER BY 1 DESC"
   }
 ]
