@@ -282,3 +282,9 @@ def test_op_step_replays_like_any_step_and_a_recipe_needs_no_llm(api, parquet):
     undone = replay_transformations_local(parquet, steps[:-1])
     assert undone["preview"][0]["Email"] == "  a@x.com "
     assert llm.calls == 0
+
+
+def test_an_insight_fix_is_counted_as_one(api):
+    client, _, recorded, _ = api
+    client.post("/transform/op", json={"file_id": "f1", "op": "dedupe", "source": "insight"})
+    assert ("insight_fix_applied", {"op": "dedupe"}) in recorded["events"]

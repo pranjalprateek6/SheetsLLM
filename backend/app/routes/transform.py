@@ -470,6 +470,8 @@ async def transform_op(request: Request):
     )
     usage.record(user_id, transforms=1, rows_processed=result["total_rows"])
     events.record(user_id, "op_applied", op=op)
+    if body.get("source") == "insight":
+        events.record(user_id, "insight_fix_applied", op=op)
 
     return {
         "type": "transform",

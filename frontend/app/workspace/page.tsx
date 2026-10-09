@@ -1,10 +1,10 @@
 "use client";
 import dynamic from "next/dynamic";
 import { Suspense, useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import {
-  BarChart3, BookMarked, Check, ChevronDown, Columns3, FileSpreadsheet, History, Lightbulb, MessageSquare, Pencil, Undo2, Upload,
+  BarChart3, BookMarked, Check, ChevronDown, Columns3, FileSpreadsheet, History, Lightbulb, MessageSquare, Pencil, Redo2, Undo2, Upload,
 } from "lucide-react";
-import { DownloadIcon, type DownloadIconHandle } from "@/components/icons/download";
 import ColumnHealth, { type HealthColumn } from "@/components/ColumnHealth";
 import PipelineSpine from "@/components/PipelineSpine";
 import DropZone from "@/components/DropZone";
@@ -12,7 +12,12 @@ import DataGrid from "@/components/DataGrid";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import SheetSelector from "@/components/SheetSelector";
 const HistoryDrawer = dynamic(() => import("@/components/HistoryDrawer"));
-import { type RecipeApplyResult } from "@/components/RecipesDrawer";
+import { type Recipe, type RecipeApplyResult } from "@/components/RecipesDrawer";
+import ExportMenu from "@/components/ExportMenu";
+import ExportClosingStrip, { shouldOfferRecipe } from "@/components/ExportClosingStrip";
+import RerunCard from "@/components/RerunCard";
+import { applyOp, OpFailure, type OpRequest } from "@/lib/ops";
+import { explainError } from "@/lib/errors";
 const RecipesDrawer = dynamic(() => import("@/components/RecipesDrawer"));
 import ChatPanel, { type LateStep } from "@/components/ChatPanel";
 import RecipeHint from "@/components/RecipeHint";
@@ -53,11 +58,13 @@ export default function Workspace() {
   );
 }
 
+// What Chef is for. Trims, dedupes, renames, sorts and fills are one click
+// in the column menu, with no AI request.
 const EXAMPLE_PROMPTS = [
-  "Remove rows with null values",
-  "Sort by date, newest first",
-  "Which column has the most nulls?",
   "Add column Profit = Revenue - Cost",
+  "Flag rows where Status is Paid but Amount is 0",
+  "Which column has the most nulls?",
+  "Split Name into First and Last",
 ];
 
 // Intent → the sample dataset that matches it (ids from SAMPLE_DATASETS)
@@ -88,6 +95,18 @@ function WorkspaceContent() {
   const [pendingUploadId, setPendingUploadId] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [recipesOpen, setRecipesOpen] = useState(false);
+  // "Save as a recipe" from the rail opens the drawer on its save form
+  const [recipesFrom, setRecipesFrom] = useState<"drawer" | "rail">("drawer");
+  const [exportOpen, setExportOpen] = useState(false);
+  // After an export with steps: offer to keep them as a recipe
+  const [exportStrip, setExportStrip] = useState<{ name: string; steps: number } | null>(null);
+  // Saved recipes, for the upload screen's re-run card
+  const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const armedRecipeId = useSearchParams().get("recipe_id");
+  // A recipe to run as soon as the next upload lands (the re-run card)
+  const pendingRecipeRef = useRef<Recipe | null>(null);
+  // Bumped after every step change; the health strip refetches null counts
+  const [healthNonce, setHealthNonce] = useState(0);
   // Below lg the chat is a 65vh bottom sheet rather than a side rail, so
   // defaulting it open there buried the grid under it on arrival. Read once at
   // mount: the transform view is not rendered during hydration, so the server
@@ -117,6 +136,9 @@ function WorkspaceContent() {
     addedCols: string[];
     removedCols: string[];
     note?: string;
+    /** "back": an undo or go-back, which reads "Back at step N" with Redo. */
+    kind?: "step" | "back";
+    redo?: { instruction: string; sql: string };
   } | null>(null);
   const [chatPrefill, setChatPrefill] = useState<{ text: string; nonce: number } | null>(null);
   // Step to confirm-revert to from the pipeline strip (0 = original file)
@@ -185,7 +207,6 @@ function WorkspaceContent() {
 
   // Previous grid shape, for computing what a transform changed
   const prevGridRef = useRef<{ columns: string[]; rowCount: number }>({ columns: [], rowCount: 0 });
-  const exportIconRef = useRef<DownloadIconHandle>(null);
   useEffect(() => {
     prevGridRef.current = { columns, rowCount };
   }, [columns, rowCount]);
@@ -293,6 +314,7 @@ function WorkspaceContent() {
       setFileId(file.id);
       setUploadInsights(null);
       showFileInUrl(file.id);
+      rememberLastFile(file.id, file.name);
       setFileName(file.name);
       setSchema(file.schema_json);
       setRowCount(file.row_count || 0);
@@ -304,7 +326,7 @@ function WorkspaceContent() {
 
       setShowTransform(true); // the grid is the file view — no interstitial
 
-      const previewRes = await fetchWithAuth(`/api/download?file_id=${id}&format=json`);
+      const previewRes = await fetchWithAuth(`/api/download?file_id=${id}&format=json&purpose=preview`);
       if (previewRes.ok) {
         const previewData = await previewRes.json();
         if (Array.isArray(previewData) && previewData.length > 0) {
@@ -370,6 +392,7 @@ function WorkspaceContent() {
         setFileId(data.file_id);
         setUploadInsights(data.insights ?? null);
         showFileInUrl(data.file_id);
+        rememberLastFile(data.file_id, file.name);
         setFileName(file.name);
         setSchema(data.schema);
         setFileReady(true);
@@ -378,7 +401,14 @@ function WorkspaceContent() {
         markOnboardingStep("upload");
         const nRows = data.preview.total_rows ?? data.preview.rows?.length ?? 0;
         const nCols = data.preview.total_columns ?? data.preview.columns?.length ?? 0;
-        toast.success(`Uploaded: ${nRows.toLocaleString()} rows × ${nCols.toLocaleString()} columns detected`);
+        const pending = pendingRecipeRef.current;
+        pendingRecipeRef.current = null;
+        if (pending) {
+          prevGridRef.current = { columns: data.preview.columns, rowCount: nRows };
+          await runRecipe(pending, data.file_id);
+        } else {
+          toast.success(`Uploaded: ${nRows.toLocaleString()} rows × ${nCols.toLocaleString()} columns detected`);
+        }
         return true;
       }
     } catch (error) {
@@ -418,7 +448,12 @@ function WorkspaceContent() {
   const handleDownload = useCallback(async (format: string = "csv") => {
     if (!fileId) return;
     try {
-      await downloadExport(fileId, format, exportFileName(stemOf(fileName), steps.length, format));
+      const name = exportFileName(stemOf(fileName), steps.length, format);
+      await downloadExport(fileId, format, name);
+      if (shouldOfferRecipe(fileId, steps.length)) {
+        setLastChange(null);
+        setExportStrip({ name, steps: steps.length });
+      }
     } catch (e) {
       console.error("Download failed", e);
       toast.error("Download failed. Please try again.");
@@ -429,6 +464,12 @@ function WorkspaceContent() {
     if (!fileId) return;
     setLoading(true);
     try {
+      // Keep the step being undone, so Redo can put it back with no AI call
+      let undone: { step_number: number; instruction: string; sql_query: string } | null = null;
+      try {
+        const h = await fetchWithAuth(`/api/files/${fileId}/history`);
+        if (h.ok) undone = ((await h.json()).steps ?? []).at(-1) ?? null;
+      } catch {}
       const res = await fetchWithAuth("/api/undo", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -441,8 +482,23 @@ function WorkspaceContent() {
         setRowCount(data.preview?.total_rows ?? data.total_rows ?? rows.length);
         setColumnCount(data.preview?.total_columns ?? data.total_columns ?? columns.length);
         setSteps((s) => s.slice(0, -1));
-        setLastChange(null);
-        toast.success("Last step undone");
+        const back = (undone?.step_number ?? 1) - 1;
+        const nRows = data.preview?.total_rows ?? data.total_rows ?? rows.length;
+        const nCols = data.preview?.total_columns ?? data.total_columns ?? columns.length;
+        setLastChange({
+          kind: "back",
+          label: back === 0 ? "Back at the original file" : `Back at step ${back}`,
+          rowsBefore: nRows,
+          rowsAfter: nRows,
+          addedCols: [],
+          removedCols: [],
+          note: `${nRows.toLocaleString()} rows × ${nCols.toLocaleString()} cols`,
+          redo: undone ? { instruction: undone.instruction, sql: undone.sql_query } : undefined,
+        });
+        setHealthNonce((n) => n + 1);
+        toast.success(undone ? `Step ${undone.step_number} undone` : "Last step undone", undone ? {
+          action: { label: "Redo", onClick: () => handleRedo({ instruction: undone!.instruction, sql: undone!.sql_query }) },
+        } : undefined);
       } else if (data.code === "NOTHING_TO_UNDO") {
         toast.info("Nothing to undo. You're at the original file.");
       } else {
@@ -473,6 +529,7 @@ function WorkspaceContent() {
         setColumnCount(data.preview?.total_columns ?? data.total_columns ?? 0);
         setSteps([]);
         setLastChange(null);
+        setHealthNonce((n) => n + 1);
         toast.success("Back at the original file");
       } else {
         toast.error(data.message || "Reset failed. Please try again.");
@@ -517,15 +574,24 @@ function WorkspaceContent() {
         setRowCount(data.preview.total_rows);
         setColumnCount(data.preview.total_columns);
         setSteps((s) => s.filter((x) => x.step_number <= stepNum));
-        setLastChange(null);
-        toast.success(`Reverted to step ${stepNum}`);
+        setLastChange({
+          kind: "back",
+          label: `Back at step ${stepNum}`,
+          rowsBefore: data.preview.total_rows,
+          rowsAfter: data.preview.total_rows,
+          addedCols: [],
+          removedCols: [],
+          note: `${data.preview.total_rows.toLocaleString()} rows × ${data.preview.total_columns.toLocaleString()} cols`,
+        });
+        setHealthNonce((n) => n + 1);
+        toast.success(`Back at step ${stepNum}`);
       } else {
-        toast.error(data.message || "Revert failed. Please try again.");
+        toast.error(explainError(data).text);
       }
       setHistoryOpen(false);
     } catch (e) {
-      console.error("Revert failed:", e);
-      toast.error("Revert failed. Check your connection.");
+      console.error("Go back failed:", e);
+      toast.error("Couldn't go back. Check your connection.");
     } finally {
       setLoading(false);
     }
@@ -546,8 +612,9 @@ function WorkspaceContent() {
     const added = p.columns.filter((c) => !prev.columns.includes(c));
     const removed = prev.columns.filter((c) => !p.columns.includes(c));
     setLastChange({
+      kind: "step",
       stepNumber: p.stepNumber,
-      label: p.instruction ?? "Transform",
+      label: p.instruction ?? "Step",
       rowsBefore: prev.rowCount,
       rowsAfter: p.totalRows ?? p.rows.length,
       addedCols: added,
@@ -564,6 +631,8 @@ function WorkspaceContent() {
     setRows(p.rows);
     if (typeof p.totalRows === "number") setRowCount(p.totalRows);
     if (typeof p.totalColumns === "number") setColumnCount(p.totalColumns);
+    setExportStrip(null);
+    setHealthNonce((n) => n + 1);
     // Celebrate the aha moment once — and point at the step that makes
     // this product different (the recipe), while the win is fresh.
     let firstTransform = false;
@@ -574,7 +643,7 @@ function WorkspaceContent() {
     if (firstTransform) {
       toast.success("That was your first transform. It's saved as step 1, undo anytime.", {
         description:
-          "When your cleanup is done, save the chain as a recipe: next month's file becomes one click.",
+          "When your cleanup is done, save these steps as a recipe: next month's file becomes one click.",
         duration: 9000,
         action: {
           label: "See recipes",
@@ -589,7 +658,7 @@ function WorkspaceContent() {
   const handleLateStep = useCallback(async (step: LateStep) => {
     if (!fileId) return;
     try {
-      const res = await fetchWithAuth(`/api/download?file_id=${fileId}&format=json`);
+      const res = await fetchWithAuth(`/api/download?file_id=${fileId}&format=json&purpose=preview`);
       if (!res.ok) return;
       const data = await res.json();
       if (!Array.isArray(data)) return;
@@ -609,7 +678,7 @@ function WorkspaceContent() {
 
   // A recipe apply is a transform too: same change-bar treatment, wherever
   // it was applied from (the drawer, or the hint over the grid).
-  const handleRecipeApplied = useCallback((result: RecipeApplyResult) => {
+  const handleRecipeApplied = useCallback((result: RecipeApplyResult, appliedTo?: string) => {
     const prev = prevGridRef.current;
     setLastChange({
       label: `Recipe applied: ${result.steps_added} step${result.steps_added === 1 ? "" : "s"}`,
@@ -622,8 +691,125 @@ function WorkspaceContent() {
     setRows(result.preview.rows);
     setRowCount(result.preview.total_rows);
     setColumnCount(result.preview.total_columns);
-    if (fileId) refreshSteps(fileId);
+    setExportStrip(null);
+    setHealthNonce((n) => n + 1);
+    const id = appliedTo ?? fileId;
+    if (id) refreshSteps(id);
   }, [fileId, refreshSteps]);
+
+  // ── One-click fixes: a step with no AI call ─────────────────────────
+  const handleOp = useCallback(async (req: OpRequest, source?: string): Promise<boolean> => {
+    if (!fileId) return false;
+    setLoading(true);
+    try {
+      const r = await applyOp(fileId, req, source);
+      previewHandler({
+        columns: r.preview.columns,
+        rows: r.preview.rows,
+        totalRows: r.preview.total_rows,
+        totalColumns: r.preview.total_columns,
+        stepNumber: r.step_number,
+        instruction: r.instruction,
+      });
+      return true;
+    } catch (e) {
+      toast.error(e instanceof OpFailure ? explainError({ code: e.code, message: e.message }).text : "That fix didn't apply. Try again.");
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }, [fileId, previewHandler]);
+
+  // ── Redo: put an undone step back from its SQL, no AI call ──────────
+  const handleRedo = useCallback(async (step: { instruction: string; sql: string }) => {
+    if (!fileId) return;
+    setLoading(true);
+    try {
+      const r = await fetchWithAuth(`/api/files/${fileId}/steps`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(step),
+      });
+      const data = await r.json();
+      if (!r.ok) {
+        toast.error(explainError(data).text);
+        return;
+      }
+      previewHandler({
+        columns: data.preview.columns,
+        rows: data.preview.rows,
+        totalRows: data.preview.total_rows,
+        totalColumns: data.preview.total_columns,
+        stepNumber: data.step_number,
+        instruction: data.instruction,
+      });
+    } catch {
+      toast.error("Couldn't redo that step. Check your connection.");
+    } finally {
+      setLoading(false);
+    }
+  }, [fileId, previewHandler]);
+
+  // ── Re-run card: upload, then apply the recipe ──────────────────────
+  const runRecipe = async (recipe: Recipe, targetId: string) => {
+    try {
+      const r = await fetchWithAuth(`/api/recipes/${recipe.id}/apply`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ file_id: targetId, from: "rerun" }),
+      });
+      const data = await r.json();
+      if (!r.ok) {
+        toast.error(explainError(data).text);
+        return;
+      }
+      handleRecipeApplied(data as RecipeApplyResult, targetId);
+      toast.success(`Ran "${recipe.name}" on the new file.`);
+    } catch {
+      toast.error(`Couldn't run "${recipe.name}". The file is uploaded; apply it from Recipes.`);
+    }
+  };
+
+  const handleRerun = (file: File, recipe: Recipe) => {
+    pendingRecipeRef.current = recipe;
+    onUpload(file);
+  };
+
+  // Recipes for the upload screen's re-run card
+  useEffect(() => {
+    if (fileReady) return;
+    let alive = true;
+    fetchWithAuth("/api/recipes")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (alive && Array.isArray(d?.recipes)) setRecipes(d.recipes); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [fileReady]);
+
+  // Health recomputes after every step: null counts for the grid as it is now
+  useEffect(() => {
+    if (!fileId || healthNonce === 0) return;
+    const t = setTimeout(async () => {
+      try {
+        const r = await fetchWithAuth(`/api/insights/${fileId}`);
+        if (!r.ok) return;
+        const d = await r.json();
+        const nulls = new Map<string, number>(
+          (d?.insights?.null_columns ?? []).map((c: { column: string; null_pct: number }) => [c.column, c.null_pct]),
+        );
+        setSchema((prev) => {
+          const meta = new Map((prev?.columns ?? []).map((c) => [c.name, c] as const));
+          const cols = prevGridRef.current.columns.map((name) => ({
+            ...(meta.get(name) ?? { name, dtype: "" }),
+            name,
+            null_pct: nulls.get(name) ?? 0,
+          }));
+          return { ...(prev ?? {}), columns: cols as SchemaColumn[] };
+        });
+      } catch {}
+    }, 500);
+    return () => clearTimeout(t);
+  }, [fileId, healthNonce]);
 
   const latestStep = steps.reduce((n, s) => Math.max(n, s.step_number), 0);
 
@@ -632,7 +818,7 @@ function WorkspaceContent() {
       <div className="relative bg-background">
         {showTransform && (
           <KeyboardShortcuts
-            onDownload={handleDownload}
+            onDownload={() => setExportOpen(true)}
             onUndo={handleUndo}
             onFocusInput={() => {
               const input = document.querySelector<HTMLTextAreaElement>('textarea[placeholder*="Chef"]');
@@ -710,6 +896,8 @@ function WorkspaceContent() {
                 </div>
               )}
               <div className="grid gap-5 md:grid-cols-2">
+                <div className="space-y-5">
+                <RerunCard recipes={recipes} armedId={armedRecipeId} disabled={loading} onRun={handleRerun} />
                 <div className="rounded-md border bg-card p-6">
                   <h2 className="mb-4 text-lg font-semibold tracking-tight">Upload a spreadsheet</h2>
                   <DropZone disabled={loading} onDropFile={onUpload} />
@@ -751,6 +939,7 @@ function WorkspaceContent() {
                     </div>
                   </div>
                 </div>
+                </div>
                 <div className="space-y-4">
                   <GettingStarted />
                   <div className="rounded-md border bg-card p-5">
@@ -789,6 +978,10 @@ function WorkspaceContent() {
               onAddStep={() => {
                 setChatOpen(true);
                 setChatPrefill({ text: "", nonce: Date.now() });
+              }}
+              onSaveRecipe={() => {
+                setRecipesFrom("rail");
+                setRecipesOpen(true);
               }}
               className="hidden lg:flex"
             />
@@ -884,7 +1077,10 @@ function WorkspaceContent() {
                       variant="outline"
                       size="sm"
                       className="h-8 gap-1.5 px-2 sm:px-3"
-                      onClick={() => setRecipesOpen(true)}
+                      onClick={() => {
+                        setRecipesFrom("drawer");
+                        setRecipesOpen(true);
+                      }}
                       aria-label={steps.length > 0 ? "Save recipe" : "Recipes"}
                     >
                       <BookMarked className="h-3.5 w-3.5" />
@@ -892,27 +1088,19 @@ function WorkspaceContent() {
                         {steps.length > 0 ? "Save recipe" : "Recipes"}
                       </span>
                     </Button>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          size="sm"
-                          className="h-8 gap-1.5"
-                          aria-label="Export"
-                          onMouseEnter={() => exportIconRef.current?.startAnimation()}
-                          onMouseLeave={() => exportIconRef.current?.stopAnimation()}
-                        >
-                          <DownloadIcon ref={exportIconRef} size={14} />
-                          Export
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleDownload("csv")}>CSV</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleDownload("xlsx")}>Excel (.xlsx)</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleDownload("json")}>JSON</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleDownload("tsv")}>TSV</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleDownload("parquet")}>Parquet</DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    <ExportMenu
+                      fileId={fileId}
+                      localSteps={steps.length}
+                      rowCount={rowCount}
+                      columnCount={columnCount}
+                      open={exportOpen}
+                      onOpenChange={setExportOpen}
+                      onExport={(f) => handleDownload(f)}
+                      onReload={() => {
+                        setExportOpen(false);
+                        if (fileId) loadFileById(fileId);
+                      }}
+                    />
                   </div>
                 </TooltipProvider>
               </div>
@@ -930,6 +1118,7 @@ function WorkspaceContent() {
                     className="hidden flex-1 sm:flex"
                     changedCols={lastChange?.addedCols}
                     onSelect={(name) => setGridJump({ name, nonce: Date.now() })}
+                    onFix={(req) => handleOp(req, "health")}
                   />
                   {/* The segments are proportional to column width, so on a
                       phone the narrow ones compress to 14px: too small to read
@@ -949,11 +1138,21 @@ function WorkspaceContent() {
               <RecipeHint
                 fileId={fileId}
                 enabled={fileReady && showTransform && steps.length === 0 && !lastChange && !recipesOpen}
-                onApplied={handleRecipeApplied}
+                onApplied={(r) => handleRecipeApplied(r)}
               />
 
-              {/* Change bar: what the last transform actually did */}
-              {lastChange && (
+              {exportStrip && fileId && (
+                <ExportClosingStrip
+                  fileId={fileId}
+                  exportedName={exportStrip.name}
+                  steps={exportStrip.steps}
+                  stem={stemOf(fileName)}
+                  onDone={() => setExportStrip(null)}
+                />
+              )}
+
+              {/* Change bar: what the last step actually did */}
+              {lastChange && !exportStrip && (
                 <div
                   className={`flex flex-shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b px-4 py-1.5 text-xs ${
                     lastChange.rowsAfter === 0
@@ -963,11 +1162,12 @@ function WorkspaceContent() {
                 >
                   {lastChange.rowsAfter > 0 && <Check className="h-3.5 w-3.5 flex-shrink-0 text-success-text" />}
                   <span className="font-medium">
-                    {typeof lastChange.stepNumber === "number"
+                    {lastChange.kind !== "back" && typeof lastChange.stepNumber === "number"
                       ? `Step ${lastChange.stepNumber} applied`
                       : lastChange.label}
                   </span>
-                  {lastChange.note && <span className="text-muted-foreground">{lastChange.note}</span>}
+                  {lastChange.note && <span className="tabular-nums text-muted-foreground">{lastChange.note}</span>}
+                  {lastChange.kind !== "back" && (
                   <span className="tabular-nums text-muted-foreground">
                     {lastChange.rowsAfter === 0
                       ? `Every row was removed (${lastChange.rowsBefore.toLocaleString()} → 0)`
@@ -977,6 +1177,7 @@ function WorkspaceContent() {
                             lastChange.rowsAfter > lastChange.rowsBefore ? "+" : "−"
                           }${Math.abs(lastChange.rowsAfter - lastChange.rowsBefore).toLocaleString()})`}
                   </span>
+                  )}
                   {lastChange.addedCols.length > 0 && (
                     <span className="text-muted-foreground">
                       added <span className="font-medium text-foreground">{lastChange.addedCols.join(", ")}</span>
@@ -988,12 +1189,27 @@ function WorkspaceContent() {
                     </span>
                   )}
                   <div className="ml-auto flex items-center gap-2">
-                    <button
-                      onClick={handleUndo}
-                      className="inline-flex items-center gap-1 font-medium text-primary underline-offset-2 hover:underline"
-                    >
-                      <Undo2 className="h-3 w-3" /> Undo
-                    </button>
+                    {lastChange.kind === "back" ? (
+                      lastChange.redo && (
+                        <button
+                          onClick={() => {
+                            const redo = lastChange.redo!;
+                            setLastChange(null);
+                            handleRedo(redo);
+                          }}
+                          className="inline-flex items-center gap-1 font-medium text-primary underline-offset-2 hover:underline"
+                        >
+                          <Redo2 className="h-3 w-3" /> Redo
+                        </button>
+                      )
+                    ) : (
+                      <button
+                        onClick={handleUndo}
+                        className="inline-flex items-center gap-1 font-medium text-primary underline-offset-2 hover:underline"
+                      >
+                        <Undo2 className="h-3 w-3" /> Undo
+                      </button>
+                    )}
                     <button
                       onClick={() => setLastChange(null)}
                       className="text-muted-foreground hover:text-foreground"
@@ -1016,6 +1232,7 @@ function WorkspaceContent() {
                   totalRows={rowCount}
                   stepCount={steps.length}
                   onColumnWidths={handleColumnWidths}
+                  onOp={(req) => handleOp(req, "grid")}
                   onAskColumn={(col) => {
                     setChatOpen(true);
                     setChatPrefill({ text: `Tell me about the "${col}" column`, nonce: Date.now() });
@@ -1046,6 +1263,12 @@ function WorkspaceContent() {
                   latestStep={latestStep}
                   onLateStep={handleLateStep}
                   prefill={chatPrefill}
+                  columns={columns.map((name) => ({ name, dtype: columnMetaMap[name]?.dtype }))}
+                  onOp={(req, source) => handleOp(req, source)}
+                  onOpenRecipes={() => {
+                    setRecipesFrom("drawer");
+                    setRecipesOpen(true);
+                  }}
                 />
               </div>
             )}
@@ -1068,7 +1291,8 @@ function WorkspaceContent() {
           onClose={() => setRecipesOpen(false)}
           fileId={fileId}
           fileName={fileName}
-          onApplied={handleRecipeApplied}
+          onApplied={(r) => handleRecipeApplied(r)}
+          saveFrom={recipesFrom}
         />
         <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
           <DialogContent className="sm:max-w-sm">

@@ -304,7 +304,7 @@ async def apply_recipe(request: Request, recipe_id: str):
 
     usage.record(user_id, rows_processed=result["total_rows"])
     # Where the apply came from: the hint over a fresh file, or the drawer
-    source = body.get("from") if body.get("from") in ("hint", "drawer") else None
+    source = body.get("from") if body.get("from") in ("hint", "drawer", "rerun", "recipes_page") else None
     events.record(
         user_id, "recipe_applied", recipe_id=recipe_id, steps=len(new_steps),
         **({"from": source} if source else {}),

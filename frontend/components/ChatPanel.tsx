@@ -15,6 +15,12 @@ import {
 import { TextShimmer } from "@/components/ui/text-shimmer";
 import { cn } from "@/lib/utils";
 import { toSuggestions, type Suggestion } from "@/lib/suggestions";
+import { explainError } from "@/lib/errors";
+import { matchVerb, type ColumnInfo } from "@/lib/verbs";
+import type { OpRequest } from "@/lib/ops";
+import ErrorBubble from "@/components/ErrorBubble";
+import PrivacyChip from "@/components/PrivacyChip";
+import SentDisclosure, { type SentReceipt } from "@/components/SentDisclosure";
 
 type ChatMessage = {
   id?: string;
@@ -48,7 +54,7 @@ export const LATE_STEP_CHECKS_MS = [1500, 5000, 15000, 30000];
 
 export default function ChatPanel({
   fileId, onPreview, open, fileName, onUndo, onReset, starterSuggestions, initialInsights,
-  latestStep, onLateStep, prefill,
+  latestStep, onLateStep, prefill, columns, onOp, onOpenRecipes,
 }: {
   fileId?: string;
   onPreview: PreviewFn;
@@ -68,6 +74,12 @@ export default function ChatPanel({
   /** Externally-seeded input (e.g. "Ask Chef about this column"); nonce
    *  forces re-application when the same text is sent twice. */
   prefill?: { text: string; nonce: number } | null;
+  /** The current columns, for fixes that need no AI. */
+  columns?: ColumnInfo[];
+  /** Run a fix as a step without Chef. Resolves true when it applied. */
+  onOp?: (req: OpRequest, source: "insight" | "intercept") => Promise<boolean>;
+  /** "Open recipes" from an error that says the AI is out for today. */
+  onOpenRecipes?: () => void;
 }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -80,6 +92,19 @@ export default function ChatPanel({
   const [suggestionsChecked, setSuggestionsChecked] = useState(false);
   const [stage, setStage] = useState(0);
   const [confirmClear, setConfirmClear] = useState(false);
+  // What Chef sees, from the privacy chip; null until the setting loads
+  const [strict, setStrict] = useState<boolean | null>(null);
+  // After RATE_LIMITED, Send waits until this time
+  const [cooldownUntil, setCooldownUntil] = useState(0);
+  const [, tick] = useState(0);
+  useEffect(() => {
+    if (cooldownUntil <= Date.now()) return;
+    const t = setTimeout(() => tick((n) => n + 1), 1000);
+    return () => clearTimeout(t);
+  });
+  const coolingDown = cooldownUntil > Date.now();
+  // A typed request a one-click fix already covers
+  const intercept = columns && onOp ? matchVerb(input, columns) : null;
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -239,7 +264,7 @@ export default function ChatPanel({
         if (data.type === "transform") {
           setMessages((prev) => [...prev, {
             role: "assistant", content: data.message || `Applied: ${msg}`,
-            message_type: "transform", metadata: { sql: data.sql, step_number: data.step_number },
+            message_type: "transform", metadata: { sql: data.sql, step_number: data.step_number, sent: data.sent },
           }]);
           if (data.preview) {
             onPreview({
@@ -257,15 +282,17 @@ export default function ChatPanel({
             metadata: { suggestions: data.suggestions },
           }]);
         } else if (data.type === "insight") {
-          setMessages((prev) => [...prev, { role: "assistant", content: data.message, message_type: "insight" }]);
-        } else if (data.code) {
           setMessages((prev) => [...prev, {
-            role: "assistant",
-            content:
-              data.code === "REQUEST_TIMEOUT"
-                ? "That took too long and was stopped. Try again, or ask something more specific."
-                : data.message || "I couldn't complete that. Try rephrasing it, or ask for something simpler.",
-            message_type: "error",
+            role: "assistant", content: data.message, message_type: "insight", metadata: { strict: data.strict },
+          }]);
+        } else if (data.code) {
+          // Keep the whole payload: the bubble explains it by code, and
+          // "Edit and retry" needs what was typed.
+          const explained = explainError(data);
+          if (explained.retryAfter) setCooldownUntil(Date.now() + explained.retryAfter * 1000);
+          setMessages((prev) => [...prev, {
+            role: "assistant", content: explained.text, message_type: "error",
+            metadata: { code: data.code, payload: data, instruction: msg },
           }]);
         } else {
           // Unrecognized response shape — never let "Thinking…" vanish silently.
@@ -278,7 +305,10 @@ export default function ChatPanel({
           setMessages((prev) => [...prev, { role: "assistant", content: "Stopped.", message_type: "error" }]);
           watchForLateStep(baseline);
         } else {
-          setMessages((prev) => [...prev, { role: "assistant", content: "Failed to send message. Please try again.", message_type: "error" }]);
+          setMessages((prev) => [...prev, {
+            role: "assistant", content: "Couldn't reach Chef. Check your connection and try again.", message_type: "error",
+            metadata: { code: "NETWORK", payload: { code: "NETWORK", message: "Couldn't reach Chef. Check your connection and try again." }, instruction: msg },
+          }]);
         }
       } finally {
         abortRef.current = null;
@@ -359,8 +389,15 @@ export default function ChatPanel({
             <div>
               <p className="text-sm font-medium">{fileName || "Your file"} is ready</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Ask a question or describe a transformation.
+                Ask a question or describe a change.
               </p>
+              {strict !== null && (
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  {strict
+                    ? "Chef sees column names and types, never your values."
+                    : "Chef sees column names, types and a few sample rows."}
+                </p>
+              )}
             </div>
           </div>
 
@@ -373,15 +410,19 @@ export default function ChatPanel({
               <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                 Try one of these
               </p>
-              {suggestions.map((s, i) => (
-                <button
-                  key={i}
-                  onClick={() => sendMessage(s.instruction)}
-                  className="block w-full rounded-lg border bg-background px-3 py-2 text-left text-xs text-foreground/80 transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-foreground"
-                >
-                  {s.text}
-                </button>
-              ))}
+              {suggestions.map((s, i) => {
+                const fix = columns && onOp ? matchVerb(s.instruction, columns) : null;
+                return (
+                  <button
+                    key={i}
+                    onClick={() => (fix && onOp ? onOp(fix, "insight") : sendMessage(s.instruction))}
+                    className="flex w-full items-center justify-between gap-2 rounded-lg border bg-background px-3 py-2 text-left text-xs text-foreground/80 transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-foreground"
+                  >
+                    <span>{s.text}</span>
+                    <span className="flex-shrink-0 text-[10px] text-muted-foreground">{fix ? "no AI" : "asks Chef"}</span>
+                  </button>
+                );
+              })}
             </div>
           ) : (
             <div className="space-y-1.5">
@@ -426,10 +467,34 @@ export default function ChatPanel({
                   : "border border-border/60 bg-card/85"
               )}
             >
-              <p className="whitespace-pre-wrap">{msg.content}</p>
+              {msg.message_type === "error" && msg.role === "assistant" && msg.metadata?.code ? (
+                <ErrorBubble
+                  error={explainError({
+                    ...((msg.metadata.payload as object) ?? {}),
+                    code: String(msg.metadata.code),
+                  })}
+                  instruction={
+                    (msg.metadata.instruction as string | undefined) ??
+                    (messages[i - 1]?.role === "user" ? messages[i - 1].content : undefined)
+                  }
+                  onEditRetry={(text) => {
+                    setInput(text);
+                    setTimeout(() => inputRef.current?.focus(), 0);
+                  }}
+                  onRetry={(text) => sendMessage(text)}
+                  onOpenRecipes={onOpenRecipes}
+                />
+              ) : (
+                <p className="whitespace-pre-wrap">{msg.content}</p>
+              )}
+
+              {msg.message_type === "insight" && msg.metadata?.strict === true && (
+                <p className="mt-1 text-[10px] text-muted-foreground">From column names and types only</p>
+              )}
 
               {msg.message_type === "transform" && !!msg.metadata?.sql && (
-                <div className="mt-1.5">
+                <div className="mt-1.5 flex flex-wrap items-start gap-x-3">
+                  <SentDisclosure sent={msg.metadata.sent as SentReceipt | undefined} />
                   <button
                     onClick={() => setExpandedSql(expandedSql === String(i) ? null : String(i))}
                     aria-expanded={expandedSql === String(i)}
@@ -519,13 +584,27 @@ export default function ChatPanel({
 
       {/* Input */}
       <div className="flex-shrink-0 border-t px-3 py-3">
+        <div className="mb-2 flex flex-wrap items-center gap-2">
+          <PrivacyChip onChange={setStrict} />
+          {intercept && onOp && (
+            <button
+              type="button"
+              onClick={async () => {
+                if (await onOp(intercept, "intercept")) setInput("");
+              }}
+              className="inline-flex h-6 items-center gap-1 rounded-full border border-primary/30 bg-primary/5 px-2 text-[11px] font-medium text-primary transition-colors hover:bg-primary/10"
+            >
+              Apply without AI: {intercept.label}
+            </button>
+          )}
+        </div>
         <div className="flex items-end gap-2">
           <textarea
             ref={inputRef}
             value={input}
             onChange={handleTextareaChange}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey && !sending) {
+              if (e.key === "Enter" && !e.shiftKey && !sending && !coolingDown) {
                 e.preventDefault();
                 sendMessage();
               }
@@ -548,8 +627,8 @@ export default function ChatPanel({
             onClick={() => sendMessage()}
             onMouseEnter={() => sendIconRef.current?.startAnimation()}
             onMouseLeave={() => sendIconRef.current?.stopAnimation()}
-            disabled={sending || !input.trim()}
-            aria-label="Send"
+            disabled={sending || coolingDown || !input.trim()}
+            aria-label={coolingDown ? "Send (waiting out the rate limit)" : "Send"}
           >
             <SendIcon ref={sendIconRef} size={16} />
           </Button>
