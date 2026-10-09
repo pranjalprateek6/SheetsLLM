@@ -81,7 +81,6 @@ function WorkspaceContent() {
   const [fileName, setFileName] = useState("");
   const [schema, setSchema] = useState<{ columns?: SchemaColumn[] } | undefined>(undefined);
   const [showUpload, setShowUpload] = useState(true);
-  const [showResetDialog, setShowResetDialog] = useState(false);
   const [showSheetSelector, setShowSheetSelector] = useState(false);
   const [availableSheets, setAvailableSheets] = useState<string[]>([]);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
@@ -121,6 +120,11 @@ function WorkspaceContent() {
   const [chatPrefill, setChatPrefill] = useState<{ text: string; nonce: number } | null>(null);
   // Step to confirm-revert to from the pipeline strip (0 = original file)
   const [confirmRevert, setConfirmRevert] = useState<number | null>(null);
+  // What the revert dialog shows. Holds the last target through the closing
+  // animation, which otherwise reads "Go back to step null?".
+  const revertShownRef = useRef(0);
+  if (confirmRevert !== null) revertShownRef.current = confirmRevert;
+  const revertShown = revertShownRef.current;
   // Re-entry shortcut on the upload screen
   const [lastFile, setLastFile] = useState<{ id: string; name: string } | null>(null);
   const [renameOpen, setRenameOpen] = useState(false);
@@ -478,7 +482,7 @@ function WorkspaceContent() {
         setColumnCount(data.preview?.total_columns ?? data.total_columns ?? 0);
         setSteps([]);
         setLastChange(null);
-        toast.success("All steps reset. You're back to the original file");
+        toast.success("Back at the original file");
       } else {
         toast.error(data.message || "Reset failed. Please try again.");
       }
@@ -489,8 +493,6 @@ function WorkspaceContent() {
       setLoading(false);
     }
   }, [fileId]);
-
-  const handleResetClick = () => setShowResetDialog(true);
 
   const handleFullReset = () => {
     setFileReady(false);
@@ -505,7 +507,6 @@ function WorkspaceContent() {
     setSampleSuggestions(null);
     setUploadInsights(null);
     setShowUpload(true);
-    setShowResetDialog(false);
     showFileInUrl(undefined);
   };
 
@@ -1048,7 +1049,7 @@ function WorkspaceContent() {
                   onPreview={previewHandler}
                   fileName={fileName}
                   onUndo={handleUndo}
-                  onReset={handleReset}
+                  onReset={() => setConfirmRevert(0)}
                   starterSuggestions={sampleSuggestions}
                   initialInsights={uploadInsights}
                   latestStep={latestStep}
@@ -1078,7 +1079,6 @@ function WorkspaceContent() {
           fileName={fileName}
           onApplied={handleRecipeApplied}
         />
-        <ConfirmDialog isOpen={showResetDialog} onConfirm={handleFullReset} onCancel={() => setShowResetDialog(false)} title="Are you sure you want to reset?" message="This will clear your current work and return to the upload screen." confirmText="Reset" cancelText="Cancel" items={["Clear your current file and all transformations", "Return to the upload screen"]} />
         <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
           <DialogContent className="sm:max-w-sm">
             <DialogHeader>
@@ -1108,13 +1108,13 @@ function WorkspaceContent() {
             else if (target !== null) handleRevert(target);
           }}
           onCancel={() => setConfirmRevert(null)}
-          title={confirmRevert === 0 ? "Back to the original file?" : `Go back to step ${confirmRevert}?`}
+          title={revertShown === 0 ? "Back to the original file?" : `Go back to step ${revertShown}?`}
           message={
-            confirmRevert === 0
+            revertShown === 0
               ? "All steps will be removed. Your original data is untouched and you can re-run any instruction."
               : "Steps after this point will be removed. Your original data is untouched and you can re-run any instruction."
           }
-          confirmText={confirmRevert === 0 ? "Reset steps" : "Go back"}
+          confirmText={revertShown === 0 ? "Go back to the original" : "Go back"}
           cancelText="Cancel"
         />
         <SheetSelector isOpen={showSheetSelector} sheets={availableSheets} onSelect={handleSheetSelect} onCancel={() => { setShowSheetSelector(false); setPendingFile(null); setPendingUploadId(null); setLoading(false); }} />
@@ -1126,7 +1126,10 @@ function WorkspaceContent() {
           onUndo={handleUndo}
           onDownload={handleDownload}
           onDownloadXlsx={() => handleDownload("xlsx")}
-          onReset={handleResetClick}
+          onCloseFile={() => {
+            handleFullReset();
+            toast.success("File closed. It's in Files whenever you need it.");
+          }}
           onChat={() => setChatOpen((v) => !v)}
           onHistory={() => setHistoryOpen(true)}
           onSaveRecipe={() => setRecipesOpen(true)}

@@ -254,6 +254,9 @@ async def chat(request: Request):
         column_count_after=result["total_columns"],
         columns_after=result["columns"],
     )
+    # The step is saved, so this chat turn was a transform: meter it as one,
+    # with the rows it produced, the same as POST /transform does.
+    usage.record(user_id, transforms=1, rows_processed=result["total_rows"])
     try:
         db.update_file(
             file_id, user_id,

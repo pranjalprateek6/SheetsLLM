@@ -147,3 +147,16 @@ describe("ChatPanel stop", () => {
     expect(screen.queryByText(/finished on the server/)).not.toBeInTheDocument();
   });
 });
+
+describe("ChatPanel header", () => {
+  beforeEach(() => server.use(chatHistory(), insights([])));
+
+  it("names the rail button for its outcome, and calls the handler", async () => {
+    const onReset = vi.fn();
+    render(<ChatPanel fileId="f1" open onPreview={noop} onReset={onReset} />);
+    const button = await screen.findByRole("button", { name: "Go back to the original file" });
+    expect(screen.queryByRole("button", { name: "Reset all steps" })).not.toBeInTheDocument();
+    await userEvent.click(button);
+    expect(onReset).toHaveBeenCalledTimes(1);
+  });
+});

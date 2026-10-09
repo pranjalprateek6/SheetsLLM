@@ -18,6 +18,8 @@ type UsageSummary = {
     rows_processed: number;
   };
   recipe_applies?: number;
+  /** Saved recipes are a running total; saved is null when unknown. */
+  recipes?: { saved: number | null; limit: number };
   limits: {
     uploads: number;
     transforms: number;
@@ -25,10 +27,12 @@ type UsageSummary = {
   };
 };
 
+// Every Chef message costs one AI request, whether it transforms, answers or
+// asks back, so that is the AI meter. The backend's separate transforms
+// counter is not shown until the two are merged.
 const METERS = [
   { key: "uploads", label: "Uploads" },
-  { key: "transforms", label: "AI transforms" },
-  { key: "chat_requests", label: "Chat" },
+  { key: "chat_requests", label: "AI requests" },
 ] as const;
 
 const NUDGE_THRESHOLD = 0.8;
@@ -70,8 +74,7 @@ export default function UsageCard({ embedded = false }: { embedded?: boolean }) 
     return (
       <div className={cn(!embedded && "mb-6 rounded-md border bg-card p-4")}>
         <Skeleton className="mb-4 h-4 w-40" />
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <Skeleton className="h-8" />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Skeleton className="h-8" />
           <Skeleton className="h-8" />
         </div>
@@ -135,7 +138,7 @@ export default function UsageCard({ embedded = false }: { embedded?: boolean }) 
         </p>
       )}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {meters.map((m) => (
           <div key={m.key}>
             <div className="mb-1.5 flex items-baseline justify-between">
@@ -161,13 +164,25 @@ export default function UsageCard({ embedded = false }: { embedded?: boolean }) 
         ))}
       </div>
 
+      {typeof usage.recipes?.saved === "number" && (
+        <p className="mt-3 flex items-baseline justify-between font-mono text-[11px]">
+          <span className="text-[10px] uppercase tracking-[0.08em] text-muted-foreground">Saved recipes</span>
+          <span className="font-medium tabular-nums">
+            {usage.recipes.saved.toLocaleString()}
+            <span className="text-muted-foreground">
+              {usage.recipes.limit > 0 ? ` / ${usage.recipes.limit.toLocaleString()}` : " (unlimited)"}
+            </span>
+          </span>
+        </p>
+      )}
+
       {showNudge && (
         <div className="mt-4 flex items-center justify-between gap-3 border-t pt-4">
           <p className="text-sm text-muted-foreground">
             {capped
               ? "You've hit a monthly limit on the Free plan."
               : "You're close to a monthly limit on the Free plan."}{" "}
-            Pro raises caps to 1,000 uploads and 5,000 transforms.
+            Pro raises caps to 1,000 uploads and 5,000 AI requests a month.
           </p>
           <Button size="sm" onClick={() => router.push(`/pricing?reason=${tightest.key}`)} className="whitespace-nowrap">
             <Zap className="mr-1.5 h-3.5 w-3.5" /> Upgrade to Pro

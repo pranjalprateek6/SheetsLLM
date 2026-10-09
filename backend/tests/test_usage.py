@@ -124,3 +124,29 @@ def test_summary_recipe_applies_fails_open(monkeypatch):
     monkeypatch.setattr(usage.db, "count_audit_actions", _boom)
     s = usage.summary("u1")
     assert s["recipe_applies"] == 0
+
+
+# ── Saved recipes in the summary (the "Recipes 1 / 1" line) ──────────
+
+def test_summary_reports_saved_recipes_against_the_cap(monkeypatch):
+    from app import usage
+
+    monkeypatch.setattr(usage.db, "get_subscription", lambda uid: None)
+    monkeypatch.setattr(usage.db, "get_usage", lambda uid, month: None)
+    monkeypatch.setattr(usage.db, "count_audit_actions", lambda *a: 0)
+    monkeypatch.setattr(usage.db, "list_recipes", lambda uid: [{"id": "r1"}])
+    assert usage.summary("u1")["recipes"] == {"saved": 1, "limit": usage.RECIPE_LIMITS["free"]}
+
+
+def test_summary_recipes_count_fails_open(monkeypatch):
+    from app import usage
+
+    monkeypatch.setattr(usage.db, "get_subscription", lambda uid: None)
+    monkeypatch.setattr(usage.db, "get_usage", lambda uid, month: None)
+    monkeypatch.setattr(usage.db, "count_audit_actions", lambda *a: 0)
+
+    def _boom(uid):
+        raise RuntimeError("db down")
+
+    monkeypatch.setattr(usage.db, "list_recipes", _boom)
+    assert usage.summary("u1")["recipes"]["saved"] is None

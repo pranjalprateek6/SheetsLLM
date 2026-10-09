@@ -337,11 +337,11 @@ export default function ChatPanel({
               {onReset && (
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={onReset} aria-label="Reset all steps">
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={onReset} aria-label="Go back to the original file">
                       <RotateCcw className="h-3.5 w-3.5" />
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent>Reset all steps</TooltipContent>
+                  <TooltipContent>Go back to the original file</TooltipContent>
                 </Tooltip>
               )}
             </div>
