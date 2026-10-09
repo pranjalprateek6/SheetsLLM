@@ -1,14 +1,14 @@
 "use client";
-import { useEffect, useState } from "react";
-import { useReducedMotion } from "framer-motion";
+import { useRef } from "react";
 import { BookMarked, Check, ChevronDown, Download, FileSpreadsheet, RotateCcw, Sparkles } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { GhostCursor, useScene, type Frame } from "@/components/marketing/ghost";
 
-/* The product at work, rendered live rather than screenshotted: a sample
-   orders export gets three real fixes in sequence (the same three the
-   insights strip offers), the steps rail fills in, and the change bar
-   counts what each one did. Plays once and holds; Replay runs it again.
+/* The product at work, rendered live rather than screenshotted, and looped
+   like a muted video: the cursor takes the duplicates insight, standardises
+   Order Date and fills Region from the column menus, then saves the steps as
+   a recipe. The rail fills in and the change bar counts what each step did.
    Reduced motion shows the finished state. All figures are sample data. */
 
 type Row = { id: string; order: string; date: string; region: string | null; amount: string; dup?: boolean };
@@ -34,33 +34,56 @@ const STEPS = [
   { label: "Fill empty Region with Unknown", change: "1,000 rows · 215 cells filled" },
 ];
 
-// ms after mount at which each step lands
-const TIMELINE = [900, 2100, 3300];
+type S = { applied: number; menu: null | "date" | "region"; saved: boolean };
+
+const SCENE: Frame<S>[] = [
+  { at: 0, cursor: null, applied: 0, menu: null, saved: false },
+  { at: 700, cursor: "insight" },
+  { at: 1500, click: true },
+  { at: 1700, applied: 1 },
+  { at: 2500, cursor: "h-date" },
+  { at: 3200, click: true },
+  { at: 3400, menu: "date", cursor: "m-date" },
+  { at: 4200, click: true },
+  { at: 4400, menu: null, applied: 2 },
+  { at: 5200, cursor: "h-region" },
+  { at: 5900, click: true },
+  { at: 6100, menu: "region", cursor: "m-region" },
+  { at: 6900, click: true },
+  { at: 7100, menu: null, applied: 3 },
+  { at: 7900, cursor: "save" },
+  { at: 8600, click: true },
+  { at: 8800, saved: true },
+  { at: 10600, cursor: null },
+];
+const TOTAL = 11400;
+const INITIAL: S = { applied: 0, menu: null, saved: false };
+
+function MiniMenu({ item, id }: { item: string; id: string }) {
+  return (
+    <div className="absolute left-0 top-full z-20 mt-1 w-44 rounded-lg border bg-popover p-1 text-left text-[11px] font-normal text-foreground shadow-lg">
+      <p className="px-2 pb-0.5 pt-1 text-[10px] font-medium text-muted-foreground">Fix, no AI</p>
+      <p className="rounded-md px-2 py-1 text-muted-foreground">Trim whitespace</p>
+      <p data-ghost={id} className="rounded-md bg-accent px-2 py-1">{item}</p>
+      <p className="rounded-md px-2 py-1 text-muted-foreground">Rename…</p>
+    </div>
+  );
+}
 
 export default function HeroWorkspace() {
-  const reduced = useReducedMotion();
-  const [applied, setApplied] = useState(0);
-  const [run, setRun] = useState(0);
-
-  useEffect(() => {
-    if (reduced) {
-      setApplied(STEPS.length);
-      return;
-    }
-    setApplied(0);
-    const timers = TIMELINE.map((ms, i) => setTimeout(() => setApplied(i + 1), ms));
-    return () => timers.forEach(clearTimeout);
-  }, [reduced, run]);
+  const frame = useRef<HTMLElement>(null);
+  const s = useScene(SCENE, TOTAL, INITIAL, frame);
+  const { applied } = s;
 
   const rows = ROWS.filter((r) => !(applied >= 1 && r.dup));
   const last = applied > 0 ? STEPS[applied - 1] : null;
   const done = applied === STEPS.length;
 
   return (
-    <figure className="relative overflow-hidden rounded-xl border bg-card text-left shadow-lg">
+    <figure ref={frame} className="relative overflow-hidden rounded-xl border bg-card text-left shadow-lg">
       <figcaption className="sr-only">
         The SheetsLLM workspace cleaning a sample orders file: duplicates removed, dates standardised and empty
-        regions filled, each saved as a step you can undo, then offered as a recipe.
+        regions filled, each saved as a step you can undo, then saved as a recipe.
       </figcaption>
       {/* Toolbar */}
       <div className="flex h-11 items-center gap-2 border-b px-3" aria-hidden>
@@ -89,9 +112,9 @@ export default function HeroWorkspace() {
               <span className="grid h-4 w-4 place-items-center rounded-full border bg-background text-[9px]">·</span>
               Original file
             </li>
-            {STEPS.map((s, i) => (
+            {STEPS.map((st, i) => (
               <li
-                key={s.label}
+                key={st.label}
                 className={cn(
                   "flex items-center gap-2 rounded-md px-1.5 py-1 text-[12px] transition-[opacity,transform] duration-500 ease-out-quint",
                   i < applied ? "translate-x-0 opacity-100" : "-translate-x-1 opacity-0",
@@ -106,17 +129,21 @@ export default function HeroWorkspace() {
                 >
                   {i + 1}
                 </span>
-                <span className="truncate">{s.label}</span>
+                <span className="truncate">{st.label}</span>
               </li>
             ))}
           </ol>
           <div
+            data-ghost="save"
             className={cn(
-              "mt-2 flex items-center gap-1.5 rounded-md px-1.5 py-1 text-[12px] font-medium text-primary-accent transition-opacity duration-500",
+              "mt-2 flex items-center gap-1.5 rounded-md px-1.5 py-1 text-[12px] font-medium transition-[opacity,background-color,color] duration-300",
               done ? "opacity-100" : "opacity-0",
+              s.saved ? "bg-success/[0.08] text-success-text" : "text-primary-accent",
+              s.click && s.cursor === "save" && "bg-accent",
             )}
           >
-            <BookMarked className="h-3.5 w-3.5" /> Save as a recipe
+            {s.saved ? <Check className="h-3.5 w-3.5" /> : <BookMarked className="h-3.5 w-3.5" />}
+            {s.saved ? "Saved: Monthly orders" : "Save as a recipe"}
           </div>
         </div>
 
@@ -138,24 +165,39 @@ export default function HeroWorkspace() {
                 </span>
               </>
             ) : (
-              <>
-                <Sparkles className="h-3.5 w-3.5 text-primary-accent" />
-                <span className="text-muted-foreground">Remove 12 duplicate rows</span>
-                <span className="text-muted-foreground/70">· no AI</span>
-              </>
+              <span
+                data-ghost="insight"
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-md border bg-card px-2 py-0.5 shadow-xs transition-colors",
+                  s.click && s.cursor === "insight" && "border-primary/40 bg-primary/[0.06]",
+                )}
+              >
+                <Sparkles className="h-3 w-3 text-primary-accent" />
+                Remove 12 duplicate rows
+                <span className="text-muted-foreground">· no AI</span>
+              </span>
             )}
           </div>
           <table className="w-full table-fixed text-[12px]">
             <thead>
               <tr className="border-b text-left text-[11px] text-muted-foreground">
                 <th className="hidden w-9 py-1.5 pl-3 font-normal sm:table-cell" />
-                {["Order ID", "Order Date", "Region", "Amount"].map((h) => (
-                  <th key={h} className={cn("py-1.5 pr-3 font-medium first:pl-3 sm:first:pl-0", h === "Amount" && "text-right")}>
-                    <span className="inline-flex items-center gap-1">
-                      {h} {h !== "Amount" && <ChevronDown className="h-3 w-3 opacity-50" />}
-                    </span>
-                  </th>
-                ))}
+                {(["Order ID", "Order Date", "Region", "Amount"] as const).map((h) => {
+                  const key = h === "Order Date" ? "date" : h === "Region" ? "region" : null;
+                  const pressed = key && (s.menu === key || (s.click && s.cursor === `h-${key}`));
+                  return (
+                    <th key={h} className={cn("relative py-1.5 pr-3 font-medium first:pl-3 sm:first:pl-0", h === "Amount" && "text-right")}>
+                      <span
+                        data-ghost={key ? `h-${key}` : undefined}
+                        className={cn("-mx-1 inline-flex items-center gap-1 rounded px-1 transition-colors", pressed && "bg-accent text-foreground")}
+                      >
+                        {h} {h !== "Amount" && <ChevronDown className="h-3 w-3 opacity-50" />}
+                      </span>
+                      {s.menu === "date" && key === "date" && <MiniMenu item="Standardise dates…" id="m-date" />}
+                      {s.menu === "region" && key === "region" && <MiniMenu item="Fill empty cells…" id="m-region" />}
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody>
@@ -167,8 +209,9 @@ export default function HeroWorkspace() {
                   <tr key={r.id} className={cn("border-b border-border/60 transition-colors", r.dup && applied === 0 && "bg-warning/[0.07]")}>
                     <td className="hidden py-1.5 pl-3 tabular-nums text-muted-foreground/70 sm:table-cell">{i + 1}</td>
                     <td className="truncate py-1.5 pl-3 pr-3 tabular-nums sm:pl-0">{r.order}</td>
-                    <td className={cn("truncate py-1.5 pr-3 tabular-nums transition-colors duration-700", dateFixed && "cell-changed")}>{date}</td>
-                    <td className={cn("truncate py-1.5 pr-3", regionFilled && "cell-changed")}>
+                    {/* Keyed on the change so the wash replays every loop */}
+                    <td key={`d-${dateFixed}`} className={cn("truncate py-1.5 pr-3 tabular-nums", dateFixed && "cell-changed")}>{date}</td>
+                    <td key={`r-${regionFilled}`} className={cn("truncate py-1.5 pr-3", regionFilled && "cell-changed")}>
                       {r.region ?? (regionFilled ? "Unknown" : <span className="rounded bg-muted px-1 text-[10px] text-muted-foreground">empty</span>)}
                     </td>
                     <td className="truncate py-1.5 pr-3 text-right tabular-nums">{r.amount}</td>
@@ -182,15 +225,7 @@ export default function HeroWorkspace() {
           </div>
         </div>
       </div>
-      {done && !reduced && (
-        <button
-          type="button"
-          onClick={() => setRun((n) => n + 1)}
-          className="absolute bottom-1 right-1 inline-flex h-6 items-center rounded-md px-2 text-[11px] font-medium text-primary-accent underline-offset-2 hover:underline"
-        >
-          Replay
-        </button>
-      )}
+      <GhostCursor frame={frame} target={s.cursor} click={s.click} />
     </figure>
   );
 }
