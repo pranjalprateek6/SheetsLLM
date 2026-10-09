@@ -21,54 +21,52 @@ export default function ToolShell({
   children: React.ReactNode;
 }) {
   return (
-    <div className="mx-auto max-w-3xl px-4 pb-20 pt-12 sm:px-6">
-      <div className="mb-8 text-center">
-        <h1 className="text-3xl font-semibold tracking-tight">{title}</h1>
-        <p className="mx-auto mt-3 max-w-xl text-muted-foreground">{intro}</p>
-        <p className="mt-4 inline-flex items-center gap-1.5 rounded-full border bg-card px-3 py-1 text-xs font-medium text-success-text">
+    <div className="mx-auto max-w-3xl px-4 pb-20 pt-14 sm:px-6">
+      <div className="mb-8">
+        <h1 className="text-4xl font-semibold tracking-[-0.03em]">{title}</h1>
+        <p className="mt-3 max-w-xl text-[17px] leading-relaxed text-muted-foreground">{intro}</p>
+        <p className="mt-4 inline-flex items-center gap-1.5 text-[13px] font-medium text-success-text">
           <Lock className="h-3.5 w-3.5" />
           Runs entirely in your browser. Your file never leaves your computer
         </p>
       </div>
 
       {/* The tool itself */}
-      <div className="rounded-lg border bg-card p-6">{children}</div>
+      <div className="rounded-xl border bg-card p-6 shadow-sm">{children}</div>
 
       {/* How it works */}
-      <div className="mt-12 grid gap-4 sm:grid-cols-3">
+      <h2 className="mt-14 text-lg font-semibold tracking-[-0.015em]">How it works</h2>
+      <ol className="mt-4 grid gap-6 sm:grid-cols-3">
         {steps.map((s, i) => (
-          <div key={i} className="rounded-lg border bg-card p-4">
-            <span className="mb-2 flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
-              {i + 1}
-            </span>
-            <p className="text-sm text-muted-foreground">{s}</p>
-          </div>
+          <li key={i} className="border-t pt-4">
+            <span className="text-[13px] font-medium tabular-nums text-muted-foreground">Step {i + 1}</span>
+            <p className="mt-1.5 text-sm">{s}</p>
+          </li>
         ))}
-      </div>
+      </ol>
 
       {/* Recipe CTA */}
-      <div className="relative mt-12 overflow-hidden rounded-lg border p-8 text-center">
-        <div aria-hidden className="absolute inset-0 -z-10 bg-gradient-brand opacity-[0.06]" />
-        <RefreshCw className="mx-auto mb-3 h-6 w-6 text-primary" />
-        <h2 className="text-xl font-semibold tracking-tight">
+      <div className="mt-14 rounded-xl border bg-canvas p-6 sm:p-8">
+        <RefreshCw className="mb-3 h-5 w-5 text-primary-accent" aria-hidden />
+        <h2 className="text-lg font-semibold tracking-[-0.015em]">
           Doing this to the same export every month?
         </h2>
-        <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
+        <p className="mt-1.5 max-w-lg text-sm text-muted-foreground">
           SheetsLLM turns your cleanup into a saved recipe: describe it once in plain English,
           then re-run it on every new file in one click. By default the AI sees column names and
           types, never your values.
         </p>
         <Button className="mt-5" asChild>
           <Link href="/auth?mode=signup">
-            Automate it free <ArrowRight className="ml-1.5 h-4 w-4" />
+            Automate it free <ArrowRight className="h-4 w-4" />
           </Link>
         </Button>
       </div>
 
       {/* FAQ */}
-      <div className="mt-12">
-        <h2 className="mb-4 text-lg font-semibold tracking-tight">Frequently asked questions</h2>
-        <div className="divide-y rounded-lg border bg-card px-5">
+      <div className="mt-14">
+        <h2 className="mb-4 text-lg font-semibold tracking-[-0.015em]">Frequently asked questions</h2>
+        <div className="divide-y rounded-xl border bg-card px-5 shadow-xs">
           {faq.map((item) => (
             <details key={item.q} className="group py-4">
               <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-medium [&::-webkit-details-marker]:hidden">

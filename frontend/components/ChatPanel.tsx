@@ -2,7 +2,7 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
-import { ChefHat, ChevronDown, Code2, Eraser, RotateCcw, Square, Undo2, User } from "lucide-react";
+import { ChefHat, ChevronDown, Code2, Eraser, RotateCcw, Square, Undo2 } from "lucide-react";
 import { SendIcon, type SendIconHandle } from "@/components/icons/send";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,6 +18,7 @@ import { toSuggestions, type Suggestion } from "@/lib/suggestions";
 import { explainError } from "@/lib/errors";
 import { matchVerb, type ColumnInfo } from "@/lib/verbs";
 import type { OpRequest } from "@/lib/ops";
+import ChatText from "@/components/ChatText";
 import ErrorBubble from "@/components/ErrorBubble";
 import PrivacyChip from "@/components/PrivacyChip";
 import SentDisclosure, { type SentReceipt } from "@/components/SentDisclosure";
@@ -407,7 +408,7 @@ export default function ChatPanel({
             </div>
           ) : suggestions.length > 0 ? (
             <div className="space-y-1.5">
-              <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+              <p className="text-xs font-medium text-muted-foreground">
                 Try one of these
               </p>
               {suggestions.map((s, i) => {
@@ -447,24 +448,26 @@ export default function ChatPanel({
             ? `Chef replied: ${messages[messages.length - 1].content}`
             : ""}
       </div>
-      <div ref={scrollRef} aria-busy={sending} className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
+      <div ref={scrollRef} aria-busy={sending} className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
         {messages.map((msg, i) => (
           <div key={i} className={cn("flex gap-2", msg.role === "user" ? "justify-end" : "justify-start")}>
             {msg.role === "assistant" && (
-              <div className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md bg-primary/10">
-                <ChefHat className="h-3 w-3 text-primary" />
+              <div className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md border bg-card shadow-xs">
+                <ChefHat className="h-3 w-3 text-primary-accent" />
               </div>
             )}
+            {/* You speak in a quiet bubble; Chef answers in plain text, and
+                only a change to the file or an error earns a container. */}
             <div
               className={cn(
-                "max-w-[85%] rounded-md px-3 py-2 text-[13px]",
+                "min-w-0 text-[13px] leading-relaxed",
                 msg.role === "user"
-                  ? "bg-primary text-primary-foreground"
+                  ? "max-w-[85%] rounded-xl rounded-br-md bg-muted px-3 py-2"
                   : msg.message_type === "error"
-                  ? "border border-destructive/30 bg-destructive/5 text-destructive-text"
+                  ? "max-w-[90%] rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-destructive-text"
                   : msg.message_type === "transform"
-                  ? "border border-primary/20 bg-primary/5"
-                  : "border border-border/60 bg-card/85"
+                  ? "max-w-[90%] rounded-lg border bg-card px-3 py-2 shadow-xs"
+                  : "max-w-[90%] pt-0.5"
               )}
             >
               {msg.message_type === "error" && msg.role === "assistant" && msg.metadata?.code ? (
@@ -484,6 +487,8 @@ export default function ChatPanel({
                   onRetry={(text) => sendMessage(text)}
                   onOpenRecipes={onOpenRecipes}
                 />
+              ) : msg.role === "assistant" ? (
+                <ChatText text={msg.content} />
               ) : (
                 <p className="whitespace-pre-wrap">{msg.content}</p>
               )}
@@ -518,7 +523,7 @@ export default function ChatPanel({
                     <button
                       key={j}
                       onClick={() => sendMessage(s)}
-                      className="rounded-md border border-primary/25 bg-primary/5 px-2 py-1 text-[11px] text-primary transition-colors hover:bg-primary/10"
+                      className="rounded-md border bg-card px-2 py-1 text-[12px] shadow-xs transition-colors hover:border-foreground/20 hover:bg-accent"
                     >
                       {s}
                     </button>
@@ -526,20 +531,15 @@ export default function ChatPanel({
                 </div>
               )}
             </div>
-            {msg.role === "user" && (
-              <div className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md bg-muted">
-                <User className="h-3 w-3 text-muted-foreground" />
-              </div>
-            )}
           </div>
         ))}
 
         {sending && (
           <div className="flex gap-2">
-            <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md bg-primary/10">
-              <ChefHat className="h-3 w-3 text-primary" />
+            <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md border bg-card shadow-xs">
+              <ChefHat className="h-3 w-3 text-primary-accent" />
             </div>
-            <div className="flex items-center gap-2 rounded-md bg-muted px-3 py-2">
+            <div className="flex items-center gap-2 pt-0.5">
               <TextShimmer className="text-xs" duration={1}>{STAGES[stage]}</TextShimmer>
               <button
                 onClick={() => abortRef.current?.abort()}

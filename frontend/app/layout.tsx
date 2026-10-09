@@ -1,24 +1,14 @@
 import "@/styles/globals.css";
-import { Archivo, JetBrains_Mono } from "next/font/google";
+import { GeistSans } from "geist/font/sans";
+import { GeistMono } from "geist/font/mono";
 import { AuthProvider } from "@/contexts/AuthContext";
 import Header from "@/components/Header";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 
-// Archivo over Inter: higher x-height holds up at the 11-13px label sizes a
-// dense grid needs, and it has a voice at display sizes instead of being the
-// face every product defaults to.
-const archivo = Archivo({
-  subsets: ["latin"],
-  variable: "--font-sans",
-  display: "swap",
-});
-
-const jetbrainsMono = JetBrains_Mono({
-  subsets: ["latin"],
-  variable: "--font-mono",
-  display: "swap",
-});
+// Geist Sans for every word of interface and prose, Geist Mono only where a
+// string is data: SQL, cell values in code views, file names in tables.
+// Self-hosted by the geist package (next/font/local), so no layout shift.
 
 export const metadata = {
   metadataBase: new URL("https://sheets-llm.vercel.app"),
@@ -29,7 +19,7 @@ export const metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${archivo.variable} ${jetbrainsMono.variable}`} suppressHydrationWarning>
+    <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`} suppressHydrationWarning>
       <body className="min-h-dvh font-sans">
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} disableTransitionOnChange>
           <AuthProvider>

@@ -39,43 +39,46 @@ const TOOLS = [
 
 export default function ToolsIndex() {
   return (
-    <div className="mx-auto max-w-3xl px-4 pb-20 pt-12 sm:px-6">
-      <div className="mb-10 text-center">
-        <h1 className="text-3xl font-semibold tracking-tight">Free CSV &amp; JSON tools</h1>
-        <p className="mx-auto mt-3 max-w-xl text-muted-foreground">
-          Quick fixes for messy data files. Every tool runs entirely in your browser.
-          No upload, no signup, no data collection.
-        </p>
-      </div>
+    <div className="mx-auto max-w-3xl px-4 pb-20 pt-14 sm:px-6">
+      <h1 className="text-4xl font-semibold tracking-[-0.03em]">Free CSV &amp; JSON tools</h1>
+      <p className="mt-3 max-w-xl text-[17px] leading-relaxed text-muted-foreground">
+        Quick fixes for messy data files. Every tool runs entirely in your browser.
+        No upload, no signup, no data collection.
+      </p>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      {/* A list, not a wall of icon tiles: the names are what you scan */}
+      <ul className="mt-10 divide-y overflow-hidden rounded-xl border bg-card shadow-sm">
         {TOOLS.map((t) => (
-          <Link
-            key={t.href}
-            href={t.href}
-            className="group rounded-lg border bg-card p-5 transition-colors hover:border-primary/40 hover:bg-accent/40"
-          >
-            <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-              <t.icon className="h-5 w-5 text-primary" />
-            </div>
-            <h2 className="font-medium group-hover:text-primary">{t.name}</h2>
-            <p className="mt-1 text-sm text-muted-foreground">{t.desc}</p>
-          </Link>
+          <li key={t.href}>
+            <Link
+              href={t.href}
+              className="group flex items-center gap-4 px-5 py-4 transition-colors hover:bg-accent/60 focus-visible:bg-accent/60 focus-visible:outline-none"
+            >
+              <t.icon className="h-4 w-4 shrink-0 text-muted-foreground transition-colors group-hover:text-primary-accent" aria-hidden />
+              <div className="min-w-0 flex-1">
+                <h2 className="text-[15px] font-medium">{t.name}</h2>
+                <p className="mt-0.5 text-sm text-muted-foreground">{t.desc}</p>
+              </div>
+              <ArrowRight
+                className="h-4 w-4 shrink-0 -translate-x-1 text-muted-foreground opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100"
+                aria-hidden
+              />
+            </Link>
+          </li>
         ))}
-      </div>
+      </ul>
 
-      <div className="relative mt-12 overflow-hidden rounded-lg border p-8 text-center">
-        <div aria-hidden className="absolute inset-0 -z-10 bg-gradient-brand opacity-[0.06]" />
-        <h2 className="text-xl font-semibold tracking-tight">
-          Same cleanup every week? Stop doing it by hand.
-        </h2>
-        <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
-          SheetsLLM turns any cleanup into a saved recipe you re-run on every new export,
-          described in plain English, with your data never sent to the AI.
-        </p>
-        <Button className="mt-5" asChild>
+      <div className="mt-12 flex flex-col items-start gap-5 rounded-xl border bg-canvas p-6 sm:flex-row sm:items-center sm:justify-between sm:p-8">
+        <div className="max-w-md">
+          <h2 className="text-lg font-semibold tracking-[-0.015em]">Same cleanup every week? Stop doing it by hand.</h2>
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            SheetsLLM turns any cleanup into a saved recipe you re-run on every new export,
+            described in plain English. By default the AI sees column names and types, never your values.
+          </p>
+        </div>
+        <Button className="shrink-0" asChild>
           <Link href="/auth?mode=signup">
-            Try SheetsLLM free <ArrowRight className="ml-1.5 h-4 w-4" />
+            Try SheetsLLM free <ArrowRight className="h-4 w-4" />
           </Link>
         </Button>
       </div>

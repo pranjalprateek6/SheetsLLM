@@ -114,9 +114,9 @@ export default function UsageCard({ embedded = false }: { embedded?: boolean }) 
         <div className="flex items-center gap-2">
           <Gauge className="h-4 w-4 text-muted-foreground" />
           <h2 className="text-sm font-medium">Usage this month</h2>
-          <Badge variant="secondary" className="font-mono text-[10px] uppercase tracking-wide">{usage.tier}</Badge>
+          <Badge variant="secondary" className="capitalize">{usage.tier}</Badge>
         </div>
-        <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">Resets {resetDate(usage.month)}</span>
+        <span className="text-xs font-medium text-muted-foreground">Resets {resetDate(usage.month)}</span>
       </div>
 
       {/* The numbers say what you used; this line says what it got you. */}
@@ -143,8 +143,8 @@ export default function UsageCard({ embedded = false }: { embedded?: boolean }) 
         {meters.map((m) => (
           <div key={m.key}>
             <div className="mb-1.5 flex items-baseline justify-between">
-              <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">{m.label}</span>
-              <span className="font-mono text-[11px] font-medium tabular-nums">
+              <span className="text-xs font-medium text-muted-foreground">{m.label}</span>
+              <span className="text-xs font-medium tabular-nums">
                 {m.used.toLocaleString()}
                 {m.limit > 0 ? (
                   <span className="text-muted-foreground"> / {m.limit.toLocaleString()}</span>
@@ -159,15 +159,15 @@ export default function UsageCard({ embedded = false }: { embedded?: boolean }) 
                 />
               </div>
             ) : (
-              <p className="font-mono text-[11px] text-muted-foreground">Unlimited</p>
+              <p className="text-xs text-muted-foreground">Unlimited</p>
             )}
           </div>
         ))}
       </div>
 
       {typeof usage.recipes?.saved === "number" && (
-        <p className="mt-3 flex items-baseline justify-between font-mono text-[11px]">
-          <span className="text-[10px] uppercase tracking-[0.08em] text-muted-foreground">Saved recipes</span>
+        <p className="mt-3 flex items-baseline justify-between text-xs">
+          <span className="text-xs text-muted-foreground">Saved recipes</span>
           <span className="font-medium tabular-nums">
             {usage.recipes.saved.toLocaleString()}
             <span className="text-muted-foreground">

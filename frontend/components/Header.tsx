@@ -16,7 +16,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChevronDown, FileSpreadsheet, LogOut, Menu, Moon, ShieldCheck, Sun, User, X } from "lucide-react";
+import { ChevronDown, FileSpreadsheet, LogOut, Menu, Moon, ShieldCheck, Sun, X } from "lucide-react";
 import { onOpenFile, type OpenFile } from "@/lib/open-file";
 import { toast } from "sonner";
 import { useTheme } from "next-themes";
@@ -123,7 +123,7 @@ export default function Header() {
   const fullBleed = pathname.startsWith("/workspace");
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-card/85 backdrop-blur-md">
+    <header className="sticky top-0 z-50 w-full border-b bg-background/80 backdrop-blur-lg backdrop-saturate-150 supports-[not(backdrop-filter:blur(0))]:bg-background">
       <div
         className={cn(
           "relative flex h-14 items-center justify-between px-4",
@@ -134,7 +134,7 @@ export default function Header() {
         <div className="flex min-w-0 items-center">
           <Link href={user ? "/dashboard" : "/"} className="flex items-center gap-2">
             {/* eslint-disable-next-line @next/next/no-img-element -- static SVG, no optimizer needed */}
-            <img src="/logo.svg" alt="" width={26} height={26} className="h-[26px] w-[26px]" />
+            <img src="/logo.svg" alt="" width={22} height={22} className="h-[22px] w-[22px]" />
             <span className="text-[15px] font-semibold tracking-tight">SheetsLLM</span>
           </Link>
 
@@ -166,9 +166,9 @@ export default function Header() {
                       href={`/workspace?file_id=${openFile.id}`}
                       aria-current="page"
                       title={openFile.name}
-                      className="flex max-w-[220px] items-center gap-1.5 rounded-md bg-accent px-2.5 py-1 text-sm text-foreground"
+                      className="flex max-w-[240px] items-center gap-1.5 rounded-md bg-accent px-2.5 py-1 text-sm font-medium text-foreground"
                     >
-                      <FileSpreadsheet className="h-3.5 w-3.5 flex-shrink-0 text-primary" aria-hidden />
+                      <FileSpreadsheet className="h-3.5 w-3.5 flex-shrink-0 text-primary-accent" aria-hidden />
                       <span className="truncate">{openFile.name}</span>
                     </Link>
                   </>
@@ -207,8 +207,13 @@ export default function Header() {
           {loading ? null : user ? (
             <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground">
-                  <User className="h-4 w-4" />
+                <Button variant="ghost" size="sm" className="gap-2 pl-1.5 text-muted-foreground">
+                  <span
+                    aria-hidden
+                    className="grid h-6 w-6 place-items-center rounded-full bg-primary/10 text-[11px] font-semibold uppercase text-primary-accent"
+                  >
+                    {(user.email ?? "?").charAt(0)}
+                  </span>
                   <span className="max-w-[120px] truncate">{user.email?.split("@")[0]}</span>
                   <ChevronDown className="h-3.5 w-3.5" />
                 </Button>

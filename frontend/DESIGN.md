@@ -1,236 +1,210 @@
 # SheetsLLM Design System
 
 Personality: **calm, precise, trustworthy**. The product handles people's finance
-and ops data. It should feel like an instrument someone reaches for every Monday
-morning, not a demo.
+and ops data, for a broad audience that is not necessarily technical. It should
+feel like the category standard, held to the craft of Linear, Vercel, Notion and
+Stripe: the file and what just changed in it are the only loud things on screen.
 
 `styles/globals.css` is the source of truth for every value below. If this file
 and that one disagree, that file is right and this one is stale. Fix it.
 
-## The organizing idea: two registers, one system
+## The organizing idea: one world, two densities
 
-The split runs along authentication, not along which page was rebuilt last.
+Signed out (landing, pricing, `/tools`) and signed in (workspace, files,
+recipes, account) share every token. The difference is density and air, never a
+second palette or a second type family.
 
-**Signed out (editorial).** Landing, pricing, the free `/tools` pages. More air,
-a larger type scale, one gradient moment, scroll entrances. Its job is to explain
-the wedge: reusable recipes, schema-only privacy, a real audit trail.
+- **Signed out** has more air: a 60px hero, 40px section heads, py-20 to py-28
+  rhythm, and live product fragments drawn in DOM instead of screenshots.
+- **Signed in** is dense and quiet: 13 to 14px text, hairline separation, panels
+  that sit on the page rather than float above it.
 
-**Signed in (instrument).** Workspace, files, account. Dense, quiet, fast.
-Separation comes from hairlines rather than shadowed cards. Numbers are mono and
-tabular. Column headings and section labels are mono uppercase micro-labels at
-10px. Violet appears on the primary action and on things that just changed, and
-nowhere else.
-
-Both registers use the same tokens. The difference is density and air, never a
-second palette.
+Violet is the only colour in the chrome. It marks the primary action, focus, and
+what just changed, and nowhere else.
 
 ## Tokens
 
 CSS custom properties in `styles/globals.css`, consumed through Tailwind and
 shadcn conventions as `hsl(var(--token))`. Light is `:root`, dark is `.dark`,
-and next-themes toggles the class. Both ship.
+and next-themes toggles the class. Both ship, and dark is selected rather than
+flipped.
 
-### Color
+### Colour
 
-**Neutrals.** Light is warm paper (`--background: 40 20% 98%`) with a slightly
-warmer raised surface (`--card: 40 25% 99%`) and near-black ink
-(`--foreground: 240 6% 10%`). Dark is neutral charcoal with no navy cast
-(`--background: 240 8% 4%`, `--card: 240 7% 7%`). The grays are close to
-desaturated on purpose, so the violet reads as the only color in the chrome.
+**Neutrals: cool zinc.** Light is pure white (`--background: 0 0% 100%`) with a
+barely-grey `--canvas` (`240 5% 98.5%`) for recessed bands, rails, footers and
+empty states, and near-black ink (`240 10% 4%`). Dark is near-black with no blue
+cast (`--background: 240 5% 5%`, `--canvas: 240 5% 4%`), and surfaces step up in
+lightness: `--card 8%`, `--popover 10%`, `--muted 12%`.
 
-**Primary.** Violet `254 75% 63%` in light, `253 85% 65%` in dark, matching the
-logo mark. It is a reserved signal, not a theme. `--primary-accent` is the
-variant for violet *text and icons on neutral surfaces*; `--primary` is the solid
-fill that white text sits on. The two pull in opposite directions and must stay
-separate values, which is why dark sets the accent lighter (`253 85% 68%`).
+**Primary: the violet of the mark.** `--primary` (`251 70% 57%` light,
+`251 72% 60%` dark) is the fill white text sits on. `--primary-accent`
+(`251 62% 52%` light, `251 90% 76%` dark) is violet *text and icons on neutral
+surfaces*. They pull in opposite directions and must stay separate values.
 
-**Control boundaries.** `--input` is `240 8% 60%` light and `240 8% 40%` dark.
-Both were solved for 3:1 against their own surface, which is what WCAG 1.4.11
-asks of a control's outer bound. `--border` is quieter (`240 9% 94%` light,
-`240 8% 20%` dark) because it separates content rather than bounding a control.
+**Boundaries.** `--input` (`240 5% 58%` light, `240 4% 40%` dark) bounds a
+control at 3:1, the WCAG 1.4.11 floor. `--border` (`240 6% 90%` light,
+`240 4% 16%` dark) is quieter because it separates content rather than bounding
+a control.
 
 **Semantic fills and semantic text are different steps.** `--success`,
-`--warning` and `--destructive` are mixed for white text sitting on top of them,
-so they are too light to *be* text, and lowering their opacity only makes it
-worse. Every semantic string uses `--success-text`, `--warning-text` or
-`--destructive-text`. Non-text indicators that sit on `--muted`, such as a meter
-fill, also need the text step: the warning fill managed 1.9:1 on the track.
+`--warning` and `--destructive` are mixed for white text on top of them, so they
+are too light to *be* text. Every semantic string uses `--success-text`,
+`--warning-text` or `--destructive-text`, each 4.5:1 or better on white and on
+`--muted`.
 
-**Gradient family (marketing only).** Emerald to cyan to violet, via
-`.text-gradient` and `.bg-gradient-brand`. Both carry a forced-colors fallback,
-because Windows High Contrast strips background images and clipped text would
-otherwise vanish.
+**No gradients.** `--gradient-*` and `.bg-gradient-brand` survive only as legacy
+utilities set to flat violet. Nothing in the product uses them; do not start.
 
 ### Charts
 
 Eight fixed categorical slots, `--chart-1` through `--chart-8`, plus
-`.chart-other` for the overflow. The rules:
+`.chart-other` for the overflow.
 
-- **Fixed order is the safety mechanism.** Assign slots in order and never cycle.
-  A ninth series folds into "Other", it never gets an invented hue.
-- **Dark is selected, not flipped.** The dark steps are the same hues re-stepped
-  into the dark lightness band and re-validated against the dark surface. A
-  straight reuse of the light values failed the band on four of the eight.
-- **Color never carries identity alone.** Two or more series always get a legend,
-  and four or fewer are also direct-labeled.
+- **Fixed order is the safety mechanism.** Assign slots in order and never
+  cycle. A ninth series folds into "Other"; it never gets an invented hue.
+- **Dark is selected, not flipped.** Same hues, re-stepped into the dark
+  lightness band and re-validated against the dark surface.
+- **Colour never carries identity alone.** Two or more series get a legend, and
+  four or fewer are also direct-labeled.
 - Set `color` once via `.chart-sN` and let `fill`/`stroke` inherit it.
 
 The palette was produced with the `dataviz` skill's validator against both
-surfaces: lightness band, chroma floor, adjacent-pair CVD separation,
-normal-vision floor, and contrast. Re-run it before changing any value. The
-palette it replaced failed at ΔE 3.6 under protanopia against a floor of 6.
+surfaces. Re-run it before changing any value.
 
 ### Typography
 
-Two families through `next/font` (self-hosted, no CLS):
+**Geist Sans** for everything a person reads, **Geist Mono** only for what is
+literally code: SQL, column types (`VARCHAR`, `DOUBLE`), and inline code in
+Chef's answers. Both come from the `geist` package (pinned 1.7.2) through
+`next/font`, so they are self-hosted with no layout shift.
 
-- **Sans: Archivo** (`--font-sans`). Chosen over Inter for its higher x-height,
-  which is what holds up at the 11 to 13px label sizes this UI is mostly made of.
-  Display headings are the same family at `tracking-tight`.
-- **Mono: JetBrains Mono** (`--font-mono`). Data cells, column names, file names,
-  numbers in tables, SQL, and the 10px uppercase micro-labels. In the app
-  register mono is a semantic choice: it marks a string as *data* rather than
-  prose.
+Mono is not a costume. Labels, file names, counts and grid values are sans with
+`tabular-nums`, which Geist Sans supports. There are no uppercase micro-labels
+and no eyebrows above headings.
 
-Editorial scale: 56/64 hero, 40/48 h2, 24/32 h3, 18/28 lead, 16/24 body.
-Instrument scale: 20/28 page title, 14/20 default, 13/18 dense, 12/16 caption,
-11px and 10px for mono labels and gutters.
+| role | size / tracking |
+| --- | --- |
+| Hero | 44px, 60px from `sm`, weight 600, `-0.035em`, second line in muted ink |
+| Section head | 30px, 40px from `sm`, `-0.025em` |
+| Page title (app) | 24px, `-0.02em` |
+| Lead | 17 to 18px, `leading-relaxed`, muted |
+| Body | 14 to 15px |
+| Dense UI | 13px (menus, grid cells, chat) |
+| Caption | 11 to 12px |
 
-### Space, radius, elevation
+Headings use `text-wrap: balance`, paragraphs `text-wrap: pretty`.
 
-Space is the Tailwind 4px scale. Editorial section rhythm is py-24/32; app
-gutters are px-3 in chrome bars and px-4/6 in page containers.
+### Radius
 
-**Radius is `--radius: 0.375rem` (6px), and only three Tailwind steps derive
-from it:**
+`--radius: 0.5rem` (8px).
 
 | class | value | use |
 | --- | --- | --- |
-| `rounded-sm` | 2px | `--radius` minus 4 |
-| `rounded-md` | 4px | `--radius` minus 2. App panels, cards, chat bubbles |
-| `rounded-lg` | 6px | `--radius` itself. Editorial panels, inputs, buttons |
-| `rounded-full` | pill | badges, meters, avatars |
+| `rounded-md` | 6px | menu items, small chips, inline code |
+| `rounded-lg` | 8px | controls: buttons, inputs, selects, tabs, menus |
+| `rounded-xl` | 12px | panels: cards, tables, dialogs, product frames |
+| `rounded-full` | pill | avatars, switches, meters |
 
-`rounded-xl` and larger are **off-system**. They are Tailwind's untouched
-defaults (12px, 16px, 24px) and do not track `--radius`, so reaching for one
-silently opts that element out of the scale. The only remaining exceptions are
-the marketing product shots, which simulate a browser window.
+### Elevation
 
-**Elevation is for things that genuinely float** (menus, dialogs, product shots).
-A flat surface is separated by a hairline, not a glow: `border` alone, no
-`shadow-xs` under it. Light uses a flat black spread. Dark cannot separate
-near-black surfaces with a black spread, so each dark level also carries a light
-top rim (`inset 0 1px 0 hsl(0 0% 100% / …)`).
+Two-layer shadows: a tight contact shadow plus a soft ambient one, always offset
+downward. Panels pair a hairline with `shadow-xs` or `shadow-sm`; menus,
+dialogs and the landing's product frames use `shadow-md` or `shadow-lg`. Dark
+cannot separate near-black surfaces with a black spread, so every dark level
+also carries a faint light top rim.
+
+The primary button is a raised fill: an inset top highlight plus a short
+contact shadow. Overlays are `bg-black/40` with a 2px backdrop blur.
+
+### The parts nobody draws
+
+Caret is violet. Selection is 18% violet. `:focus-visible` is a 2px `--ring`
+outline at 2px offset. Scrollbars are thin, transparent-tracked, and tinted
+from the foreground. Links underline at a 3px offset.
 
 ### Motion
 
-Duration, easing, distance, scale and blur tokens come from the transitions.dev
-scale and live at the bottom of `globals.css`. Every `t-*` pattern reads from
-them rather than hardcoding a curve.
+Duration, easing and distance tokens live at the bottom of `globals.css`.
 
 - Hover 150ms, UI state 250ms, entrances 400 to 500ms.
-- Default easing `--ease-smooth-out: cubic-bezier(0.22, 1, 0.36, 1)`.
-- Dropdowns and modals animate through `data-state` keyframes rather than
-  transitions, because Radix only keeps a closing surface mounted while a CSS
-  *animation* runs.
+- Default easing `--ease-smooth-out: cubic-bezier(0.22, 1, 0.36, 1)`. No bounce
+  or elastic curves.
+- No section entrance animations on the landing. The one moving thing is the
+  hero workspace, which plays three real fixes once and holds; Replay runs it
+  again; reduced motion shows the finished state.
+- Dropdowns and modals animate through `data-state` keyframes, because Radix
+  only keeps a closing surface mounted while a CSS *animation* runs.
 - Nothing loops except an explicit loading state (WCAG 2.2.2).
-- Every pattern has a `prefers-reduced-motion` branch. Framer Motion's
-  `reducedMotion="user"` is not enough on its own: it only suppresses
-  positional keys, so a shimmer driven by `background-position` keeps moving and
-  needs its own `useReducedMotion()` fallback.
 
-One motion is load-bearing: `.cell-changed` washes a changed cell in violet for
-1.4s and settles. It exists so a transform is visible without diffing two
-screenshots. Under reduced motion it becomes a static tint rather than nothing,
-because the information still has to arrive.
+One motion is load-bearing: `.cell-changed` washes a changed cell in violet and
+settles. Under reduced motion it becomes a static tint, because the information
+still has to arrive.
 
 ## Component layer
 
 shadcn/ui primitives, vendored into `components/ui/*` and restyled with the
-tokens above: `button`, `card`, `dialog`, `alert-dialog`, `sheet`,
-`dropdown-menu`, `command` (cmdk), `sonner`, `input`, `textarea`, `label`,
-`select`, `switch`, `table`, `tabs`, `badge`, `skeleton`, `tooltip`, `progress`,
-`separator`, `avatar`.
+tokens above. Controls are `h-9` (`h-8` small, `h-11` large) at `rounded-lg`.
+Inputs focus with a violet border plus a 3px `primary/20` ring. Tooltips are
+inverted (foreground on background). Badges are `rounded-md`, 11px, and tinted
+rather than filled.
 
-Two of them carry decisions worth knowing:
-
-- **`table`** is the instrument register in primitive form: 9px-tall mono
-  uppercase heads, `px-3 py-2` cells, `border-border/60` row rules. Only the
-  files list uses it. The workspace grid is a hand-rolled virtualised table that
-  matches it by hand.
-- **`button`** animates `transform`, not `scale`. Tailwind v3 compiles
-  `scale-[0.96]` to `transform: … scaleX(var(--tw-scale-x))`, so a transition
-  naming the `scale` property animates nothing.
-
-Shared app pieces that are not shadcn: `ColumnHealth` (the per-column
-completeness strip above the grid), `PipelineSpine` (the step rail),
-`CsvDropzone` and `ProgressBar` (shared by the four `/tools` pages).
+- **`table`** heads are 12px sans in muted ink. Only the files list uses it; the
+  workspace grid is a hand-rolled virtualised table that matches it by hand.
+- **`button`** animates `transform`, not `scale`, because Tailwind v3 compiles
+  `scale-[…]` into `transform`.
+- **`ChatText`** renders Chef's light markdown (paragraphs, lists, bold, inline
+  code) as React elements, never as HTML.
 
 ## Surface guidelines
 
-- **Landing.** Hero is one declarative sentence about recurring cleanup plus a
-  live product mockup built from real DOM, never a screenshot. Then the trust
-  band, how-it-works, the recipe re-run demo, the schema-only privacy diagram,
-  and the final CTA. One gradient moment, in the hero.
-- **Workspace, no file.** Opens with the same `WORKSPACE / No file open` status
-  bar the loaded state uses, so both phases of the page share a left edge with
-  the full-width header. Upload zone, samples, and starter instructions on one
-  calm screen. No modal tour.
-- **Workspace, loaded.** Full bleed. Step rail on the left, command bar across
-  the top, column health strip under it, grid, chat on the right. The grid keeps
-  a sticky header, a mono gutter, visible row hover, and right-aligned numerics.
-- **Files.** A real data table: mono names, right-aligned tabular size, rows and
-  columns, the format as a type mark rather than a pill, and one violet action.
-- **Pricing.** Two cards. Pro is emphasised with `border-primary` plus a ring,
-  not elevation, because it is not floating.
-- **Auth and account.** A single card and mono section labels respectively;
-  minimal fields, privacy reassurance in the microcopy.
+- **Header.** Translucent background with blur and saturation, a 22px mark.
+  Signed out, the menu is centered on the page axis. Signed in, the location
+  sits beside the mark (Files, Recipes, then the open file) and the account is an
+  initial avatar.
+- **Landing.** Split hero: the headline in two weights on the left and the live
+  workspace frame on the right. Then a three-fact proof strip, four alternating
+  sections each anchored on a DOM fragment of the real UI, the free tools as one
+  hairline grid, a closing call to action, and a four-column footer.
+- **Files.** A real data table in a 12px panel: names in sans medium, the format
+  as a small bordered type mark, right-aligned tabular numbers, one violet
+  action.
+- **Workspace.** Full bleed. Step rail on `--canvas`, toolbar, column health
+  strip, grid, Chef on the right. In chat, you speak in a quiet muted bubble;
+  Chef answers in plain text beside its mark; only a change to the file or an
+  error earns a container.
+- **Tools.** Left-aligned title and lead, the tool in a 12px panel, how-it-works
+  as three ruled steps, the recipe call to action on `--canvas`. The index is a
+  list, not a wall of icon tiles.
+- **Pricing.** Two cards; Pro carries `border-primary`, a ring and `shadow-md`.
+- **Account.** Narrow column of 12px panels with sans section headings.
 
 ## Accessibility bar
 
-- 4.5:1 for body text, 3:1 for large text and for non-text UI boundaries (1.4.11).
-  Micro-labels count as text: a 10px mono format mark at 3.3:1 is a defect, not a
-  decoration.
+- 4.5:1 for body text, 3:1 for large text and non-text UI boundaries (1.4.11).
 - 24x24 CSS px minimum for pointer targets (2.5.8).
-- Visible focus on every interactive element, via `--ring`.
+- Visible focus on every interactive element.
 - Icon-only buttons carry `aria-label`; the skip link is the first focusable
-  element on the page.
-- Status messages get `role="status"`, errors get `role="alert"`, long jobs get
-  `role="progressbar"`. A progress bar is deliberately *not* a live region:
-  assistive tech polls it, whereas a status role would read out every slice.
-- Reduced-motion fallbacks preserve information, they do not just remove motion.
+  element.
+- Decorative product fragments on the landing are `aria-hidden`; the hero frame
+  is a `<figure>` with a screen-reader caption.
+- Reduced-motion fallbacks preserve information; they do not just remove it.
 
 ## Rejected, do not reintroduce
 
-- **Glassmorphism and ambient gradient washes.** Tried and removed. They sit
-  between the reader and the numbers.
-- **Indigo `243 75% 59%` and cool-tinted gray `220 27% 97%`.** The v2 palette.
-  Replaced by the logo violet on warm paper.
-- **Inter.** Replaced by Archivo for x-height at label sizes.
-- **A shadow under a flat bordered panel.** Pick one.
-- **`rounded-xl` and larger on app or marketing panels.** Off the radius scale.
-- **Color as the only carrier of series identity, and any dual-axis chart.**
+- **Gradient text, glass panels, glows, and ambient gradient washes.**
+- **Eyebrows or kickers above headings, and mono uppercase micro-labels.**
+- **Same-size icon cards as page structure.**
+- **An identical entrance animation on every section.**
+- **The previous world:** warm paper neutrals, Archivo and JetBrains Mono, 6px
+  radius, the emerald-cyan-violet gradient.
+- **Colour as the only carrier of series identity, and any dual-axis chart.**
 
 ## Research notes
 
-Verified and followed:
-
 - Semantic background/foreground CSS-variable pairs are shadcn's documented
-  convention. The OKLCH plus `@theme inline` format is Tailwind v4 only; this
-  repo is on v3.4, where `hsl(var(--token))` is correct.
-- Product-as-hero: Linear's marketing anchors every section on real product UI,
-  which is why HeroDemo and ProductShot are built from DOM.
-- Onboarding: sample data plus inline contextual guidance beats a front-loaded
-  modal tour for multi-path products. Checklists work best at 3 to 5 activation
-  milestones with pre-filled progress (endowed progress effect, Nunes and Dreze
-  2006), which is what GettingStarted does.
+  convention. This repo is on Tailwind v3.4, where `hsl(var(--token))` is right;
+  OKLCH plus `@theme inline` is v4 only.
+- Product-as-hero, with fragments built from DOM, follows the reference set.
 - CVD simulation for the palette validator uses Machado, Oliveira and Fernandes
   (2009); ΔE is measured in OKLab times 100.
-
-Checked and refuted, do not reintroduce as fact:
-
-- Stripe's text color being #0A2540; Linear's exact letter-spacing scale;
-  "Linear uses a single accent color"; "interactive onboarding lifts activation
-  ~50%"; "compositor-safe motion cannot hurt Core Web Vitals".
-- "SVG presentation attributes do not resolve `var()`". They do, in every
-  browser this app targets.

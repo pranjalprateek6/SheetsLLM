@@ -128,7 +128,7 @@ function RecipesContent() {
       )}
 
       {recipes?.length === 0 && (
-        <div className="rounded-md border border-dashed">
+        <div className="rounded-xl border border-dashed bg-canvas">
           <EmptyState
             variant="recipes"
             title="No recipes yet"
@@ -145,7 +145,7 @@ function RecipesContent() {
       {recipes && recipes.length > 0 && (
         <ul className="space-y-3">
           {recipes.map((r) => (
-            <li key={r.id} className="rounded-md border bg-card">
+            <li key={r.id} className="rounded-xl border bg-card shadow-xs">
               <div className="flex flex-wrap items-center gap-3 p-4">
                 <BookMarked className="h-4 w-4 flex-shrink-0 text-primary" aria-hidden />
                 <div className="min-w-0 flex-1">
@@ -175,7 +175,7 @@ function RecipesContent() {
                   {!steps[r.id] && <li className="text-muted-foreground">Loading…</li>}
                   {steps[r.id]?.map((s) => (
                     <li key={s.step_number} className="flex gap-2 py-0.5">
-                      <span className="w-5 flex-shrink-0 text-right font-mono text-xs tabular-nums text-muted-foreground">
+                      <span className="w-5 flex-shrink-0 text-right text-[13px] tabular-nums text-muted-foreground">
                         {s.step_number}
                       </span>
                       <span>{s.instruction}</span>

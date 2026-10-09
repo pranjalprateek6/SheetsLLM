@@ -294,7 +294,7 @@ function PricingContent() {
 
       <div className="grid gap-6 md:grid-cols-2">
         {/* Free */}
-        <div className="flex flex-col rounded-lg border bg-card p-7">
+        <div className="flex flex-col rounded-xl border bg-card p-7 shadow-sm">
           <h2 className="font-medium">Free</h2>
           <p className="mt-2 text-4xl font-semibold tracking-tight">
             ₹0<span className="text-base font-normal text-muted-foreground">/mo</span>
@@ -331,7 +331,7 @@ function PricingContent() {
         </div>
 
         {/* Pro */}
-        <div className="relative flex flex-col rounded-lg border border-primary bg-card p-7 ring-1 ring-primary/25">
+        <div className="relative flex flex-col rounded-xl border border-primary bg-card p-7 shadow-md ring-1 ring-primary/25">
           <Badge className="absolute -top-3 left-6">Recommended</Badge>
           <h2 className="font-medium">Pro</h2>
           <p className="mt-2 text-4xl font-semibold tracking-tight">
@@ -404,7 +404,7 @@ function PricingContent() {
           </h2>
           <div className="grid gap-4 sm:grid-cols-3">
             {UPGRADE_TIMELINE.map((step) => (
-              <div key={step.title} className="rounded-lg border bg-card p-5">
+              <div key={step.title} className="rounded-xl border bg-card p-5 shadow-sm">
                 <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
                   <step.icon className="h-4 w-4 text-primary" />
                 </div>
@@ -421,7 +421,7 @@ function PricingContent() {
         <h2 className="mb-6 text-center text-xl font-semibold tracking-tight">
           Compare plans
         </h2>
-        <div className="overflow-hidden rounded-lg border bg-card">
+        <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b bg-muted/40 text-left">
@@ -460,7 +460,7 @@ function PricingContent() {
         <h2 className="mb-6 text-center text-xl font-semibold tracking-tight">
           Frequently asked questions
         </h2>
-        <div className="divide-y rounded-lg border bg-card px-6">
+        <div className="divide-y rounded-xl border bg-card px-6 shadow-xs">
           {FAQ.filter((item) => billingConfigured || !item.q.startsWith("Can I cancel")).map((item) => (
             <details key={item.q} className="group py-4">
               <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-medium [&::-webkit-details-marker]:hidden">

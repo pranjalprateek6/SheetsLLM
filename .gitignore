@@ -29,3 +29,11 @@ frontend/playwright-report/
 
 # Local admin helper: signs in with the Supabase service key. Never commit.
 frontend/scripts/magic-link.mjs
+
+# Impeccable design-tool working files (machine-local)
+.impeccable/config.local.json
+.impeccable/build/
+.impeccable/decision/
+.impeccable/questions/
+.impeccable/review/
+.impeccable/mocks/
