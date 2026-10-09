@@ -17,6 +17,7 @@ const RecipesDrawer = dynamic(() => import("@/components/RecipesDrawer"));
 import ChatPanel, { type LateStep } from "@/components/ChatPanel";
 import RecipeHint from "@/components/RecipeHint";
 import { useOpenFileUrl } from "@/lib/use-open-file-url";
+import { downloadExport, exportFileName, fileStem as stemOf } from "@/lib/export";
 import { type SchemaColumn } from "@/components/SchemaPanel";
 const SchemaPanel = dynamic(() => import("@/components/SchemaPanel"));
 const ChartPanel = dynamic(() => import("@/components/ChartPanel"));
@@ -417,22 +418,12 @@ function WorkspaceContent() {
   const handleDownload = useCallback(async (format: string = "csv") => {
     if (!fileId) return;
     try {
-      const r = await fetchWithAuth(`/api/download?file_id=${fileId}&format=${format}`);
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      const blob = await r.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = fileName.replace(/\.[^/.]+$/, "") + `_transformed.${format}`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      await downloadExport(fileId, format, exportFileName(stemOf(fileName), steps.length, format));
     } catch (e) {
       console.error("Download failed", e);
       toast.error("Download failed. Please try again.");
     }
-  }, [fileId, fileName]);
+  }, [fileId, fileName, steps.length]);
 
   const handleUndo = useCallback(async () => {
     if (!fileId) return;

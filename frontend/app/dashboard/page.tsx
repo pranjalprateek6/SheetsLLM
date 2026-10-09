@@ -7,6 +7,7 @@ import AuthGuard from "@/components/AuthGuard";
 import EmptyState from "@/components/EmptyState";
 import UsageCard from "@/components/UsageCard";
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
+import { downloadExport, exportFileName, fileStem } from "@/lib/export";
 import {
   ArrowDown, ArrowUp, Copy, Download, FileSpreadsheet, Grid3X3, List, MoreHorizontal, Pencil, Search, Trash2,
 } from "lucide-react";
@@ -184,19 +185,16 @@ export default function DashboardPage() {
     finally { setActionLoading(null); }
   };
 
-  const handleDownload = async (fileId: string, name: string, format: string) => {
+  // An export is the file as it is now, steps applied, so it is named for
+  // them; the step count comes from the row when listed, else from history.
+  const handleDownload = async (fileId: string, name: string, format: string, knownSteps?: number) => {
     try {
-      const res = await fetchWithAuth(`/api/download?file_id=${fileId}&format=${format}`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = name.replace(/\.[^/.]+$/, "") + `.${format}`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      let steps = knownSteps;
+      if (typeof steps !== "number") {
+        const h = await fetchWithAuth(`/api/files/${fileId}/history`);
+        steps = h.ok ? ((await h.json()).total_steps ?? 0) : 0;
+      }
+      await downloadExport(fileId, format, exportFileName(fileStem(name), steps ?? 0, format));
     } catch (e) {
       console.error("Download failed:", e);
       toast.error("Download failed. Please try again.");
