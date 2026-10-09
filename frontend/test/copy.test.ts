@@ -13,7 +13,7 @@ const ROOT = join(__dirname, "..");
 const DIRS = ["app", "components"];
 
 const RULES: { name: string; re: RegExp }[] = [
-  { name: "transformation (say step)", re: /\btransformations?\b/i },
+  { name: "transform, transformed, transformation (say step or clean)", re: /\btransform(s|ed|ing|ations?)?\b/i },
   { name: "chain (say recipe or steps)", re: /\bchain\b/i },
   { name: "revert (say go back)", re: /\brevert(ed|s|ing)?\b/i },
   { name: "Download as (say Export as)", re: /\bDownload as\b/ },
@@ -47,6 +47,8 @@ function readable(source: string): string[] {
     // Prose has a space and a letter, and is not a class list, path or key
     if (!/\s/.test(text) || !/[A-Za-z]/.test(text)) continue;
     if (/^[\w:/.[\]()%#&>=-]+(\s+[\w:/.[\]()%#&>=!-]+)*$/.test(text) && !/[A-Z][a-z]+ [a-z]/.test(text)) continue;
+    // Tailwind class lists ("inline-flex items-center ... transition-transform")
+    if (/(^|\s)(inline-flex|flex|grid|items-\w+|justify-\w+|rounded(-\w+)?|text-\w+|bg-\w+|p[xy]?-\d|gap-\d|[hw]-\d)(\s|$)/.test(text)) continue;
     out.push(text);
   }
   return out;

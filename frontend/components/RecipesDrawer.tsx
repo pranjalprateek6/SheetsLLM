@@ -469,7 +469,7 @@ export default function RecipesDrawer({
               <AlertDialogTitle>Delete &ldquo;{confirmDelete?.name}&rdquo;?</AlertDialogTitle>
               <AlertDialogDescription>
                 This recipe and its steps are removed for good. Files you already
-                transformed with it are not affected.
+                cleaned with it are not affected.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

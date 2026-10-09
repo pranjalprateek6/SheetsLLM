@@ -61,8 +61,12 @@ export default function SentDisclosure({ sent, className }: { sent?: SentReceipt
           <span className="block">
             {sent.mode === "strict" ? "Schema only" : "Schema + sample rows"}:{" "}
             {rows > 0
-              ? `${rows} sample row${rows === 1 ? "" : "s"}, up to ${sent.values_per_column ?? 0} example values per column`
-              : "no sample rows, no values"}
+              ? `${rows} sample row${rows === 1 ? "" : "s"}${
+                  sent.values_per_column ? `, up to ${sent.values_per_column} example values per column` : ""
+                }`
+              : sent.values_per_column
+                ? `no sample rows, up to ${sent.values_per_column} example values per column`
+                : "no sample rows, no values"}
           </span>
           {!!sent.columns_sent?.length && (
             <span className="mt-1 block font-mono text-muted-foreground">
