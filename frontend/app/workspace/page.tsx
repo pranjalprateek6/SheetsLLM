@@ -356,6 +356,8 @@ function WorkspaceContent() {
       const params = new URLSearchParams();
       if (sheetName) params.set("sheet_name", sheetName);
       if (pendingId) params.set("pending_id", pendingId);
+      // Curated suggestions come only with a sample file
+      if (suggestions !== undefined) params.set("source", "sample");
       const qs = params.toString();
       const url = `/api/upload${qs ? `?${qs}` : ""}`;
 

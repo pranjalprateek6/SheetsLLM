@@ -11,6 +11,8 @@ export async function POST(req: NextRequest) {
   const params = new URLSearchParams();
   if (sheetName) params.set("sheet_name", sheetName);
   if (pendingId) params.set("pending_id", pendingId);
+  // Sample files are tagged so the metrics can tell them from real uploads
+  if (searchParams.get("source") === "sample") params.set("source", "sample");
   const qs = params.toString();
   const backendUploadUrl = `${BACKEND_URL()}/upload${qs ? `?${qs}` : ""}`;
 

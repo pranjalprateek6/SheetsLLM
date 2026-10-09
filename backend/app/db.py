@@ -427,6 +427,41 @@ def upsert_subscription(user_id: str, **fields) -> dict:
 # ── Events (funnel analytics) ────────────────────────────────────────
 
 
+def list_events(since_iso: str, names: list[str], limit: int = 20000) -> list[dict]:
+    """Event rows of the given names since a time, oldest first, for the
+    metrics page. Capped; the page says so if the cap is reached."""
+    resp = (
+        get_client()
+        .table("events")
+        .select("user_id,event,properties,created_at")
+        .in_("event", names)
+        .gte("created_at", since_iso)
+        .order("created_at", desc=False)
+        .limit(limit)
+        .execute()
+    )
+    return resp.data or []
+
+
+def count_recipes() -> int:
+    resp = get_client().table("recipes").select("id", count="exact").limit(0).execute()
+    return resp.count or 0
+
+
+def step_counts(file_ids: list[str]) -> dict[str, int]:
+    """Steps per file, for files that still exist; one query."""
+    ids = [f for f in file_ids if is_uuid(f)]
+    if not ids:
+        return {}
+    existing = get_client().table("files").select("id").in_("id", ids).execute().data or []
+    counts = {r["id"]: 0 for r in existing}
+    if counts:
+        steps = get_client().table("transformations").select("file_id").in_("file_id", list(counts)).execute().data or []
+        for s in steps:
+            counts[s["file_id"]] = counts.get(s["file_id"], 0) + 1
+    return counts
+
+
 def insert_event(user_id: str, event: str, properties: dict) -> None:
     get_client().table("events").insert(
         {"user_id": user_id, "event": event, "properties": properties}

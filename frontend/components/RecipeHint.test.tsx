@@ -140,3 +140,20 @@ describe("RecipeHint", () => {
     expect(await screen.findByRole("region", { name: "Recipe suggestion" })).toBeInTheDocument();
   });
 });
+
+describe("RecipeHint measurement", () => {
+  it("records recipe_hint_shown once per file, however often it re-renders", async () => {
+    const sent: unknown[] = [];
+    server.use(
+      recipes(RECIPES),
+      http.post("/api/events", async ({ request }) => {
+        sent.push(await request.json());
+        return HttpResponse.json({ recorded: true });
+      }),
+    );
+    const { rerender } = render(<RecipeHint fileId="f-measure" enabled onApplied={vi.fn()} />);
+    await screen.findByRole("region", { name: "Recipe suggestion" });
+    rerender(<RecipeHint fileId="f-measure" enabled onApplied={vi.fn()} />);
+    await waitFor(() => expect(sent).toEqual([{ event: "recipe_hint_shown", properties: { recipe_id: "r-new" } }]));
+  });
+});

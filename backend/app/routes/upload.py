@@ -45,6 +45,7 @@ async def upload(
     x_filename: str = Header(default="upload.csv"),
     sheet_name: str | None = Query(None),
     pending_id: str | None = Query(None),
+    source: str | None = Query(None),
 ):
     request_id = getattr(request.state, "request_id", "unknown")
     user_id = getattr(request.state, "user_id", "anonymous")
@@ -239,7 +240,10 @@ async def upload(
         file_id, row_count, col_count, elapsed_ms,
     )
 
-    events.record(user_id, "upload_completed", rows=preview["total_rows"], columns=preview["total_columns"])
+    events.record(
+        user_id, "upload_completed", rows=preview["total_rows"], columns=preview["total_columns"],
+        file_id=file_id, sample=source == "sample",
+    )
     return {
         "file_id": file_id,
         "schema": schema,
