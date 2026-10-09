@@ -58,7 +58,21 @@ def create_file(
     return resp.data[0]
 
 
+def is_uuid(value: object) -> bool:
+    """True for a well-formed UUID string. Ids are UUID columns, and
+    PostgREST answers a malformed one with an error rather than no rows."""
+    try:
+        UUID(str(value))
+        return True
+    except (ValueError, TypeError, AttributeError):
+        return False
+
+
 def get_file(file_id: str, user_id: str) -> dict | None:
+    # Every file route looks the file up first and answers 404 on None, so
+    # a malformed id ("undefined", "") is turned into "not found" here, once.
+    if not is_uuid(file_id):
+        return None
     resp = (
         get_client()
         .table("files")
@@ -369,6 +383,8 @@ def list_recipes(user_id: str) -> list[dict]:
 
 
 def get_recipe(recipe_id: str, user_id: str) -> dict | None:
+    if not is_uuid(recipe_id):
+        return None
     resp = (
         get_client()
         .table("recipes")
