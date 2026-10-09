@@ -130,9 +130,17 @@ Duration, easing and distance tokens live at the bottom of `globals.css`.
 - Hover 150ms, UI state 250ms, entrances 400 to 500ms.
 - Default easing `--ease-smooth-out: cubic-bezier(0.22, 1, 0.36, 1)`. No bounce
   or elastic curves.
-- No section entrance animations on the landing. The one moving thing is the
-  hero workspace, which plays three real fixes once and holds; Replay runs it
-  again; reduced motion shows the finished state.
+- No section entrance animations on the landing. What moves is the product:
+  the hero and every section fragment loop their real flow like a muted video,
+  with a ghost cursor that moves, presses and opens menus (`marketing/ghost.tsx`).
+  Each loop plays only while on screen; reduced motion shows the last frame.
+- **The dot ripple.** The hero and each section visual stand on a field of dots
+  at the intersections of a 32px grid (`marketing/GridBackdrop.tsx`, one canvas
+  each, masked to fade out). Slow rings spread from random points and brighten
+  the dots they pass in violet, like a change moving through a sheet. Base dots
+  are `--muted-foreground` at 38%; colours follow the theme; it pauses offscreen
+  and is still under reduced motion. Chosen over beams, a drifting spotlight and
+  filling cells.
 - Dropdowns and modals animate through `data-state` keyframes, because Radix
   only keeps a closing surface mounted while a CSS *animation* runs.
 - Nothing loops except an explicit loading state (WCAG 2.2.2).

@@ -1,5 +1,5 @@
 "use client";
-import { createContext, useContext, useEffect, useState } from "react";
+import { useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Check } from "lucide-react";
@@ -7,7 +7,7 @@ import { ArrowRight, Check } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import HeroWorkspace from "@/components/marketing/HeroWorkspace";
-import GridBackdrop, { BACKDROP_VARIANTS, type BackdropVariant } from "@/components/marketing/GridBackdrop";
+import GridBackdrop from "@/components/marketing/GridBackdrop";
 import { FixSlice, HistorySlice, PrivacySlice, RerunSlice } from "@/components/marketing/Slices";
 import { cn } from "@/lib/utils";
 
@@ -24,18 +24,11 @@ const TOOLS = [
   { href: "/tools/json-to-csv", name: "JSON to CSV", body: "Flatten JSON into a spreadsheet." },
 ];
 
-// The light moving through the grid. One variant ships; ?bg= previews the
-// others (compared side by side at /lab/backgrounds).
-const DEFAULT_BACKDROP: BackdropVariant = "beams";
-const BackdropContext = createContext<BackdropVariant>(DEFAULT_BACKDROP);
-
-/** A product visual standing on the grid, which fades out around it. */
+/** A product visual standing on the dot grid, which fades out around it. */
 function OnGrid({ children }: { children: React.ReactNode }) {
-  const variant = useContext(BackdropContext);
   return (
     <div className="relative">
       <GridBackdrop
-        variant={variant}
         className="-inset-x-10 -inset-y-12 h-[calc(100%+96px)] w-[calc(100%+80px)] [mask-image:radial-gradient(ellipse_closest-side,black_55%,transparent)]"
       />
       <div className="relative">{children}</div>
@@ -90,22 +83,14 @@ export default function LandingPage() {
     if (!loading && user) router.replace("/dashboard");
   }, [user, loading, router]);
 
-  const [backdrop, setBackdrop] = useState<BackdropVariant>(DEFAULT_BACKDROP);
-  useEffect(() => {
-    const bg = new URLSearchParams(window.location.search).get("bg") as BackdropVariant | null;
-    if (bg && BACKDROP_VARIANTS.includes(bg)) setBackdrop(bg);
-  }, []);
-
   return (
-    <BackdropContext.Provider value={backdrop}>
     <div className="overflow-x-clip">
       {/* Hero */}
       <section className="relative">
         <GridBackdrop
-          variant={backdrop}
-          className="inset-0 -z-10 h-full w-full [mask-image:radial-gradient(ellipse_75%_70%_at_70%_40%,black,transparent_80%)]"
+          className="inset-0 h-full w-full [mask-image:radial-gradient(ellipse_75%_70%_at_70%_40%,black,transparent_80%)]"
         />
-        <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 pb-20 pt-14 sm:px-6 sm:pt-20 lg:grid-cols-[0.9fr_1.1fr] lg:gap-14 lg:pb-28">
+        <div className="relative mx-auto grid max-w-6xl items-center gap-12 px-4 pb-20 pt-14 sm:px-6 sm:pt-20 lg:grid-cols-[0.9fr_1.1fr] lg:gap-14 lg:pb-28">
           <div>
             <h1 className="text-[44px] font-semibold leading-[1.02] tracking-[-0.035em] sm:text-6xl">
               Clean the same spreadsheet once.
@@ -276,6 +261,5 @@ export default function LandingPage() {
         </div>
       </footer>
     </div>
-    </BackdropContext.Provider>
   );
 }
