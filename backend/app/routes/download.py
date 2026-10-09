@@ -18,7 +18,7 @@ from fastapi import APIRouter, Query, Request, Response
 from fastapi.responses import FileResponse
 from starlette.background import BackgroundTask
 
-from app import db
+from app import db, events
 from app.cache import get_local_parquet
 from app.engine import (
     QueryTimeoutError,
@@ -60,16 +60,21 @@ def _json_response(status: int, code: str, message: str, **extra) -> Response:
     )
 
 
-def _audit(user_id: str, file_id: str, fmt: str, size_bytes: int) -> None:
+def _audit(user_id: str, file_id: str, fmt: str, size_bytes: int, *, steps: int = 0, preview: bool = False) -> None:
+    """Record an export. A preview (the workspace loading its grid) is not one,
+    so it never moves "last exported" or counts as export_completed."""
+    if preview:
+        return
     try:
         db.create_audit_entry(
             user_id=user_id,
             file_id=file_id,
             action="download",
-            metadata={"format": fmt, "size_bytes": size_bytes},
+            metadata={"format": fmt, "size_bytes": size_bytes, "steps": steps},
         )
     except Exception:
         pass
+    events.record(user_id, "export_completed", format=fmt, steps=steps)
 
 
 def _cleanup(path: str) -> None:
@@ -84,6 +89,7 @@ def download(
     request: Request,
     file_id: str = Query(...),
     format: str = Query("csv"),
+    purpose: str | None = Query(None),
 ):
     user_id = getattr(request.state, "user_id", "anonymous")
 
@@ -138,7 +144,7 @@ def download(
                 "Preparing the download failed. Please try again.",
             )
 
-        _audit(user_id, file_id, fmt, len(content))
+        _audit(user_id, file_id, fmt, len(content), steps=len(steps), preview=purpose == "preview")
         return Response(
             content=content,
             media_type=XLSX_MIME,
@@ -165,7 +171,7 @@ def download(
             "Preparing the download failed. Please try again.",
         )
 
-    _audit(user_id, file_id, fmt, os.path.getsize(tmp.name))
+    _audit(user_id, file_id, fmt, os.path.getsize(tmp.name), steps=len(steps), preview=purpose == "preview")
     return FileResponse(
         tmp.name,
         media_type=media_type,

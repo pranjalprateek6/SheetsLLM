@@ -20,12 +20,14 @@ from app.engine import (
     get_schema_after_steps,
     replay_transformations_local,
 )
+from app.llm.errors import is_quota_error
 from app.llm.factory import get_llm
 from app.llm.prompts import (
     CHAT_SYSTEM_PROMPT,
     SYSTEM_PROMPT,
     build_retry_message,
     build_user_message,
+    sent_receipt,
     sanitize_error_for_llm,
 )
 from app.security import RateLimitExceeded, check_rate_limit
@@ -112,6 +114,7 @@ async def chat(request: Request):
         return _json_response(
             429, "RATE_LIMITED",
             f"Too many requests. Retry after {exc.retry_after:.0f}s",
+            retry_after=round(exc.retry_after),
         )
 
     # Monthly usage cap
@@ -119,7 +122,8 @@ async def chat(request: Request):
         usage.enforce(user_id, "chat_requests")
     except UsageLimitExceeded as exc:
         events.record(user_id, "paywall_hit", action="chat_requests", used=exc.used, limit=exc.limit)
-        return _json_response(429, "USAGE_LIMIT_EXCEEDED", str(exc))
+        events.record(user_id, "usage_cap_hit", meter="ai_requests")
+        return _json_response(429, "USAGE_LIMIT_EXCEEDED", str(exc), **usage.limit_payload(exc))
 
     # Parse body
     try:
@@ -168,6 +172,7 @@ async def chat(request: Request):
     user_message = build_user_message(
         message, schema, privacy_mode=privacy_mode
     )
+    sent = sent_receipt(schema, privacy_mode=privacy_mode)
     if conversation_context:
         user_message = f"Previous conversation:\n{conversation_context}\n\nNew request:\n{user_message}"
 
@@ -176,6 +181,13 @@ async def chat(request: Request):
         raw = await asyncio.to_thread(llm.generate_sql, CHAT_SYSTEM_PROMPT, user_message)
     except Exception as exc:
         logger.error("LLM generation failed: %s", exc)
+        events.record(user_id, "chat_sent", kind="error")
+        if is_quota_error(exc):
+            events.record(user_id, "llm_quota_hit")
+            text = "Chef is out of AI capacity for today. Your recipes and one-click fixes still work."
+            _save_error(file_id, text, "LLM_QUOTA")
+            return _json_response(503, "LLM_QUOTA", text)
+        _save_error(file_id, "Chef didn't answer. Try again.", "LLM_FAILED")
         return _json_response(502, "LLM_FAILED", f"LLM error: {exc}")
 
     # The LLM call is the metered cost, regardless of response type
@@ -190,6 +202,7 @@ async def chat(request: Request):
             message_type="clarification",
             metadata={"suggestions": clarification.get("suggestions", [])},
         )
+        events.record(user_id, "chat_sent", kind="clarification")
         return {
             "type": "clarification",
             "message": assistant_content,
@@ -200,19 +213,24 @@ async def chat(request: Request):
     insight = _is_insight_response(raw)
     if insight is not None:
         assistant_content = insight.get("insight", "")
+        # In strict mode the answer came from names, types and stats only
         db.create_chat_message(
             file_id=file_id, role="assistant", content=assistant_content,
-            message_type="insight",
+            message_type="insight", metadata={"strict": privacy_mode},
         )
+        events.record(user_id, "chat_sent", kind="insight")
         return {
             "type": "insight",
             "message": assistant_content,
+            "strict": privacy_mode,
         }
 
     # It's SQL — validate and execute
     try:
         sql = validate_sql(raw)
     except SQLValidationError as exc:
+        events.record(user_id, "chat_sent", kind="error")
+        _save_error(file_id, "I couldn't write a safe query for that. Try naming the column.", "INVALID_SQL")
         return _json_response(
             400, "INVALID_SQL", f"Generated SQL failed validation: {exc}",
         )
@@ -237,8 +255,9 @@ async def chat(request: Request):
             error_msg = f"I couldn't execute that transformation: {first_error}"
             db.create_chat_message(
                 file_id=file_id, role="assistant", content=error_msg,
-                message_type="error",
+                message_type="error", metadata={"code": "EXECUTION_FAILED"},
             )
+            events.record(user_id, "chat_sent", kind="error")
             return _json_response(
                 400, "EXECUTION_FAILED", f"SQL execution failed: {first_error}", sql=sql,
             )
@@ -253,6 +272,7 @@ async def chat(request: Request):
         row_count_after=result["total_rows"],
         column_count_after=result["total_columns"],
         columns_after=result["columns"],
+        sent=sent,
     )
     # The step is saved, so this chat turn was a transform: meter it as one,
     # with the rows it produced, the same as POST /transform does.
@@ -266,13 +286,17 @@ async def chat(request: Request):
     except Exception:
         pass
 
-    # Save assistant message
-    assistant_content = f"Applied: {message}"
+    # Save assistant message: what the step did, not an echo of the request
+    assistant_content = done_message(
+        file_rec.get("row_count"), result["total_rows"],
+        [c["name"] for c in schema.get("columns", [])], result["columns"],
+    )
     db.create_chat_message(
         file_id=file_id, role="assistant", content=assistant_content,
         message_type="transform",
-        metadata={"sql": sql, "step_number": step_number},
+        metadata={"sql": sql, "step_number": step_number, "sent": sent},
     )
+    events.record(user_id, "chat_sent", kind="transform")
 
     elapsed_ms = round((perf_counter() - start_time) * 1000, 2)
 
@@ -282,6 +306,7 @@ async def chat(request: Request):
         "file_id": file_id,
         "step_number": step_number,
         "sql": sql,
+        "sent": sent,
         "preview": {
             "columns": result["columns"],
             "rows": result["preview"],
@@ -308,3 +333,30 @@ def _build_conversation_context(messages: list[dict]) -> str:
             else:
                 lines.append(f"Assistant: {content}")
     return "\n".join(lines)
+
+
+def _save_error(file_id: str, text: str, code: str) -> None:
+    """Keep a failed turn in the conversation, so it survives a reload."""
+    try:
+        db.create_chat_message(
+            file_id=file_id, role="assistant", content=text,
+            message_type="error", metadata={"code": code},
+        )
+    except Exception:
+        logger.warning("could not save the error message for %s", file_id)
+
+
+def done_message(rows_before, rows_after: int, cols_before: list[str], cols_after: list[str]) -> str:
+    """'Done. 4,982 → 4,120 rows · +Profit' rather than an echo of the request."""
+    parts = []
+    if isinstance(rows_before, int) and rows_before != rows_after:
+        parts.append(f"{rows_before:,} → {rows_after:,} rows")
+    else:
+        parts.append(f"{rows_after:,} rows")
+    added = [c for c in cols_after if c not in cols_before]
+    removed = [c for c in cols_before if c not in cols_after]
+    if added:
+        parts.append("+" + ", +".join(added))
+    if removed:
+        parts.append("−" + ", −".join(removed))
+    return "Done. " + " · ".join(parts)

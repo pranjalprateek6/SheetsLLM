@@ -110,6 +110,9 @@ async def create_recipe(request: Request):
         )
     except Exception:
         logger.warning("Audit entry failed for recipe_create %s", recipe["id"])
+    source = body.get("from") if body.get("from") in ("export_strip", "rail", "drawer") else None
+    events.record(user_id, "recipe_saved", recipe_id=recipe["id"], steps=len(recipe_steps),
+                  **({"from": source} if source else {}))
 
     return {
         "recipe_id": recipe["id"],
@@ -122,6 +125,10 @@ async def create_recipe(request: Request):
 def list_recipes(request: Request):
     user_id = getattr(request.state, "user_id", "anonymous")
     recipes = db.list_recipes(user_id)
+    try:
+        names = db.file_names([r["source_file_id"] for r in recipes if r.get("source_file_id")])
+    except Exception:
+        names = {}
     return {
         "recipes": [
             {
@@ -130,6 +137,12 @@ def list_recipes(request: Request):
                 "description": r.get("description"),
                 "steps": len(r.get("steps") or []),
                 "created_at": r.get("created_at"),
+                "source_file_id": r.get("source_file_id"),
+                "source_file_name": names.get(r.get("source_file_id") or ""),
+                "required_columns": [
+                    c.get("name") for c in (r.get("required_columns") or [])
+                    if isinstance(c, dict) and c.get("name")
+                ],
             }
             for r in recipes
         ],
@@ -252,9 +265,11 @@ async def apply_recipe(request: Request, recipe_id: str):
             f" The recipe's source file had columns this file lacks: {missing}."
             if missing else ""
         )
+        events.record(user_id, "recipe_incompatible", recipe_id=recipe_id, missing=missing)
         return _json_response(
             400, "RECIPE_INCOMPATIBLE",
             f"Recipe could not be applied to this file: {exc}.{hint}",
+            missing=missing,
         )
 
     # Persist the appended steps (counts recorded on the final step)
@@ -268,6 +283,7 @@ async def apply_recipe(request: Request, recipe_id: str):
                 instruction=step["instruction"],
                 sql_query=step["sql_query"],
                 explain=f"recipe: {recipe['name']}",
+                sent={"source": "recipe"},
                 row_count_after=result["total_rows"] if is_last else None,
                 column_count_after=result["total_columns"] if is_last else None,
                 columns_after=result["columns"] if is_last else None,

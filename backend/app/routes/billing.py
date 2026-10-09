@@ -45,6 +45,25 @@ def billing_status(request: Request):
     }
 
 
+_WAITLIST_REASONS = {"uploads", "ai_requests", "chat_requests", "recipes", "pricing", "account"}
+
+
+@router.post("/billing/waitlist")
+async def join_waitlist(request: Request):
+    """Join the Pro waitlist while billing is not configured: one event, with
+    the cap that brought the user here, so demand is measured, not guessed."""
+    user_id = _require_real_user(request)
+    if not user_id:
+        return _json_response(401, "UNAUTHORIZED", "Sign in to join the waitlist")
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    reason = (body or {}).get("reason")
+    events.record(user_id, "waitlist_joined", reason=reason if reason in _WAITLIST_REASONS else None)
+    return {"joined": True}
+
+
 @router.post("/billing/checkout")
 def checkout(request: Request):
     user_id = _require_real_user(request)

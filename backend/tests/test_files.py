@@ -14,8 +14,9 @@ def test_allowed_sorts_accepted(sort):
     assert _normalize_sort(sort, "asc") == (sort, "asc")
 
 
-def test_unknown_sort_falls_back_to_created_at():
-    assert _normalize_sort("evil; DROP TABLE files", "asc") == ("created_at", "asc")
+def test_unknown_sort_falls_back_to_updated_at():
+    # Most recently worked on first: the Files list answers "where was I"
+    assert _normalize_sort("evil; DROP TABLE files", "asc") == ("updated_at", "asc")
 
 
 def test_unknown_dir_falls_back_to_desc():
@@ -23,7 +24,11 @@ def test_unknown_dir_falls_back_to_desc():
 
 
 def test_none_falls_back_to_defaults():
-    assert _normalize_sort(None, None) == ("created_at", "desc")
+    assert _normalize_sort(None, None) == ("updated_at", "desc")
+
+
+def test_created_at_is_still_a_valid_sort():
+    assert _normalize_sort("created_at", "asc") == ("created_at", "asc")
 
 
 def test_case_and_whitespace_normalized():

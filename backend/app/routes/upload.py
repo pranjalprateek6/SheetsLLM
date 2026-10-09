@@ -57,7 +57,8 @@ async def upload(
         usage.enforce(user_id, "uploads")
     except UsageLimitExceeded as exc:
         events.record(user_id, "paywall_hit", action="uploads", used=exc.used, limit=exc.limit)
-        return _json_response(429, "USAGE_LIMIT_EXCEEDED", str(exc))
+        events.record(user_id, "usage_cap_hit", meter="uploads")
+        return _json_response(429, "USAGE_LIMIT_EXCEEDED", str(exc), **usage.limit_payload(exc))
 
     if pending_id is not None:
         # ── Redeem a stashed multi-sheet upload (no re-POST of bytes) ─
@@ -238,6 +239,7 @@ async def upload(
         file_id, row_count, col_count, elapsed_ms,
     )
 
+    events.record(user_id, "upload_completed", rows=preview["total_rows"], columns=preview["total_columns"])
     return {
         "file_id": file_id,
         "schema": schema,

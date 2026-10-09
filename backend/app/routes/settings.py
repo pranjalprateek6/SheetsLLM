@@ -7,7 +7,7 @@ import logging
 
 from fastapi import APIRouter, Request, Response
 
-from app import db
+from app import db, events
 
 logger = logging.getLogger("sheetsllm.routes.settings")
 
@@ -45,4 +45,5 @@ async def update_settings(request: Request):
 
     row = db.upsert_user_settings(user_id, privacy_mode=privacy_mode)
     logger.info("settings updated user=%s privacy_mode=%s", user_id, privacy_mode)
+    events.record(user_id, "privacy_mode_changed", strict=privacy_mode)
     return {"privacy_mode": db.privacy_mode_from_row(row)}

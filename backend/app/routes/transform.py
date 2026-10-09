@@ -30,11 +30,13 @@ from app.engine import (
     get_schema_after_steps,
     replay_transformations_local,
 )
+from app.llm.errors import is_quota_error
 from app.llm.factory import get_llm
 from app.llm.prompts import (
     SYSTEM_PROMPT,
     build_retry_message,
     build_user_message,
+    sent_receipt,
     sanitize_error_for_llm,
 )
 from app.security import RateLimitExceeded, check_rate_limit
@@ -72,11 +74,13 @@ def _is_clarification(raw: str) -> dict | None:
 
 
 def _generate_or_cache_sql(
-    user_id: str, instruction: str, schema: dict, *, privacy_mode: bool = False
+    user_id: str, instruction: str, schema: dict, *, privacy_mode: bool = False,
+    meta: dict | None = None,
 ) -> str | dict:
     """
     Get SQL from cache or generate via LLM.
     Returns SQL string on success, or clarification dict if LLM needs more info.
+    `meta`, when given, gets {"cache": True} on a cache hit (nothing was sent).
     """
     s_hash = schema_fingerprint(schema)
     cache_key = sql_cache_key(user_id, instruction, s_hash)
@@ -84,6 +88,8 @@ def _generate_or_cache_sql(
     cached = get_cached_sql(cache_key)
     if cached is not None:
         logger.info("LLM cache HIT for key=%s", cache_key[:12])
+        if meta is not None:
+            meta["cache"] = True
         return cached
 
     user_message = build_user_message(instruction, schema, privacy_mode=privacy_mode)
@@ -158,6 +164,7 @@ def _save_transform(
     start_time: float,
     *,
     explain: str | None = None,
+    sent: dict | None = None,
 ) -> int:
     """Persist transformation step + update file metadata + audit log."""
     step_number = db.get_next_step_number(file_id)
@@ -167,6 +174,7 @@ def _save_transform(
         instruction=instruction,
         sql_query=sql,
         explain=explain,
+        sent=sent,
         row_count_after=result["total_rows"],
         column_count_after=result["total_columns"],
         columns_after=result["columns"],
@@ -204,6 +212,7 @@ def _run_transform_job(
     schema: dict,
     start_time: float,
     privacy_mode: bool = False,
+    sent: dict | None = None,
 ) -> None:
     """Background task for large-file transforms."""
     try:
@@ -214,7 +223,7 @@ def _run_transform_job(
 
         jobs.update_job(job_id, progress=70)
         step_number = _save_transform(
-            file_id, user_id, instruction, final_sql, result, start_time
+            file_id, user_id, instruction, final_sql, result, start_time, sent=sent,
         )
 
         jobs.complete_job(job_id, {
@@ -254,7 +263,8 @@ async def transform(request: Request, background_tasks: BackgroundTasks):
         usage.enforce(user_id, "transforms")
     except UsageLimitExceeded as exc:
         events.record(user_id, "paywall_hit", action="transforms", used=exc.used, limit=exc.limit)
-        return _json_response(429, "USAGE_LIMIT_EXCEEDED", str(exc))
+        events.record(user_id, "usage_cap_hit", meter="transforms")
+        return _json_response(429, "USAGE_LIMIT_EXCEEDED", str(exc), **usage.limit_payload(exc))
 
     # ── Parse body ─────────────────────────────────────────────────────
     try:
@@ -293,10 +303,11 @@ async def transform(request: Request, background_tasks: BackgroundTasks):
 
     # ── Generate / cache SQL ───────────────────────────────────────────
     privacy_mode = db.get_privacy_mode(user_id)
+    gen_meta: dict = {}
     try:
         sql_or_clarification = await asyncio.to_thread(
             _generate_or_cache_sql, user_id, instruction, schema,
-            privacy_mode=privacy_mode,
+            privacy_mode=privacy_mode, meta=gen_meta,
         )
     except SQLValidationError as exc:
         return _json_response(
@@ -304,6 +315,12 @@ async def transform(request: Request, background_tasks: BackgroundTasks):
         )
     except Exception as exc:
         logger.error("LLM generation failed: %s", exc)
+        if is_quota_error(exc):
+            events.record(user_id, "llm_quota_hit")
+            return _json_response(
+                503, "LLM_QUOTA",
+                "Chef is out of AI capacity for today. Your recipes and one-click fixes still work.",
+            )
         return _json_response(502, "LLM_FAILED", f"LLM error: {exc}")
 
     # ── Handle clarification ───────────────────────────────────────────
@@ -315,6 +332,11 @@ async def transform(request: Request, background_tasks: BackgroundTasks):
         }
 
     sql = sql_or_clarification
+    # A cache hit sent nothing; otherwise record what the prompt carried
+    sent = (
+        {"source": "cache"} if gen_meta.get("cache")
+        else sent_receipt(schema, privacy_mode=privacy_mode)
+    )
 
     # ── Async for large files ──────────────────────────────────────────
     if row_count > _ASYNC_THRESHOLD:
@@ -327,7 +349,7 @@ async def transform(request: Request, background_tasks: BackgroundTasks):
         background_tasks.add_task(
             _run_transform_job,
             job_id, file_id, user_id, r2_key, steps,
-            instruction, sql, schema, start_time, privacy_mode,
+            instruction, sql, schema, start_time, privacy_mode, sent,
         )
         return {"job_id": job_id, "status": "processing"}
 
@@ -349,7 +371,7 @@ async def transform(request: Request, background_tasks: BackgroundTasks):
 
     try:
         step_number = _save_transform(
-            file_id, user_id, instruction, final_sql, result, start_time
+            file_id, user_id, instruction, final_sql, result, start_time, sent=sent,
         )
     except Exception as exc:
         logger.error("Failed to save transformation: %s", exc)
@@ -368,6 +390,7 @@ async def transform(request: Request, background_tasks: BackgroundTasks):
         "step_number": step_number,
         "instruction": instruction,
         "sql": final_sql,
+        "sent": sent,
         "preview": {
             "columns": result["columns"],
             "rows": result["preview"],
@@ -443,6 +466,7 @@ async def transform_op(request: Request):
 
     step_number = _save_transform(
         file_id, user_id, instruction, sql, result, start_time, explain=f"op: {op}",
+        sent={"source": "op"},
     )
     usage.record(user_id, transforms=1, rows_processed=result["total_rows"])
     events.record(user_id, "op_applied", op=op)
@@ -456,6 +480,7 @@ async def transform_op(request: Request):
         "instruction": instruction,
         "message": instruction,
         "sql": sql,
+        "sent": {"source": "op"},
         "preview": {
             "columns": result["columns"],
             "rows": result["preview"],

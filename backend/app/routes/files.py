@@ -24,7 +24,7 @@ def _json_response(status: int, code: str, message: str, **extra) -> Response:
     )
 
 
-_ALLOWED_SORTS = {"created_at", "name", "row_count"}
+_ALLOWED_SORTS = {"updated_at", "created_at", "name", "row_count"}
 _ALLOWED_DIRS = {"asc", "desc"}
 
 
@@ -33,7 +33,7 @@ def _normalize_sort(sort: str | None, direction: str | None) -> tuple[str, str]:
     sort = (sort or "").strip().lower()
     direction = (direction or "").strip().lower()
     if sort not in _ALLOWED_SORTS:
-        sort = "created_at"
+        sort = "updated_at"
     if direction not in _ALLOWED_DIRS:
         direction = "desc"
     return sort, direction
@@ -45,7 +45,7 @@ def list_files(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     q: str | None = Query(None),
-    sort: str = Query("created_at"),
+    sort: str = Query("updated_at"),
     dir: str = Query("desc"),
 ):
     user_id = getattr(request.state, "user_id", "anonymous")
@@ -58,8 +58,16 @@ def list_files(
         sort=sort_field,
         direction=direction,
     )
+    # What state each file is in, in a fixed number of queries for the page
+    files = result["items"]
+    try:
+        states = db.file_states([f["id"] for f in files])
+    except Exception as exc:
+        logger.warning("file states unavailable: %s", exc)
+        states = {}
+    files = [{**f, **states.get(f["id"], {})} for f in files]
     return {
-        "files": result["items"],
+        "files": files,
         "total": result["total"],
         "page": page,
         "page_size": page_size,
@@ -207,10 +215,112 @@ def get_history(request: Request, file_id: str):
         return _json_response(404, "FILE_NOT_FOUND", "File not found")
 
     steps = db.get_transformations(file_id)
+    try:
+        original_rows = db.get_upload_row_count(file_id)
+    except Exception:
+        original_rows = None
+    base_columns = [
+        c.get("name") for c in (file_rec.get("schema_json") or {}).get("columns") or []
+        if isinstance(c, dict) and c.get("name")
+    ]
     return {
         "file_id": file_id,
-        "steps": steps,
+        "steps": with_deltas(steps, base_columns),
         "total_steps": len(steps),
+        "original_row_count": original_rows,
+        "base_columns": base_columns,
+    }
+
+
+def step_source(step: dict) -> str:
+    """Where a step came from: llm, cache, recipe, op or redo."""
+    sent = step.get("sent") or {}
+    if isinstance(sent, dict) and sent.get("source"):
+        return str(sent["source"])
+    explain = step.get("explain") or ""
+    for prefix, source in (("recipe: ", "recipe"), ("op: ", "op"), ("redo", "redo")):
+        if explain.startswith(prefix):
+            return source
+    return "llm"
+
+
+def with_deltas(steps: list[dict], base_columns: list[str]) -> list[dict]:
+    """Each step with the columns it added and removed, from the stored
+    columns_after of the step and the last step before it that has them.
+    Unknown (null) when either side was not recorded."""
+    out = []
+    prev: list[str] | None = list(base_columns) if base_columns else None
+    for step in steps:
+        cols = step.get("columns_after")
+        added = removed = None
+        if isinstance(cols, list) and prev is not None:
+            added = [c for c in cols if c not in prev]
+            removed = [c for c in prev if c not in cols]
+        if isinstance(cols, list):
+            prev = cols
+        out.append({**step, "columns_added": added, "columns_removed": removed, "source": step_source(step)})
+    return out
+
+
+# ── POST /files/{id}/steps: put back a step you know the SQL of ──────
+
+
+@router.post("/files/{file_id}/steps")
+async def add_step(request: Request, file_id: str):
+    """Redo: re-apply a step from its stored SQL. Validated exactly as a
+    recipe step is, replayed, saved. No AI call, no AI request metered."""
+    from app import usage
+    from app.sql_validator import SQLValidationError, validate_sql
+
+    user_id = getattr(request.state, "user_id", "anonymous")
+    file_rec = db.get_file(file_id, user_id)
+    if not file_rec:
+        return _json_response(404, "FILE_NOT_FOUND", "File not found")
+    try:
+        body = await request.json()
+    except Exception:
+        return _json_response(400, "INVALID_JSON", "Request body must be JSON")
+    instruction = str((body or {}).get("instruction") or "").strip()
+    sql = str((body or {}).get("sql") or "")
+    if not instruction or not sql:
+        return _json_response(400, "MISSING_FIELDS", "instruction and sql are required")
+    try:
+        sql = validate_sql(sql)
+    except SQLValidationError as exc:
+        return _json_response(400, "INVALID_SQL", str(exc))
+
+    steps = db.get_transformations(file_id)
+    step_number = len(steps) + 1
+    try:
+        local_path = get_local_parquet(file_rec["r2_key"])
+        result = replay_transformations_local(
+            local_path, steps + [{"step_number": step_number, "sql_query": sql}]
+        )
+    except Exception as exc:
+        return _json_response(400, "EXECUTION_FAILED", f"That step no longer runs on this file: {exc}")
+
+    db.create_transformation(
+        file_id=file_id, step_number=step_number, instruction=instruction, sql_query=sql,
+        explain="redo", row_count_after=result["total_rows"],
+        column_count_after=result["total_columns"], columns_after=result["columns"],
+        sent={"source": "redo"},
+    )
+    try:
+        db.update_file(file_id, user_id, row_count=result["total_rows"], column_count=result["total_columns"])
+    except Exception:
+        pass
+    usage.record(user_id, transforms=1, rows_processed=result["total_rows"])
+    return {
+        "file_id": file_id,
+        "step_number": step_number,
+        "instruction": instruction,
+        "sql": sql,
+        "preview": {
+            "columns": result["columns"],
+            "rows": result["preview"],
+            "total_rows": result["total_rows"],
+            "total_columns": result["total_columns"],
+        },
     }
 
 
