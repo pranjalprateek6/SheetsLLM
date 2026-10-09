@@ -663,7 +663,7 @@ export default function DataGrid({
               type="button"
               onClick={() => onAskChef(`Keep only rows where any column contains "${filterQ.trim()}"`)}
               className="inline-flex h-6 items-center gap-1 whitespace-nowrap text-[11px] font-medium text-primary underline-offset-2 hover:underline"
-              title="Turn this preview filter into a real transform"
+              title="Turn this preview filter into a real step"
             >
               <ChefHat className="h-3 w-3" /> Filter all rows with Chef
             </button>

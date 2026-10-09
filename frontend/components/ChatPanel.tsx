@@ -558,7 +558,7 @@ export default function ChatPanel({
           <AlertDialogHeader>
             <AlertDialogTitle>Clear this conversation?</AlertDialogTitle>
             <AlertDialogDescription>
-              Removes the chat history for this file. Your data and transformation steps are not affected.
+              Removes the chat history for this file. Your data and its steps are not affected.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

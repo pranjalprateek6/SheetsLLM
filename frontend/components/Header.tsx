@@ -16,15 +16,17 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChevronDown, LogOut, Menu, Moon, ShieldCheck, Sun, User, X } from "lucide-react";
+import { ChevronDown, FileSpreadsheet, LogOut, Menu, Moon, ShieldCheck, Sun, User, X } from "lucide-react";
+import { onOpenFile, type OpenFile } from "@/lib/open-file";
 import { toast } from "sonner";
 import { useTheme } from "next-themes";
 import FeedbackWidget from "@/components/FeedbackWidget";
 
+// Signed in, the nav is where your work lives. Pricing stays one step away
+// (usage card, account, the cap messages), not a tab beside your files.
 const APP_LINKS = [
   { href: "/dashboard", label: "Files" },
-  { href: "/workspace", label: "Workspace" },
-  { href: "/pricing", label: "Pricing" },
+  { href: "/recipes", label: "Recipes" },
 ];
 
 const MARKETING_LINKS = [
@@ -63,16 +65,19 @@ export default function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [privacyMode, setPrivacyMode] = useState<boolean | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  // The file the workspace has open, so "where am I" stays answered
+  const [openFile, setOpenFile] = useState<OpenFile>(null);
+  useEffect(() => onOpenFile(setOpenFile), []);
 
-  // Load the privacy setting when the dropdown first opens
+  // Load the privacy setting when the dropdown (or the mobile menu) opens
   useEffect(() => {
-    if (menuOpen && privacyMode === null && user) {
+    if ((menuOpen || mobileOpen) && privacyMode === null && user) {
       fetchWithAuth("/api/settings")
         .then((r) => r.json())
         .then((d) => setPrivacyMode(!!d.privacy_mode))
         .catch(() => setPrivacyMode(null)); // unknown, not "off"
     }
-  }, [menuOpen, privacyMode, user]);
+  }, [menuOpen, mobileOpen, privacyMode, user]);
 
   useEffect(() => {
     setMobileOpen(false);
@@ -154,6 +159,20 @@ export default function Header() {
                     {l.label}
                   </Link>
                 ))}
+                {openFile && pathname.startsWith("/workspace") && (
+                  <>
+                    <span className="mx-1 text-muted-foreground/60" aria-hidden>/</span>
+                    <Link
+                      href={`/workspace?file_id=${openFile.id}`}
+                      aria-current="page"
+                      title={openFile.name}
+                      className="flex max-w-[220px] items-center gap-1.5 rounded-md bg-accent px-2.5 py-1 text-sm text-foreground"
+                    >
+                      <FileSpreadsheet className="h-3.5 w-3.5 flex-shrink-0 text-primary" aria-hidden />
+                      <span className="truncate">{openFile.name}</span>
+                    </Link>
+                  </>
+                )}
               </nav>
             </>
           )}
@@ -215,7 +234,7 @@ export default function Header() {
                   <div className="flex-1">
                     <p className="text-sm">Strict privacy mode</p>
                     <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-                      The AI sees column names and types only, never your data.
+                      On: Chef sees column names and types only. Off: also a few sample rows.
                     </p>
                   </div>
                   <Switch checked={!!privacyMode} aria-hidden tabIndex={-1} className="pointer-events-none mt-0.5" />
@@ -278,12 +297,31 @@ export default function Header() {
               </Link>
             ))}
             {!loading && user && (
-              <Link
-                href="/account"
-                className="rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
-              >
-                Account &amp; billing
-              </Link>
+              <>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={privacyMode === null ? false : privacyMode}
+                  disabled={privacyMode === null}
+                  onClick={togglePrivacy}
+                  className="flex items-center gap-2.5 rounded-md px-3 py-2 text-left text-sm text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-60"
+                >
+                  <ShieldCheck className={cn("h-4 w-4", privacyMode ? "text-success-text" : "")} aria-hidden />
+                  <span className="flex-1">
+                    Strict privacy mode
+                    <span className="block text-xs">
+                      {privacyMode ? "On: Chef sees names and types only" : "Off: Chef also sees a few sample rows"}
+                    </span>
+                  </span>
+                  <Switch checked={!!privacyMode} aria-hidden tabIndex={-1} className="pointer-events-none" />
+                </button>
+                <Link
+                  href="/account"
+                  className="rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-accent hover:text-foreground"
+                >
+                  Account &amp; billing
+                </Link>
+              </>
             )}
             <div className="px-1 pt-1">
               <FeedbackWidget variant="outline" />

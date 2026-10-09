@@ -276,7 +276,7 @@ export default function RecipesDrawer({
         </SheetHeader>
 
         <div className="flex-1 space-y-3 overflow-y-auto px-6 py-4">
-          {/* Save current chain */}
+          {/* Save these steps */}
           {fileId && (
             <div className="rounded-lg border p-3">
               {!showSave ? (

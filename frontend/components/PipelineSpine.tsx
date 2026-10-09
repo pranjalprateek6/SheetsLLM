@@ -11,12 +11,12 @@ const KEY = "sllm_spine_collapsed";
 export type PipelineStep = { step_number: number; instruction: string };
 
 /**
- * The transformation chain as a vertical timeline.
+ * The steps as a vertical timeline.
  *
- * Vertical because the chain is the product: a horizontal strip silently
+ * Vertical because the steps are the product: a horizontal strip silently
  * scrolls the earlier half of your work off-screen past ~5 steps, while a
  * spine keeps the whole history addressable and reads top-to-bottom the way
- * history does. Clicking an earlier step reverts to it.
+ * history does. Clicking an earlier step goes back to it.
  */
 export default function PipelineSpine({
   steps,

@@ -16,12 +16,14 @@ import { type Recipe, type RecipeApplyResult } from "@/components/RecipesDrawer"
 import ExportMenu from "@/components/ExportMenu";
 import ExportClosingStrip, { shouldOfferRecipe } from "@/components/ExportClosingStrip";
 import RerunCard from "@/components/RerunCard";
+import CommandBarMeter from "@/components/CommandBarMeter";
 import { applyOp, OpFailure, type OpRequest } from "@/lib/ops";
 import { explainError } from "@/lib/errors";
 const RecipesDrawer = dynamic(() => import("@/components/RecipesDrawer"));
 import ChatPanel, { type LateStep } from "@/components/ChatPanel";
 import RecipeHint from "@/components/RecipeHint";
 import { useOpenFileUrl } from "@/lib/use-open-file-url";
+import { announceOpenFile } from "@/lib/open-file";
 import { downloadExport, exportFileName, fileStem as stemOf } from "@/lib/export";
 import { type SchemaColumn } from "@/components/SchemaPanel";
 const SchemaPanel = dynamic(() => import("@/components/SchemaPanel"));
@@ -173,10 +175,13 @@ function WorkspaceContent() {
   }, []);
 
   const rememberLastFile = (id: string, name: string) => {
+    announceOpenFile({ id, name });
     try {
       localStorage.setItem("sllm_last_file", JSON.stringify({ id, name }));
     } catch {}
   };
+  // Leaving the workspace closes the header's file crumb
+  useEffect(() => () => announceOpenFile(null), []);
 
   const handleRenameSubmit = async () => {
     const name = renameValue.trim();
@@ -555,7 +560,9 @@ function WorkspaceContent() {
     setSampleSuggestions(null);
     setUploadInsights(null);
     setShowUpload(true);
+    setExportStrip(null);
     showFileInUrl(undefined);
+    announceOpenFile(null);
   };
 
   const handleRevert = async (stepNum: number) => {
@@ -641,7 +648,7 @@ function WorkspaceContent() {
     } catch {}
     markOnboardingStep("transform");
     if (firstTransform) {
-      toast.success("That was your first transform. It's saved as step 1, undo anytime.", {
+      toast.success("That was your first step. It's saved as step 1, and you can undo it anytime.", {
         description:
           "When your cleanup is done, save these steps as a recipe: next month's file becomes one click.",
         duration: 9000,
@@ -970,7 +977,7 @@ function WorkspaceContent() {
         {/* Phase 3: Transform with Chef sidebar */}
         {fileReady && showTransform && (
           <div className="flex h-[calc(100dvh-56px)] animate-fade-in-up">
-            {/* The chain is the product, so it gets a permanent rail rather
+            {/* The steps are the product, so they get a permanent rail rather
                 than a strip that scrolls its own history off-screen. */}
             <PipelineSpine
               steps={steps}
@@ -1032,6 +1039,7 @@ function WorkspaceContent() {
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
+                <CommandBarMeter refreshKey={healthNonce} className="hidden md:inline-flex" />
                 <TooltipProvider>
                   <div className="flex items-center gap-0.5">
                     <Tooltip>

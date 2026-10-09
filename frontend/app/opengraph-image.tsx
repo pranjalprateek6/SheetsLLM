@@ -76,7 +76,7 @@ export default function OgImage() {
             </div>
           </div>
           <div style={{ display: "flex", fontSize: 30, color: MUTED, marginTop: 6 }}>
-            Plain-English cleanups, saved as recipes. Your data never goes to the AI.
+            Plain-English cleanups, saved as recipes. The AI sees your columns, not your values.
           </div>
         </div>
 
