@@ -1,11 +1,10 @@
 "use client";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { Gauge, Sparkles, Zap } from "lucide-react";
+import { Gauge, Sparkles } from "lucide-react";
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Button } from "@/components/ui/button";
+import UpgradeCta from "@/components/UpgradeCta";
 import { cn } from "@/lib/utils";
 
 type UsageSummary = {
@@ -20,6 +19,8 @@ type UsageSummary = {
   recipe_applies?: number;
   /** Saved recipes are a running total; saved is null when unknown. */
   recipes?: { saved: number | null; limit: number };
+  /** The one AI meter (backend 6.2); older backends only send chat_requests. */
+  ai_requests?: { used: number; limit: number };
   limits: {
     uploads: number;
     transforms: number;
@@ -31,8 +32,8 @@ type UsageSummary = {
 // asks back, so that is the AI meter. The backend's separate transforms
 // counter is not shown until the two are merged.
 const METERS = [
-  { key: "uploads", label: "Uploads" },
-  { key: "chat_requests", label: "AI requests" },
+  { key: "uploads", label: "Uploads", reason: "uploads" },
+  { key: "chat_requests", label: "AI requests", reason: "ai_requests" },
 ] as const;
 
 const NUDGE_THRESHOLD = 0.8;
@@ -54,7 +55,6 @@ function barColor(pct: number) {
 }
 
 export default function UsageCard({ embedded = false }: { embedded?: boolean }) {
-  const router = useRouter();
   const [usage, setUsage] = useState<UsageSummary | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
 
@@ -92,12 +92,13 @@ export default function UsageCard({ embedded = false }: { embedded?: boolean }) 
     );
   }
 
-  const meters = METERS.map(({ key, label }) => {
-    const used = usage.used[key] ?? 0;
-    const limit = usage.limits[key] ?? 0;
+  const meters = METERS.map(({ key, label, reason }) => {
+    const ai = key === "chat_requests" ? usage.ai_requests : undefined;
+    const used = ai?.used ?? usage.used[key] ?? 0;
+    const limit = ai?.limit ?? usage.limits[key] ?? 0;
     // 0 or negative limit = unlimited (matches backend semantics)
     const pct = limit > 0 ? Math.min(used / limit, 1) : 0;
-    return { key, label, used, limit, pct };
+    return { key, label, reason, used, limit, pct };
   });
 
   const maxPct = Math.max(...meters.map((m) => m.pct));
@@ -184,9 +185,7 @@ export default function UsageCard({ embedded = false }: { embedded?: boolean }) 
               : "You're close to a monthly limit on the Free plan."}{" "}
             Pro raises caps to 1,000 uploads and 5,000 AI requests a month.
           </p>
-          <Button size="sm" onClick={() => router.push(`/pricing?reason=${tightest.key}`)} className="whitespace-nowrap">
-            <Zap className="mr-1.5 h-3.5 w-3.5" /> Upgrade to Pro
-          </Button>
+          <UpgradeCta reason={tightest.reason} className="whitespace-nowrap" />
         </div>
       )}
     </div>

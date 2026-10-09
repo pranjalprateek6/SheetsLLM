@@ -39,8 +39,8 @@ Every month the same messy export lands on your desk, and you spend the same 30 
 
 Privacy is the core of the product, not an afterthought.
 
-- **Your rows never go to the AI.** Only a small schema summary (column names, types, and aggregate stats) is sent to generate a query. Your actual data stays in our sandbox.
-- **Strict privacy mode.** Turn it on and not even sample values leave: the AI works from column names and types alone. It is a guarantee you can show an auditor.
+- **Strict privacy by default.** The AI is sent a schema summary only: column names, types and counts, never a value from your file. It is a guarantee you can show an auditor.
+- **Sample rows, only if you ask.** Switch strict mode off and the AI also sees a handful of sample rows (at most three, plus a few example values per column), never the whole file. Every step records exactly what it sent, and recipes and one-click fixes send nothing.
 - **Your data never trains any AI model.**
 - **Read-only queries only.** The AI can produce a single read query, checked against a strict allowlist before it runs. It can never modify, delete, or reach outside your file.
 - **Immutable originals.** Your uploaded file is stored once and never changed. Every transformation is a separate, reversible step.

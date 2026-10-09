@@ -170,4 +170,21 @@ def summary(user_id: str) -> dict:
         "recipe_applies": recipe_applies,
         "limits": limits,
         "recipes": {"saved": recipes_saved, "limit": RECIPE_LIMITS.get(tier, FREE_MAX_RECIPES)},
+        # The one AI meter: every Chef message is an AI request. transforms
+        # stays in "used" as a ledger, not as a second allowance.
+        "ai_requests": {"used": int(row.get("chat_requests", 0)), "limit": limits.get("chat_requests", 0)},
+        "resets_at": resets_at(),
     }
+
+
+def resets_at(now: _dt.datetime | None = None) -> str:
+    """When this month's counters reset: the first of next month, UTC."""
+    now = now or _dt.datetime.now(_dt.timezone.utc)
+    year, month = (now.year + 1, 1) if now.month == 12 else (now.year, now.month + 1)
+    return f"{year:04d}-{month:02d}-01"
+
+
+def limit_payload(exc: "UsageLimitExceeded") -> dict:
+    """The details a USAGE_LIMIT_EXCEEDED answer carries, so the UI can say
+    which allowance ran out and when it comes back."""
+    return {"action": exc.action, "used": exc.used, "limit": exc.limit, "resets_at": resets_at()}

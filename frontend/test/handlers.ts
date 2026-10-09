@@ -17,6 +17,9 @@ export const handlers = [
   http.get("/api/usage", () => HttpResponse.json(usage)),
   http.get("/api/settings", () => HttpResponse.json({ privacy_mode: true })),
   http.get("/api/recipes", () => HttpResponse.json({ recipes: [], total: 0 })),
+  // Billing is off until Razorpay is configured: the waitlist path
+  http.get("/api/billing/status", () => HttpResponse.json({ tier: "free", billing_configured: false })),
+  http.post("/api/billing/waitlist", () => HttpResponse.json({ joined: true })),
   http.get("/api/insights/:fileId", ({ params }) =>
     HttpResponse.json({ file_id: params.fileId, insights: { suggestions: [] } })
   ),

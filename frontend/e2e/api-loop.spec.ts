@@ -75,6 +75,13 @@ test("upload, transform, undo, recipe, apply, export", async ({ request }) => {
   expect(lines[0]).toContain("Order ID");
   expect(lines.length).toBe(1001);
 
+  // The proxy keeps the backend's media type and name for every format
+  const parquet = await request.get(`/api/download?file_id=${up.file_id}&format=parquet`);
+  expect(parquet.status()).toBe(200);
+  expect(parquet.headers()["content-type"]).toBe("application/octet-stream");
+  expect(parquet.headers()["content-disposition"]).toMatch(/\.parquet"?/);
+  expect((await parquet.body()).subarray(0, 4).toString()).toBe("PAR1");
+
   const quota = await request.post("/api/chat", { data: { file_id: up.file_id, message: "__quota__" } });
   expect(quota.status()).not.toBe(500);
   expect((await quota.json()).code).toMatch(/LLM|QUOTA|RATE/);

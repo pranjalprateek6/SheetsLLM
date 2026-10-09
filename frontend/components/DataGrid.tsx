@@ -2,17 +2,28 @@
 import { useRef, useState, useMemo, useCallback, useEffect } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
-  ArrowDown, ArrowUp, Calendar, Check, ChevronDown, Hash, Rows3, Rows4,
-  ChefHat, ToggleLeft, Type,
+  ArrowDown, ArrowUp, ArrowUpDown, Calendar, CalendarDays, Check, ChevronDown, Copy, Filter, Hash,
+  PaintBucket, Pencil, Replace, Rows3, Rows4, Scissors, ChefHat, ToggleLeft, Trash2, Type,
 } from "lucide-react";
 import { TextShimmer } from "@/components/ui/text-shimmer";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
-  DropdownMenuTrigger,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
+  DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  CAST_TYPES, DATE_FORMATS, isTextType, looksLikeDates, type OpRequest,
+} from "@/lib/ops";
 
 type SortDir = "asc" | "desc" | null;
 type Density = "compact" | "comfortable";
+/** A column fix that needs one value before it runs. */
+type FieldKind = "rename" | "fill" | "date";
+
+const FIELD_LABEL: Record<FieldKind, string> = {
+  rename: "New name",
+  fill: "Fill empty cells with",
+  date: "The dates look like",
+};
 
 export type ColumnMeta = {
   dtype?: string;
@@ -64,6 +75,7 @@ export default function DataGrid({
   rows,
   loading,
   onSort,
+  onOp,
   columnMeta,
   highlightCols,
   totalRows,
@@ -77,6 +89,8 @@ export default function DataGrid({
   rows: Record<string, unknown>[];
   loading: boolean;
   onSort?: (column: string, direction: "asc" | "desc") => void;
+  /** Run a fix as a step, with no AI (POST /transform/op). */
+  onOp?: (req: OpRequest) => void;
   /** Per-column dtype/null stats from the file schema (best-effort). */
   columnMeta?: Record<string, ColumnMeta>;
   /** Columns the last transform added; briefly tinted so changes are visible. */
@@ -120,6 +134,26 @@ export default function DataGrid({
   }, []);
 
   const [filterQ, setFilterQ] = useState("");
+  // The value a column fix is waiting for, shown under that column's header
+  const [field, setField] = useState<{ kind: FieldKind; column: string; value: string } | null>(null);
+
+  const openField = useCallback((kind: FieldKind, column: string) => {
+    setField({ kind, column, value: kind === "rename" ? column : kind === "date" ? "auto" : "" });
+  }, []);
+
+  const submitField = useCallback(() => {
+    if (!field || !onOp) return;
+    const value = field.value.trim();
+    if (field.kind !== "date" && !value) return;
+    if (field.kind === "rename") {
+      if (value !== field.column) onOp({ op: "rename", column: field.column, args: { new_name: value } });
+    } else if (field.kind === "fill") {
+      onOp({ op: "fill_nulls", column: field.column, args: { value: field.value } });
+    } else {
+      onOp({ op: "standardise_date", column: field.column, args: { format: field.value } });
+    }
+    setField(null);
+  }, [field, onOp]);
 
   // Publish the widths the grid actually RENDERS. The declared width is only a
   // request: tableLayout:fixed with min-w-full redistributes any spare space,
@@ -337,6 +371,7 @@ export default function DataGrid({
                       <button
                         className="inline-flex h-full min-h-6 min-w-6 items-center gap-1.5 transition-colors hover:text-foreground"
                         onClick={() => handleSort(h)}
+                        aria-label={`Sort preview by ${h}`}
                         title={
                           meta
                             ? `${h}${meta.dtype ? ` · ${meta.dtype}` : ""}${nullPct > 0 ? ` · ${nullPct}% nulls` : ""}`
@@ -379,11 +414,62 @@ export default function DataGrid({
                             </>
                           )}
                           <DropdownMenuItem onClick={() => { setSortCol(h); setSortDir("asc"); onSort?.(h, "asc"); }}>
-                            <ArrowUp className="mr-2 h-3.5 w-3.5" /> Sort ascending
+                            <ArrowUp className="mr-2 h-3.5 w-3.5" /> Sort preview ↑
                           </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => { setSortCol(h); setSortDir("desc"); onSort?.(h, "desc"); }}>
-                            <ArrowDown className="mr-2 h-3.5 w-3.5" /> Sort descending
+                            <ArrowDown className="mr-2 h-3.5 w-3.5" /> Sort preview ↓
                           </DropdownMenuItem>
+                          {onOp && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuLabel className="text-[10px] font-normal uppercase tracking-[0.08em] text-muted-foreground">
+                                Fix, no AI
+                              </DropdownMenuLabel>
+                              {(isTextType(meta?.dtype) || (!meta?.dtype && typeof rows[0]?.[h] === "string")) && (
+                                <DropdownMenuItem onClick={() => onOp({ op: "trim", column: h })}>
+                                  <Scissors className="mr-2 h-3.5 w-3.5" /> Trim whitespace
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuItem onClick={() => openField("fill", h)}>
+                                <PaintBucket className="mr-2 h-3.5 w-3.5" /> Fill empty cells…
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => onOp({ op: "drop_empty_rows", column: h })}>
+                                <Filter className="mr-2 h-3.5 w-3.5" /> Drop rows where empty
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => onOp({ op: "dedupe", column: h })}>
+                                <Copy className="mr-2 h-3.5 w-3.5" /> Remove duplicate rows (this column)
+                              </DropdownMenuItem>
+                              {looksLikeDates(h, meta?.dtype, rows.slice(0, 8).map((r) => r[h])) && (
+                                <DropdownMenuItem onClick={() => openField("date", h)}>
+                                  <CalendarDays className="mr-2 h-3.5 w-3.5" /> Standardise dates…
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuSub>
+                                <DropdownMenuSubTrigger>
+                                  <Replace className="mr-2 h-3.5 w-3.5" /> Change type to
+                                </DropdownMenuSubTrigger>
+                                <DropdownMenuSubContent>
+                                  {CAST_TYPES.map((t) => (
+                                    <DropdownMenuItem key={t.value} onClick={() => onOp({ op: "cast", column: h, args: { type: t.value } })}>
+                                      {t.label}
+                                    </DropdownMenuItem>
+                                  ))}
+                                </DropdownMenuSubContent>
+                              </DropdownMenuSub>
+                              <DropdownMenuItem onClick={() => onOp({ op: "sort", column: h, args: { direction: "asc" } })}>
+                                <ArrowUpDown className="mr-2 h-3.5 w-3.5" /> Sort all rows ascending
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => onOp({ op: "sort", column: h, args: { direction: "desc" } })}>
+                                <ArrowUpDown className="mr-2 h-3.5 w-3.5" /> Sort all rows descending
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => openField("rename", h)}>
+                                <Pencil className="mr-2 h-3.5 w-3.5" /> Rename…
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => onOp({ op: "drop_column", column: h })}>
+                                <Trash2 className="mr-2 h-3.5 w-3.5" /> Drop column
+                              </DropdownMenuItem>
+                            </>
+                          )}
                           {onAskColumn && (
                             <>
                               <DropdownMenuSeparator />
@@ -395,6 +481,47 @@ export default function DataGrid({
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
+                    {field?.column === h && (
+                      <form
+                        className="absolute left-0 top-full z-30 mt-1 w-60 rounded-md border bg-popover p-2 text-left font-sans font-normal shadow-md"
+                        onSubmit={(e) => { e.preventDefault(); submitField(); }}
+                        onKeyDown={(e) => { if (e.key === "Escape") { e.preventDefault(); setField(null); } }}
+                      >
+                        <label htmlFor={`field-${h}`} className="mb-1 block text-[11px] text-muted-foreground">
+                          {FIELD_LABEL[field.kind]}
+                        </label>
+                        {field.kind === "date" ? (
+                          <select
+                            id={`field-${h}`}
+                            autoFocus
+                            value={field.value}
+                            onChange={(e) => setField({ ...field, value: e.target.value })}
+                            className="h-8 w-full rounded border bg-background px-1.5 text-xs"
+                          >
+                            {DATE_FORMATS.map((f) => (
+                              <option key={f.value} value={f.value}>{f.example}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input
+                            id={`field-${h}`}
+                            autoFocus
+                            value={field.value}
+                            onChange={(e) => setField({ ...field, value: e.target.value })}
+                            maxLength={field.kind === "rename" ? 100 : 500}
+                            className="h-8 w-full rounded border bg-background px-1.5 text-xs outline-none focus:ring-1 focus:ring-ring/40"
+                          />
+                        )}
+                        <div className="mt-2 flex justify-end gap-2">
+                          <button type="button" onClick={() => setField(null)} className="h-7 rounded px-2 text-xs text-muted-foreground hover:bg-accent">
+                            Cancel
+                          </button>
+                          <button type="submit" className="h-7 rounded bg-primary px-2.5 text-xs font-medium text-primary-foreground">
+                            Apply
+                          </button>
+                        </div>
+                      </form>
+                    )}
                     <div
                       className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-primary/40 opacity-0 group-hover:opacity-100 transition-opacity"
                       onMouseDown={(e) => handleResizeStart(h, e)}
@@ -493,22 +620,50 @@ export default function DataGrid({
       </div>
       {/* Status bar */}
       <div className="flex h-8 flex-shrink-0 items-center justify-between gap-2 border-t bg-card px-3">
-        <span className="min-w-0 truncate text-[11px] tabular-nums text-muted-foreground">
-          {filterQ.trim()
-            ? `${visibleRows.length.toLocaleString()} of ${rows.length.toLocaleString()} preview rows match`
-            : typeof totalRows === "number" && totalRows > rows.length
-              ? `First ${rows.length.toLocaleString()} of ${totalRows.toLocaleString()} rows`
-              : `${rows.length.toLocaleString()} rows`}
-          {!filterQ.trim() && ` × ${head.length.toLocaleString()} cols`}
-          {!filterQ.trim() && typeof stepCount === "number" && stepCount > 0 && ` · step ${stepCount}`}
-        </span>
+        {sortCol && sortDir && !filterQ.trim() ? (
+          // A header sort reorders the loaded preview only; say so, and offer
+          // the real thing, which saves as a step and reaches the export.
+          <span className="flex min-w-0 items-center gap-2 text-[11px] tabular-nums text-muted-foreground">
+            <span className="truncate">
+              Preview sorted by {sortCol} {sortDir === "asc" ? "↑" : "↓"}
+              {typeof totalRows === "number" && totalRows > rows.length &&
+                ` (${rows.length.toLocaleString()} of ${totalRows.toLocaleString()})`}
+            </span>
+            {onOp && (
+              <button
+                type="button"
+                onClick={() => onOp({ op: "sort", column: sortCol, args: { direction: sortDir } })}
+                className="whitespace-nowrap font-medium text-primary underline-offset-2 hover:underline"
+              >
+                Sort all rows
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => { setSortCol(null); setSortDir(null); }}
+              className="whitespace-nowrap underline-offset-2 hover:text-foreground hover:underline"
+            >
+              Clear
+            </button>
+          </span>
+        ) : (
+          <span className="min-w-0 truncate text-[11px] tabular-nums text-muted-foreground">
+            {filterQ.trim()
+              ? `${visibleRows.length.toLocaleString()} of ${rows.length.toLocaleString()} preview rows match`
+              : typeof totalRows === "number" && totalRows > rows.length
+                ? `First ${rows.length.toLocaleString()} of ${totalRows.toLocaleString()} rows`
+                : `${rows.length.toLocaleString()} rows`}
+            {!filterQ.trim() && ` × ${head.length.toLocaleString()} cols`}
+            {!filterQ.trim() && typeof stepCount === "number" && stepCount > 0 && ` · step ${stepCount}`}
+          </span>
+        )}
         <div className="flex items-center gap-2">
           {filterQ.trim() && onAskChef && (
             <button
               type="button"
               onClick={() => onAskChef(`Keep only rows where any column contains "${filterQ.trim()}"`)}
               className="inline-flex h-6 items-center gap-1 whitespace-nowrap text-[11px] font-medium text-primary underline-offset-2 hover:underline"
-              title="Turn this preview filter into a real transform"
+              title="Turn this preview filter into a real step"
             >
               <ChefHat className="h-3 w-3" /> Filter all rows with Chef
             </button>

@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { PanelLeftClose, PanelLeftOpen, Plus } from "lucide-react";
+import { BookMarked, PanelLeftClose, PanelLeftOpen, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
@@ -11,23 +11,26 @@ const KEY = "sllm_spine_collapsed";
 export type PipelineStep = { step_number: number; instruction: string };
 
 /**
- * The transformation chain as a vertical timeline.
+ * The steps as a vertical timeline.
  *
- * Vertical because the chain is the product: a horizontal strip silently
+ * Vertical because the steps are the product: a horizontal strip silently
  * scrolls the earlier half of your work off-screen past ~5 steps, while a
  * spine keeps the whole history addressable and reads top-to-bottom the way
- * history does. Clicking an earlier step reverts to it.
+ * history does. Clicking an earlier step goes back to it.
  */
 export default function PipelineSpine({
   steps,
   onRevertTo,
   onAddStep,
+  onSaveRecipe,
   className,
 }: {
   steps: PipelineStep[];
-  /** Revert to this step number; 0 means the original file. */
+  /** Go back to this step number; 0 means the original file. */
   onRevertTo: (stepNumber: number) => void;
   onAddStep: () => void;
+  /** Save these steps as a recipe; the row shows once there is a step. */
+  onSaveRecipe?: () => void;
   className?: string;
 }) {
   const [collapsed, setCollapsed] = useState(false);
@@ -101,7 +104,7 @@ export default function PipelineSpine({
   return (
     <TooltipProvider delayDuration={200}>
       <nav
-        aria-label="Transformation steps"
+        aria-label="Steps"
         className={cn(
           "relative flex shrink-0 flex-col border-r bg-card transition-[width] duration-200 ease-out",
           collapsed ? "w-[52px]" : "w-[196px]",
@@ -110,8 +113,9 @@ export default function PipelineSpine({
       >
         <div className={cn("flex items-center border-b px-2 py-1.5", collapsed ? "justify-center" : "justify-between")}>
           {!collapsed && (
+            // Once there is a step, this list is a recipe in the making: name it so
             <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
-              Steps
+              {steps.length === 0 ? "Steps" : `Recipe · ${steps.length} step${steps.length === 1 ? "" : "s"}`}
             </span>
           )}
           <button
@@ -149,7 +153,7 @@ export default function PipelineSpine({
               title={
                 s.step_number === last
                   ? s.instruction
-                  : `${s.instruction} — click to go back to this step`
+                  : `${s.instruction}. Click to go back to this step.`
               }
             />
           ))}
@@ -171,6 +175,23 @@ export default function PipelineSpine({
             </span>
             {!collapsed && <span className="truncate text-[12px]">Next step</span>}
           </button>
+
+          {onSaveRecipe && steps.length >= 1 && (
+            <button
+              type="button"
+              onClick={onSaveRecipe}
+              className={cn(
+                "mt-1 flex w-full items-center gap-2.5 rounded-[3px] py-1.5 pr-2 text-left text-primary transition-colors hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                collapsed ? "justify-center pl-2" : "pl-2"
+              )}
+              title={`Save these ${steps.length} steps as a recipe`}
+            >
+              <span aria-hidden className="z-10 grid h-5 w-5 shrink-0 place-items-center rounded-full border border-primary/40 bg-background">
+                <BookMarked className="h-3 w-3" aria-hidden />
+              </span>
+              {!collapsed && <span className="truncate text-[12px] font-medium">Save as a recipe</span>}
+            </button>
+          )}
         </div>
       </nav>
     </TooltipProvider>

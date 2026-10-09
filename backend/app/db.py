@@ -58,7 +58,21 @@ def create_file(
     return resp.data[0]
 
 
+def is_uuid(value: object) -> bool:
+    """True for a well-formed UUID string. Ids are UUID columns, and
+    PostgREST answers a malformed one with an error rather than no rows."""
+    try:
+        UUID(str(value))
+        return True
+    except (ValueError, TypeError, AttributeError):
+        return False
+
+
 def get_file(file_id: str, user_id: str) -> dict | None:
+    # Every file route looks the file up first and answers 404 on None, so
+    # a malformed id ("undefined", "") is turned into "not found" here, once.
+    if not is_uuid(file_id):
+        return None
     resp = (
         get_client()
         .table("files")
@@ -95,6 +109,81 @@ def list_files(
         .execute()
     )
     return {"items": resp.data, "total": resp.count or 0}
+
+
+def file_states(file_ids: list[str]) -> dict[str, dict]:
+    """What state each file is in, for the Files list, in two queries total
+    (not one per file): step count, the recipe last applied, the last export
+    and the row count at upload. Best-effort; missing data is just absent."""
+    ids = [f for f in file_ids if is_uuid(f)]
+    states: dict[str, dict] = {
+        f: {"step_count": 0, "recipe_name": None, "last_exported_at": None, "original_row_count": None}
+        for f in ids
+    }
+    if not ids:
+        return states
+    steps = (
+        get_client()
+        .table("transformations")
+        .select("file_id,step_number,explain")
+        .in_("file_id", ids)
+        .execute()
+    ).data or []
+    last_step: dict[str, int] = {}
+    for st in steps:
+        state = states.get(st["file_id"])
+        if state is None:
+            continue
+        state["step_count"] += 1
+        explain = st.get("explain") or ""
+        if explain.startswith("recipe: ") and st["step_number"] >= last_step.get(st["file_id"], 0):
+            last_step[st["file_id"]] = st["step_number"]
+            state["recipe_name"] = explain[len("recipe: "):]
+    audit = (
+        get_client()
+        .table("audit_log")
+        .select("file_id,action,metadata,created_at")
+        .in_("file_id", ids)
+        .in_("action", ["download", "upload"])
+        .execute()
+    ).data or []
+    for entry in audit:
+        state = states.get(entry["file_id"])
+        if state is None:
+            continue
+        if entry["action"] == "download":
+            if not state["last_exported_at"] or entry["created_at"] > state["last_exported_at"]:
+                state["last_exported_at"] = entry["created_at"]
+        elif entry["action"] == "upload":
+            rows = (entry.get("metadata") or {}).get("row_count")
+            if isinstance(rows, int):
+                state["original_row_count"] = rows
+    return states
+
+
+def get_upload_row_count(file_id: str) -> int | None:
+    """Rows in the file as uploaded, from its upload audit entry."""
+    if not is_uuid(file_id):
+        return None
+    resp = (
+        get_client()
+        .table("audit_log")
+        .select("metadata")
+        .eq("file_id", file_id)
+        .eq("action", "upload")
+        .limit(1)
+        .execute()
+    )
+    rows = ((resp.data or [{}])[0].get("metadata") or {}).get("row_count") if resp.data else None
+    return rows if isinstance(rows, int) else None
+
+
+def file_names(file_ids: list[str]) -> dict[str, str]:
+    ids = [f for f in file_ids if is_uuid(f)]
+    if not ids:
+        return {}
+    resp = get_client().table("files").select("id,name").in_("id", ids).execute()
+    return {r["id"]: r["name"] for r in (resp.data or [])}
 
 
 def update_file(file_id: str, user_id: str, **updates: Any) -> dict | None:
@@ -134,6 +223,7 @@ def create_transformation(
     row_count_after: int | None = None,
     column_count_after: int | None = None,
     columns_after: list[str] | None = None,
+    sent: dict | None = None,
 ) -> dict:
     row = {
         "file_id": file_id,
@@ -145,7 +235,18 @@ def create_transformation(
         "column_count_after": column_count_after,
         "columns_after": columns_after,
     }
-    resp = get_client().table("transformations").insert(row).execute()
+    if sent is not None:
+        row["sent"] = sent
+    try:
+        resp = get_client().table("transformations").insert(row).execute()
+    except Exception as exc:
+        # Migration 010 adds the sent column; until it is applied the step
+        # is still saved, just without its receipt.
+        if "sent" not in row or "sent" not in str(exc):
+            raise
+        logger.warning("transformations.sent missing (apply migration 010); saving without it")
+        row.pop("sent")
+        resp = get_client().table("transformations").insert(row).execute()
     return resp.data[0]
 
 
@@ -369,6 +470,8 @@ def list_recipes(user_id: str) -> list[dict]:
 
 
 def get_recipe(recipe_id: str, user_id: str) -> dict | None:
+    if not is_uuid(recipe_id):
+        return None
     resp = (
         get_client()
         .table("recipes")

@@ -28,12 +28,12 @@ const PILLARS = [
   {
     icon: Lock,
     title: "Private by design",
-    body: "Only your column names and types go to the AI, never your rows. Strict mode makes that a guarantee you can show your auditor.",
+    body: "By default only column names and types go to the AI, never a value from your file. Strict privacy is on from the start, a guarantee you can show your auditor.",
   },
   {
     icon: History,
     title: "Every change auditable",
-    body: "Each step stores the instruction, the exact SQL, and row counts before and after. Undo or revert to any point.",
+    body: "Each step stores the instruction, the exact SQL, and row counts before and after. Undo one, or go back to any step.",
   },
 ];
 
@@ -107,7 +107,7 @@ export default function LandingPage() {
             className="mx-auto mt-4 max-w-xl text-balance text-lg text-muted-foreground"
           >
             Describe your cleanup in plain English, save it as a recipe, and re-run it on every
-            new export in one click. Your data never goes to the AI.
+            new export in one click. By default the AI sees column names and types, never your values.
           </motion.p>
           <motion.div
             {...fadeUp}
@@ -207,16 +207,18 @@ export default function LandingPage() {
               <ShieldCheck className="h-3.5 w-3.5" /> Privacy first
             </div>
             <h2 className="text-3xl font-semibold tracking-tight">
-              The AI never sees your rows
+              By default, the AI never sees your values
             </h2>
             <p className="mt-4 leading-relaxed text-muted-foreground">
-              ChatGPT-style tools upload your whole file to the model. SheetsLLM sends only a
-              schema summary (column names, types, and aggregate stats) and runs generated,
-              validated SQL on your data in our sandbox.
+              ChatGPT-style tools upload your whole file to the model. SheetsLLM sends a schema
+              summary (column names, types and counts) and runs generated, validated SQL on your
+              data in our sandbox. <span className="font-medium text-foreground">Strict privacy mode</span> is
+              on from the start, so that summary is all that leaves.
             </p>
             <p className="mt-3 leading-relaxed text-muted-foreground">
-              Turn on <span className="font-medium text-foreground">strict privacy mode</span> and
-              not even sample values leave: the AI works from column names and types alone.
+              For a hard request you can switch sample rows on, and Chef also sees a handful of
+              example rows, never the whole file. Every step shows exactly what it sent, and
+              recipes and one-click fixes send nothing at all.
             </p>
           </motion.div>
           <motion.div {...fadeUp} transition={{ ...fadeUp.transition, delay: 0.1 }}>
@@ -232,7 +234,7 @@ export default function LandingPage() {
                   </span>
                 ))}
               </div>
-              <p className="mb-3 mt-6 text-xs font-medium text-muted-foreground">WHAT IT NEVER SEES</p>
+              <p className="mb-3 mt-6 text-xs font-medium text-muted-foreground">WHAT STAYS WITH YOU</p>
               <div className="relative overflow-hidden rounded-lg border">
                 <div className="select-none space-y-0 blur-[5px]" aria-hidden>
                   {[1, 2, 3].map((r) => (
@@ -287,8 +289,8 @@ export default function LandingPage() {
             </div>
             <h2 className="text-3xl font-semibold tracking-tight">Show your work</h2>
             <p className="mt-4 leading-relaxed text-muted-foreground">
-              Every transformation is stored as an inspectable step: the instruction you gave, the
-              SQL that ran, and the row counts it changed. Undo one step or revert to any point.
+              Every change is stored as an inspectable step: the instruction you gave, the SQL that
+              ran, and the row counts it changed. Undo one step, or go back to any of them.
               The original file is never touched.
             </p>
             <p className="mt-3 leading-relaxed text-muted-foreground">
@@ -310,7 +312,7 @@ export default function LandingPage() {
             Two minutes to your first clean file
           </h2>
           <p className="mx-auto mt-3 max-w-md text-muted-foreground">
-            Try it on a sample dataset before you upload anything of your own.
+            Try it on a sample file before you upload anything of your own.
           </p>
           <Button size="lg" className="mt-7" asChild>
             <Link href="/auth?mode=signup">

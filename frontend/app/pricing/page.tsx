@@ -9,6 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import UpgradeCta from "@/components/UpgradeCta";
 import { TextShimmer } from "@/components/ui/text-shimmer";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
@@ -20,7 +21,7 @@ const FREE_FEATURES = [
   "200 AI requests / month",
   "Up to 1M rows per file",
   "Chat, insights & charts",
-  "Full history, undo & revert",
+  "Full history, undo & redo",
   "Strict privacy mode",
   "1 saved recipe",
 ];
@@ -39,7 +40,7 @@ const COMPARISON: { label: string; free: string; pro: string }[] = [
   { label: "AI requests / month", free: "200", pro: "5,000" },
   { label: "Saved recipes", free: "1", pro: "Unlimited" },
   { label: "Rows per file", free: "1M", pro: "1M" },
-  { label: "History, undo & revert", free: "✓", pro: "✓" },
+  { label: "History, undo & redo", free: "✓", pro: "✓" },
   { label: "Strict privacy mode", free: "✓", pro: "✓" },
   { label: "Support", free: "Community", pro: "Priority email" },
 ];
@@ -52,9 +53,14 @@ const REASONS: Record<string, { headline: string; sub: string }> = {
     headline: "You've used this month's 50 uploads",
     sub: "Pro lifts the cap to 1,000. Upgrade and keep the files coming.",
   },
+  ai_requests: {
+    headline: "You've used this month's 200 AI requests",
+    sub: "Pro lifts the cap to 5,000. Your recipes and one-click fixes keep working meanwhile.",
+  },
+  // Older links said chat_requests; same allowance
   chat_requests: {
     headline: "You've used this month's 200 AI requests",
-    sub: "Pro lifts the cap to 5,000. Upgrade and pick up right where you stopped.",
+    sub: "Pro lifts the cap to 5,000. Your recipes and one-click fixes keep working meanwhile.",
   },
   recipes: {
     headline: "The Free plan holds one saved recipe",
@@ -65,11 +71,11 @@ const REASONS: Record<string, { headline: string; sub: string }> = {
 const FAQ = [
   {
     q: "What is a recipe?",
-    a: "A recipe is a saved cleanup pipeline. Describe your transformation once in plain English, save the steps, and re-apply them to next month's export in one click. No AI call, same result every time.",
+    a: "A recipe is a saved cleanup pipeline. Describe your cleanup once in plain English, save the steps, and re-apply them to next month's export in one click. No AI call, same result every time.",
   },
   {
     q: "Does my data get sent to the AI?",
-    a: "Only a small schema summary (column names, types, and a few sample values) is sent to generate SQL, never your full dataset. Turn on strict privacy mode and the AI sees column names and types only.",
+    a: "By default, no values at all: the AI sees column names, types and counts. If you switch strict privacy off, it also sees a handful of sample rows to write better SQL, never the whole file. Recipes and one-click fixes send nothing. Your data never trains the AI.",
   },
   {
     q: "What happens when I hit a Free limit?",
@@ -108,7 +114,8 @@ const UPGRADE_TIMELINE = [
 function PricingContent() {
   const { user, loading: authLoading } = useAuth();
   const searchParams = useSearchParams();
-  const reason = REASONS[searchParams.get("reason") ?? ""];
+  const reasonKey = searchParams.get("reason") ?? "";
+  const reason = REASONS[reasonKey];
 
   const [tier, setTier] = useState<string | null>(null);
   const [billingConfigured, setBillingConfigured] = useState(true);
@@ -357,18 +364,26 @@ function PricingContent() {
                   Start with Pro <ArrowRight className="ml-1 h-4 w-4" />
                 </Link>
               </Button>
+            ) : !billingConfigured ? (
+              // Checkout is not open yet: a waitlist, never a dead button
+              <UpgradeCta reason={reasonKey || "pricing"} size="default" className="w-full" />
             ) : (
-              <Button className="w-full" onClick={upgrade} disabled={busy || awaitingPayment || !billingConfigured}>
-                {!billingConfigured ? "Coming soon" : busy ? "Redirecting…" : (
+              <Button className="w-full" onClick={upgrade} disabled={busy || awaitingPayment}>
+                {busy ? "Redirecting…" : (
                   <>
                     Upgrade to Pro <ArrowRight className="ml-1 h-4 w-4" />
                   </>
                 )}
               </Button>
             )}
-            {!isPro && (
+            {!isPro && billingConfigured && (
               <p className="mt-2 text-center text-xs text-muted-foreground">
                 No commitment. Cancel anytime in one click.
+              </p>
+            )}
+            {!isPro && !billingConfigured && !signedOut && (
+              <p className="mt-2 text-center text-xs text-muted-foreground">
+                Pro opens soon. Join and we&apos;ll email you the day it does.
               </p>
             )}
           </div>
@@ -377,11 +392,12 @@ function PricingContent() {
 
       <p className="mt-8 flex items-center justify-center gap-1.5 text-center text-xs text-muted-foreground">
         <ShieldCheck className="h-3.5 w-3.5" />
-        Your data never trains the AI. Strict privacy mode sends schema only.
+        Your data never trains the AI. Strict privacy is on by default: column names and types only.
       </p>
 
-      {/* What happens when you upgrade — certainty beats discounts */}
-      {!isPro && (
+      {/* What happens when you upgrade: certainty beats discounts. Only
+          while it is true, so not while checkout is closed. */}
+      {!isPro && billingConfigured && (
         <div className="mt-16">
           <h2 className="mb-6 text-center text-xl font-semibold tracking-tight">
             What happens when you upgrade
@@ -445,7 +461,7 @@ function PricingContent() {
           Frequently asked questions
         </h2>
         <div className="divide-y rounded-lg border bg-card px-6">
-          {FAQ.map((item) => (
+          {FAQ.filter((item) => billingConfigured || !item.q.startsWith("Can I cancel")).map((item) => (
             <details key={item.q} className="group py-4">
               <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-medium [&::-webkit-details-marker]:hidden">
                 {item.q}

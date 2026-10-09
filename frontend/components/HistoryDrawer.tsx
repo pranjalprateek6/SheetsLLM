@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { History as HistoryIcon, RotateCcw, ChevronRight, Code } from "lucide-react";
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
+import { sentSummary, type SentReceipt } from "@/components/SentDisclosure";
 import EmptyState from "@/components/EmptyState";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -20,8 +21,20 @@ export type TransformStep = {
   sql_query: string;
   row_count_after?: number;
   column_count_after?: number;
+  columns_added?: string[] | null;
+  columns_removed?: string[] | null;
+  source?: string;
+  sent?: SentReceipt | null;
   created_at?: string;
 };
+
+/** "10,000 → 9,412 (−588)" from the last known count before this step. */
+function rowDelta(before: number | null, after?: number | null): string | null {
+  if (after == null) return null;
+  if (before == null || before === after) return `${after.toLocaleString()} rows`;
+  const d = after - before;
+  return `${before.toLocaleString()} → ${after.toLocaleString()} (${d > 0 ? "+" : "−"}${Math.abs(d).toLocaleString()})`;
+}
 
 export default function HistoryDrawer({
   open,
@@ -40,6 +53,7 @@ export default function HistoryDrawer({
   const [loading, setLoading] = useState(false);
   const [expandedSql, setExpandedSql] = useState<number | null>(null);
   const [loadError, setLoadError] = useState(false);
+  const [originalRows, setOriginalRows] = useState<number | null>(null);
 
   const fetchHistory = useCallback(async () => {
     if (!fileId) return;
@@ -50,6 +64,7 @@ export default function HistoryDrawer({
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setSteps(data.steps || []);
+      setOriginalRows(typeof data.original_row_count === "number" ? data.original_row_count : null);
     } catch (e) {
       console.error("Failed to fetch history:", e);
       setLoadError(true);
@@ -71,7 +86,8 @@ export default function HistoryDrawer({
             History
           </SheetTitle>
           <SheetDescription>
-            {steps.length} step{steps.length !== 1 ? "s" : ""} applied to this file.
+            {steps.length} step{steps.length !== 1 ? "s" : ""} on this file
+            {originalRows != null && `, which had ${originalRows.toLocaleString()} rows when uploaded`}.
           </SheetDescription>
         </SheetHeader>
 
@@ -98,15 +114,21 @@ export default function HistoryDrawer({
               <EmptyState
                 compact
                 variant="history"
-                title="No transformations yet"
-                description="Every step you apply shows up here, with one-click revert to any point."
+                title="No steps yet"
+                description="Every step you apply shows up here, and you can go back to any of them."
               />
             </div>
           )}
 
           {!loading && steps.length > 0 && (
             <ol>
-              {steps.map((step, i) => (
+              {steps.map((step, i) => {
+                // The last count recorded before this step (recipe steps record
+                // theirs on the final step only)
+                const before = steps.slice(0, i).reverse().find((s) => s.row_count_after != null)?.row_count_after ?? originalRows;
+                const delta = rowDelta(before ?? null, step.row_count_after);
+                const sent = sentSummary(step.sent ?? (step.source && step.source !== "llm" ? { source: step.source } : null));
+                return (
                 <li key={step.step_number} className="relative flex gap-3 pb-6 last:pb-0">
                   {i < steps.length - 1 && (
                     <span
@@ -126,14 +148,14 @@ export default function HistoryDrawer({
                       </p>
                     )}
 
-                    {step.row_count_after != null && (
+                    {(delta || step.columns_added?.length || step.columns_removed?.length) && (
                       <p className="mt-1 text-xs tabular-nums text-muted-foreground">
-                        {step.row_count_after.toLocaleString()} rows
-                        {step.column_count_after != null && (
-                          <> &times; {step.column_count_after} cols</>
-                        )}
+                        {delta}
+                        {!!step.columns_added?.length && <> · +{step.columns_added.join(", +")}</>}
+                        {!!step.columns_removed?.length && <> · −{step.columns_removed.join(", −")}</>}
                       </p>
                     )}
+                    {sent && <p className="mt-0.5 text-[11px] text-muted-foreground">{sent}</p>}
 
                     <div className="mt-2 flex items-center gap-1">
                       <Button
@@ -173,7 +195,7 @@ export default function HistoryDrawer({
                         onClick={() => onRevert(step.step_number)}
                       >
                         <RotateCcw className="h-3.5 w-3.5" />
-                        Revert here
+                        Go back here
                       </Button>
                     </div>
 
@@ -184,7 +206,8 @@ export default function HistoryDrawer({
                     )}
                   </div>
                 </li>
-              ))}
+                );
+              })}
             </ol>
           )}
         </div>

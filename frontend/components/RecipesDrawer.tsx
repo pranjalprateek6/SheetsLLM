@@ -5,6 +5,10 @@ import { BookMarked, Pencil, Play, Trash2, Plus } from "lucide-react";
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
 import EmptyState from "@/components/EmptyState";
 import { markOnboardingStep } from "@/components/GettingStarted";
+import UpgradeCta from "@/components/UpgradeCta";
+import { markRecipeSaved } from "@/components/ExportClosingStrip";
+import { explainError } from "@/lib/errors";
+import { useBillingConfigured } from "@/lib/billing";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -27,6 +31,9 @@ export type Recipe = {
   description?: string | null;
   steps: number;
   created_at?: string;
+  source_file_id?: string | null;
+  source_file_name?: string | null;
+  required_columns?: string[];
 };
 
 export type RecipeApplyResult = {
@@ -47,12 +54,15 @@ export default function RecipesDrawer({
   fileId,
   fileName,
   onApplied,
+  saveFrom = "drawer",
 }: {
   open: boolean;
   onClose: () => void;
   fileId?: string;
   fileName?: string;
   onApplied: (result: RecipeApplyResult) => void;
+  /** Opened from the rail's "Save as a recipe": start on the save form. */
+  saveFrom?: "drawer" | "rail";
 }) {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [stepCount, setStepCount] = useState(0);
@@ -67,6 +77,7 @@ export default function RecipesDrawer({
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [renameSaving, setRenameSaving] = useState(false);
+  const billingConfigured = useBillingConfigured();
 
   const fetchRecipes = useCallback(async () => {
     setLoading(true);
@@ -101,11 +112,12 @@ export default function RecipesDrawer({
       setUpgradeWall(null);
       // Reset the save form so a stale name from a previous file can't
       // block the smart default on the next open.
-      setShowSave(false);
-      setName("");
+      setShowSave(saveFrom === "rail" && !!fileId);
+      setName(saveFrom === "rail" && fileName ? `${fileName.replace(/\.[^/.]+$/, "")} cleanup` : "");
       fetchRecipes();
       fetchStepCount();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, fileId, fetchRecipes, fetchStepCount]);
 
   const saveRecipe = async () => {
@@ -116,7 +128,7 @@ export default function RecipesDrawer({
       const res = await fetchWithAuth("/api/recipes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ file_id: fileId, name: name.trim() }),
+        body: JSON.stringify({ file_id: fileId, name: name.trim(), from: saveFrom }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -132,8 +144,9 @@ export default function RecipesDrawer({
       } else {
         setName("");
         setShowSave(false);
-        setNotice(`Saved "${data.name}" (${data.steps} steps).`);
+        setNotice(`Saved "${data.name}" (${data.steps} step${data.steps === 1 ? "" : "s"}). Run it on next month's file in one click.`);
         markOnboardingStep("recipe");
+        if (fileId) markRecipeSaved(fileId, data.steps);
         fetchRecipes();
       }
     } catch (e) {
@@ -157,9 +170,9 @@ export default function RecipesDrawer({
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.message || "Failed to apply recipe.");
+        setError(explainError(data).text);
       } else {
-        setNotice(`Applied "${recipe.name}": ${data.steps_added} steps added.`);
+        setNotice(`Applied "${recipe.name}": ${data.steps_added} step${data.steps_added === 1 ? "" : "s"} added.`);
         onApplied(data as RecipeApplyResult);
         fetchStepCount();
       }
@@ -203,6 +216,35 @@ export default function RecipesDrawer({
 
   const [confirmDelete, setConfirmDelete] = useState<Recipe | null>(null);
 
+  const replaceRecipe = async (old: Recipe) => {
+    if (!fileId) return;
+    const newName = name.trim() || `${(fileName ?? "File").replace(/\.[^/.]+$/, "")} cleanup`;
+    setSaving(true);
+    setError(null);
+    try {
+      const del = await fetchWithAuth(`/api/recipes/${old.id}`, { method: "DELETE" });
+      if (!del.ok) throw new Error(`HTTP ${del.status}`);
+      const res = await fetchWithAuth("/api/recipes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ file_id: fileId, name: newName, from: saveFrom }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || `HTTP ${res.status}`);
+      setUpgradeWall(null);
+      setName("");
+      setNotice(`Replaced "${old.name}" with "${data.name}" (${data.steps} step${data.steps === 1 ? "" : "s"}).`);
+      markOnboardingStep("recipe");
+      fetchRecipes();
+    } catch (e) {
+      console.error("Replace failed:", e);
+      setError(`Couldn't replace "${old.name}". It may already be gone; reopen Recipes to check.`);
+      fetchRecipes();
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const deleteRecipe = async (recipe: Recipe) => {
     setError(null);
     try {
@@ -229,12 +271,12 @@ export default function RecipesDrawer({
             </Badge>
           </SheetTitle>
           <SheetDescription>
-            Save a transformation chain once, re-apply it to future uploads.
+            Save your steps once, then run them on next month&apos;s file in one click.
           </SheetDescription>
         </SheetHeader>
 
         <div className="flex-1 space-y-3 overflow-y-auto px-6 py-4">
-          {/* Save current chain */}
+          {/* Save these steps */}
           {fileId && (
             <div className="rounded-lg border p-3">
               {!showSave ? (
@@ -254,8 +296,8 @@ export default function RecipesDrawer({
                 >
                   <Plus className="h-4 w-4" />
                   {stepCount === 0
-                    ? "Apply transformations first to save a recipe"
-                    : `Save current ${stepCount}-step chain as recipe`}
+                    ? "Apply a step first to save a recipe"
+                    : `Save these ${stepCount} step${stepCount === 1 ? "" : "s"} as a recipe`}
                 </Button>
               ) : (
                 <div className="space-y-2">
@@ -300,9 +342,21 @@ export default function RecipesDrawer({
                 Recipe limit reached
               </p>
               <p className="mt-1 text-xs text-muted-foreground">{upgradeWall}</p>
-              <Button asChild size="sm" className="mt-2">
-                <Link href="/pricing">Upgrade to Pro</Link>
-              </Button>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <UpgradeCta reason="recipes" />
+                {/* While Pro can't be bought, the wall still has a way through:
+                    swap the saved recipe for these steps. */}
+                {billingConfigured === false && recipes[0] && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={saving}
+                    onClick={() => replaceRecipe(recipes[0])}
+                  >
+                    Replace &lsquo;{recipes[0].name}&rsquo; with these steps
+                  </Button>
+                )}
+              </div>
             </div>
           )}
 
@@ -330,7 +384,7 @@ export default function RecipesDrawer({
                 compact
                 variant="recipes"
                 title="No recipes yet"
-                description="Transform a file, then save the chain here to re-apply it to future uploads. No AI call needed."
+                description="Clean a file, then save its steps here to run them on next month's file. No AI call needed."
               />
             </div>
           )}
@@ -415,7 +469,7 @@ export default function RecipesDrawer({
               <AlertDialogTitle>Delete &ldquo;{confirmDelete?.name}&rdquo;?</AlertDialogTitle>
               <AlertDialogDescription>
                 This recipe and its steps are removed for good. Files you already
-                transformed with it are not affected.
+                cleaned with it are not affected.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

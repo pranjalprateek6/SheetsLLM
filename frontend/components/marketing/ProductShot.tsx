@@ -109,7 +109,7 @@ function ChefPanel() {
       </div>
       <div className="border-t p-2">
         <div className="rounded-md border bg-background px-2 py-1.5 text-[10px] text-muted-foreground">
-          Describe a transformation…
+          Describe a change…
         </div>
       </div>
     </div>

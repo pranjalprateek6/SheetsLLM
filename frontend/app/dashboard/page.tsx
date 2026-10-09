@@ -7,6 +7,8 @@ import AuthGuard from "@/components/AuthGuard";
 import EmptyState from "@/components/EmptyState";
 import UsageCard from "@/components/UsageCard";
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
+import { downloadExport, exportFileName, fileStem } from "@/lib/export";
+import { describeFileState, type FileState } from "@/lib/file-state";
 import {
   ArrowDown, ArrowUp, Copy, Download, FileSpreadsheet, Grid3X3, List, MoreHorizontal, Pencil, Search, Trash2,
 } from "lucide-react";
@@ -18,7 +20,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuSub,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuSub,
   DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -29,7 +31,7 @@ import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-type FileItem = {
+type FileItem = FileState & {
   id: string;
   name: string;
   row_count: number;
@@ -37,6 +39,7 @@ type FileItem = {
   size_bytes: number;
   original_format: string;
   created_at: string;
+  updated_at?: string;
 };
 
 function formatBytes(bytes: number) {
@@ -51,7 +54,7 @@ function formatDate(iso: string) {
   });
 }
 
-type SortKey = "created_at" | "name" | "row_count";
+type SortKey = "updated_at" | "created_at" | "name" | "row_count";
 type SortDir = "asc" | "desc";
 
 const PAGE_SIZE = 50;
@@ -64,7 +67,8 @@ export default function DashboardPage() {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [view, setView] = useState<"grid" | "list">("list");
-  const [sortBy, setSortBy] = useState<SortKey>("created_at");
+  // Most recently worked on first: the list answers "where was I"
+  const [sortBy, setSortBy] = useState<SortKey>("updated_at");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [page, setPage] = useState(1);
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -126,6 +130,7 @@ export default function DashboardPage() {
       let cmp = 0;
       if (sortBy === "name") cmp = a.name.localeCompare(b.name);
       else if (sortBy === "row_count") cmp = a.row_count - b.row_count;
+      else if (sortBy === "updated_at") cmp = new Date(a.updated_at ?? a.created_at).getTime() - new Date(b.updated_at ?? b.created_at).getTime();
       else cmp = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
       return sortDir === "asc" ? cmp : -cmp;
     });
@@ -184,19 +189,16 @@ export default function DashboardPage() {
     finally { setActionLoading(null); }
   };
 
-  const handleDownload = async (fileId: string, name: string, format: string) => {
+  // An export is the file as it is now, steps applied, so it is named for
+  // them; the step count comes from the row when listed, else from history.
+  const handleDownload = async (fileId: string, name: string, format: string, knownSteps?: number) => {
     try {
-      const res = await fetchWithAuth(`/api/download?file_id=${fileId}&format=${format}`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = name.replace(/\.[^/.]+$/, "") + `.${format}`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      let steps = knownSteps;
+      if (typeof steps !== "number") {
+        const h = await fetchWithAuth(`/api/files/${fileId}/history`);
+        steps = h.ok ? ((await h.json()).total_steps ?? 0) : 0;
+      }
+      await downloadExport(fileId, format, exportFileName(fileStem(name), steps ?? 0, format));
     } catch (e) {
       console.error("Download failed:", e);
       toast.error("Download failed. Please try again.");
@@ -250,21 +252,20 @@ export default function DashboardPage() {
         </DropdownMenuItem>
         <DropdownMenuSub>
           <DropdownMenuSubTrigger>
-            <Download className="mr-2 h-4 w-4" /> Download as…
+            <Download className="mr-2 h-4 w-4" /> Export as…
           </DropdownMenuSubTrigger>
           <DropdownMenuSubContent>
-            <DropdownMenuItem onClick={() => handleDownload(file.id, file.name, "csv")}>
-              CSV
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleDownload(file.id, file.name, "xlsx")}>
-              Excel (.xlsx)
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleDownload(file.id, file.name, "json")}>
-              JSON
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleDownload(file.id, file.name, "tsv")}>
-              TSV
-            </DropdownMenuItem>
+            {/* What you get: the file as it is now, steps applied */}
+            <DropdownMenuLabel className="text-xs font-normal tabular-nums text-muted-foreground">
+              {file.row_count.toLocaleString()} rows
+              {typeof file.step_count === "number" && ` · ${file.step_count} step${file.step_count === 1 ? "" : "s"}`}
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {[["csv", "CSV"], ["xlsx", "Excel (.xlsx)"], ["json", "JSON"], ["tsv", "TSV"], ["parquet", "Parquet"]].map(([fmt, label]) => (
+              <DropdownMenuItem key={fmt} onClick={() => handleDownload(file.id, file.name, fmt, file.step_count)}>
+                {label}
+              </DropdownMenuItem>
+            ))}
           </DropdownMenuSubContent>
         </DropdownMenuSub>
         <DropdownMenuSeparator />
@@ -380,7 +381,7 @@ export default function DashboardPage() {
               <EmptyState
                 variant="files"
                 title="No files yet"
-                description="Upload a spreadsheet, or start from a sample dataset, and describe your cleanup in plain English."
+                description="Upload a spreadsheet, or start from a sample file, and describe your cleanup in plain English."
                 action={
                   <Button
                     onClick={() => router.push("/workspace")}
@@ -404,7 +405,7 @@ export default function DashboardPage() {
                   <TableHead className="hidden w-24 text-right sm:table-cell">Size</TableHead>
                   {sortableHead("Rows", "row_count", "hidden w-24 text-right sm:table-cell")}
                   <TableHead className="hidden w-20 text-right sm:table-cell">Cols</TableHead>
-                  {sortableHead("Created", "created_at", "hidden w-32 sm:table-cell")}
+                  {sortableHead("Updated", "updated_at", "hidden w-32 sm:table-cell")}
                   <TableHead className="w-12" />
                 </TableRow>
               </TableHeader>
@@ -428,7 +429,11 @@ export default function DashboardPage() {
                       {/* The columns those numbers live in are hidden below sm,
                           so the row carries them itself. */}
                       <p className="mt-1 pl-[26px] font-mono text-[11px] tabular-nums text-muted-foreground sm:hidden">
-                        {file.row_count.toLocaleString()} × {file.column_count.toLocaleString()} · {formatBytes(file.size_bytes)} · {formatDate(file.created_at)}
+                        {file.row_count.toLocaleString()} × {file.column_count.toLocaleString()} · {formatBytes(file.size_bytes)} · {formatDate(file.updated_at ?? file.created_at)}
+                      </p>
+                      {/* What state the file is in: cleaned how far, by what */}
+                      <p className="mt-0.5 truncate pl-[26px] text-[11px] tabular-nums text-muted-foreground">
+                        {describeFileState(file)}
                       </p>
                     </TableCell>
                     <TableCell className="hidden text-right font-mono text-xs tabular-nums text-muted-foreground sm:table-cell">
@@ -441,7 +446,7 @@ export default function DashboardPage() {
                       {file.column_count.toLocaleString()}
                     </TableCell>
                     <TableCell className="hidden text-xs tabular-nums text-muted-foreground sm:table-cell">
-                      {formatDate(file.created_at)}
+                      {formatDate(file.updated_at ?? file.created_at)}
                     </TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>{rowActions(file)}</TableCell>
                   </TableRow>
@@ -474,7 +479,8 @@ export default function DashboardPage() {
                 <p className="font-mono text-[11px] tabular-nums text-muted-foreground">
                   {file.row_count.toLocaleString()} × {file.column_count.toLocaleString()} · {formatBytes(file.size_bytes)}
                 </p>
-                <p className="mt-0.5 text-[11px] tabular-nums text-muted-foreground">{formatDate(file.created_at)}</p>
+                <p className="mt-0.5 truncate text-[11px] tabular-nums text-muted-foreground">{describeFileState(file)}</p>
+                <p className="mt-0.5 text-[11px] tabular-nums text-muted-foreground">{formatDate(file.updated_at ?? file.created_at)}</p>
               </div>
             ))}
           </div>
@@ -511,7 +517,7 @@ export default function DashboardPage() {
             <AlertDialogHeader>
               <AlertDialogTitle>Delete “{deleteTarget?.name}”?</AlertDialogTitle>
               <AlertDialogDescription>
-                This permanently deletes the file and its full transformation history. This cannot be undone.
+                This permanently deletes the file and all of its steps. This cannot be undone.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>

@@ -55,7 +55,8 @@ export default function ToolShell({
         </h2>
         <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
           SheetsLLM turns your cleanup into a saved recipe: describe it once in plain English,
-          then re-run it on every new file in one click. Your data never goes to the AI.
+          then re-run it on every new file in one click. By default the AI sees column names and
+          types, never your values.
         </p>
         <Button className="mt-5" asChild>
           <Link href="/auth?mode=signup">

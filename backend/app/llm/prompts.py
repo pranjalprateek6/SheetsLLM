@@ -168,3 +168,25 @@ RULES:
 - Build on previous conversation context when provided.
 - Round numeric results to 2 decimal places where appropriate.
 """
+
+
+def sent_receipt(schema: dict, *, privacy_mode: bool, source: str = "llm") -> dict:
+    """What build_user_message sends for this schema, as counts and column
+    names only: the "Sent to Chef" receipt stored with a step. It never holds
+    the sample values themselves."""
+    columns = [c["name"] for c in schema.get("columns", [])]
+    if privacy_mode:
+        rows, per_column = 0, 0
+    else:
+        rows = min(len(schema.get("samples") or []), 3)
+        per_column = max(
+            (min(len(c.get("sample_values") or []), 5) for c in schema.get("columns", [])),
+            default=0,
+        )
+    return {
+        "source": source,
+        "mode": "strict" if privacy_mode else "samples",
+        "columns_sent": columns,
+        "sample_rows_sent": rows,
+        "values_per_column": per_column,
+    }

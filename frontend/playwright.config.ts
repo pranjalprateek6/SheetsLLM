@@ -19,6 +19,9 @@ export default defineConfig({
   timeout: 60_000,
   expect: { timeout: 10_000 },
   fullyParallel: false,
+  // Backend specs share one anonymous user, its one-recipe cap and the fake
+  // LLM's call log, so with a backend they run one file at a time.
+  workers: /^(1|true|yes)$/i.test(process.env.E2E_BACKEND ?? "") ? 1 : undefined,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? "github" : "list",
   use: {

@@ -1,7 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { LogOut, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import AuthGuard from "@/components/AuthGuard";
@@ -11,6 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import UpgradeCta from "@/components/UpgradeCta";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -23,7 +23,6 @@ function AccountContent() {
   const { user, signOut } = useAuth();
   const router = useRouter();
   const [tier, setTier] = useState<string | null>(null);
-  const [billingConfigured, setBillingConfigured] = useState(false);
   const [privacyMode, setPrivacyMode] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -42,7 +41,6 @@ function AccountContent() {
       .then((r) => r.json())
       .then((d) => {
         setTier(d.tier ?? "free");
-        setBillingConfigured(d.billing_configured ?? false);
       })
       .catch(() => setTier(null)); // unknown plan: render the loading state, never guess "free"
     fetchWithAuth("/api/settings")
@@ -154,9 +152,7 @@ function AccountContent() {
                 {busy ? "Working…" : "Cancel subscription"}
               </Button>
             ) : (
-              <Button size="sm" asChild disabled={!billingConfigured}>
-                <Link href="/pricing">Upgrade to Pro</Link>
-              </Button>
+              <UpgradeCta reason="account" />
             )}
           </div>
           <p className="mt-1.5 text-xs text-muted-foreground">
@@ -181,8 +177,8 @@ function AccountContent() {
               <div>
                 <p className="text-sm font-medium">Strict privacy mode</p>
                 <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-                  When on, prompts sent to the AI contain column names and types only, never
-                  sample values or rows from your data.
+                  On by default: the AI sees column names and types only, never a value from your
+                  file. Off: it also sees a handful of sample rows to write better SQL.
                 </p>
               </div>
             </div>

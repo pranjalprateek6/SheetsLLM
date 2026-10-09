@@ -25,7 +25,7 @@ export function markOnboardingStep(step: keyof typeof ONBOARDING_FLAGS) {
 const ITEMS = [
   { key: "account", label: "Create your account", done: () => true },
   { key: "upload", label: "Upload a file, or try a sample", done: () => localStorage.getItem(ONBOARDING_FLAGS.upload) === "true" },
-  { key: "transform", label: "Run your first transform", done: () => localStorage.getItem(ONBOARDING_FLAGS.transform) === "true" },
+  { key: "transform", label: "Clean something: your first step", done: () => localStorage.getItem(ONBOARDING_FLAGS.transform) === "true" },
   { key: "recipe", label: "Save it as a recipe", done: () => localStorage.getItem(ONBOARDING_FLAGS.recipe) === "true" },
 ];
 
