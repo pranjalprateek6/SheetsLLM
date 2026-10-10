@@ -55,6 +55,14 @@ export function inferValue(v: string): string | number | boolean | null {
   return v;
 }
 
+const UNSAFE_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
+/** Sets an own, enumerable key, even "__proto__", without invoking the
+ *  prototype setter the way plain assignment would. */
+function setOwn(o: Record<string, unknown>, key: string, value: unknown) {
+  Object.defineProperty(o, key, { value, writable: true, enumerable: true, configurable: true });
+}
+
 /** Rows as objects keyed by header. With `nest`, "a.b" headers become {a: {b}}. */
 export function toRecords(table: Grid, { infer = true, nest = false } = {}): Record<string, unknown>[] {
   return table.rows.map((r) => {
@@ -62,18 +70,23 @@ export function toRecords(table: Grid, { infer = true, nest = false } = {}): Rec
     table.headers.forEach((h, i) => {
       const raw = r[i] ?? "";
       const value = infer ? inferValue(raw) : raw;
-      if (!nest || !h.includes(".")) {
-        obj[h] = value;
+      const path = h.split(".");
+      // A header comes from the file, so it must never reach the object
+      // prototype: "__proto__.x" nested would write onto Object.prototype in
+      // this tab. Such headers, and plain ones, stay flat, literal keys.
+      if (!nest || path.length < 2 || path.some((k) => UNSAFE_KEYS.has(k))) {
+        setOwn(obj, h, value);
         return;
       }
-      const path = h.split(".");
       let at = obj;
       for (let k = 0; k < path.length - 1; k++) {
         const key = path[k];
-        if (typeof at[key] !== "object" || at[key] === null) at[key] = {};
+        // Only walk into objects this record owns, never inherited members
+        const own = Object.prototype.hasOwnProperty.call(at, key) ? at[key] : undefined;
+        if (typeof own !== "object" || own === null) setOwn(at, key, {});
         at = at[key] as Record<string, unknown>;
       }
-      at[path[path.length - 1]] = value;
+      setOwn(at, path[path.length - 1], value);
     });
     return obj;
   });

@@ -49,6 +49,19 @@ describe("toRecords", () => {
     const flat = toRecords(t(["id", "address.city"], ["1", "London"]), { infer: false });
     expect(flat).toEqual([{ id: "1", "address.city": "London" }]);
   });
+
+  it("never lets a header write to the object prototype", () => {
+    const r = toRecords(
+      t(["__proto__.polluted", "constructor.prototype.bad", "a.__proto__", "ok.x"], ["1", "2", "3", "4"]),
+      { nest: true },
+    );
+    expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+    expect(({} as Record<string, unknown>).bad).toBeUndefined();
+    // Dangerous paths stay flat, literal keys; ordinary ones still nest
+    expect(Object.keys(r[0])).toEqual(["__proto__.polluted", "constructor.prototype.bad", "a.__proto__", "ok"]);
+    expect(r[0].ok).toEqual({ x: 4 });
+    expect(JSON.parse(JSON.stringify(r[0]))["__proto__.polluted"]).toBe(1);
+  });
 });
 
 describe("pickColumns", () => {
