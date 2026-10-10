@@ -507,9 +507,11 @@ def convert_to_parquet(
             arrow_table = pq.read_table(tmp.name)
             if arrow_table.num_rows > MAX_ROWS:
                 raise TooManyRowsError(arrow_table.num_rows)
-            return file_bytes, arrow_table.num_rows, arrow_table.num_columns
-
-        if lower.endswith(".xlsx") or lower.endswith(".xls"):
+            names = [str(c) for c in arrow_table.column_names]
+            if sanitize_column_names(names) == names:
+                return file_bytes, arrow_table.num_rows, arrow_table.num_columns
+            # Otherwise its names get the same cleaning as any upload, below
+        elif lower.endswith(".xlsx") or lower.endswith(".xls"):
             import pandas as pd
 
             df = pd.read_excel(
@@ -527,7 +529,8 @@ def convert_to_parquet(
             # Default: CSV
             _read_csv_lenient(con, tmp_path)
 
-        arrow_table = con.execute("SELECT * FROM staging").fetch_arrow_table()
+        if not (lower.endswith(".parquet") or lower.endswith(".pq")):
+            arrow_table = con.execute("SELECT * FROM staging").fetch_arrow_table()
     finally:
         Path(tmp.name).unlink(missing_ok=True)
 

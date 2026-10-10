@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from app.engine import get_connection
+from app.ops import quote_ident  # column names come from the file
 
 logger = logging.getLogger("sheetsllm.insights")
 
@@ -44,7 +45,7 @@ def generate_insights(local_path: str | Path) -> dict[str, Any]:
 
         # Null analysis per column
         for col_name in col_names:
-            qname = f'"{col_name}"'
+            qname = quote_ident(col_name)
             try:
                 null_result = con.execute(f"""
                     SELECT
@@ -80,7 +81,7 @@ def generate_insights(local_path: str | Path) -> dict[str, Any]:
             base_type = col_type.split("(")[0].upper()
             if base_type not in numeric_types:
                 continue
-            qname = f'"{col_name}"'
+            qname = quote_ident(col_name)
             try:
                 stats = con.execute(f"""
                     SELECT
@@ -148,7 +149,7 @@ def _mixed_dates(con, col_name: str) -> dict[str, str] | None:
     when it has to guess, so it is offered only when a day over 12 proves
     that order. Otherwise Chef gets the job, told which order the data shows.
     """
-    q = f'"{col_name}"'
+    q = quote_ident(col_name)
     v = f"TRIM(CAST({q} AS VARCHAR))"
     row = con.execute(f"""
         SELECT

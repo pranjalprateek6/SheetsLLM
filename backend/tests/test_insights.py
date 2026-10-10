@@ -66,3 +66,17 @@ def test_month_first_dates_go_to_chef_with_the_order(tmp_path):
 def test_one_date_format_is_not_flagged(tmp_path):
     path = _dates(tmp_path, ["2026-10-14", "2026-10-02", "2026-09-30"])
     assert not any("dates" in s["text"] for s in generate_insights(path)["suggestions"])
+
+
+def test_a_column_name_cannot_break_out_of_its_quotes(tmp_path):
+    # Column names come from the file. One holding a double quote must stay a
+    # name: before quoting was escaped this one failed (or worse, ran SQL).
+    path = tmp_path / "evil.parquet"
+    duckdb.connect().execute(
+        "COPY (SELECT * FROM (VALUES (1, NULL), (1, NULL), (2, 'x')) "
+        "t(a, \"b\"\") FROM data; --\")) "
+        f"TO '{str(path).replace(chr(92), '/')}' (FORMAT PARQUET)"
+    )
+    insights = generate_insights(str(path))
+    assert insights["duplicate_rows"] == 1
+    assert [c["column"] for c in insights["null_columns"]] == ['b") FROM data; --']
