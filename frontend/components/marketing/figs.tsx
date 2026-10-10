@@ -48,11 +48,13 @@ export function FigLayers({ active }: { active: boolean }) {
   const W = 150;
   const layers = 6;
   return (
-    <svg viewBox="-150 -150 300 300" className="h-full w-full" aria-hidden>
-      <g transform="translate(0 40)">
+    // The opened stack spans y -113 to 135 in this box: the top sheet's corner
+    // sits at -83, lowered 60, lifted at most 5 × 18; nothing reaches the edge
+    <svg viewBox="-150 -150 300 300" overflow="visible" className="h-full w-full" aria-hidden>
+      <g transform="translate(0 60)">
         {Array.from({ length: layers }, (_, i) => {
           const isTop = i === layers - 1;
-          const lift = i * (open ? 22 : 12);
+          const lift = i * (open ? 18 : 12);
           const grid = isTop
             ? Array.from({ length: 5 }, (_, k) => {
                 const t = ((k + 1) / 6) * W;
@@ -104,7 +106,7 @@ export function FigSteps({ active }: { active: boolean }) {
     { x: -30, y: 40, h: 56, n: 4 },
   ];
   return (
-    <svg viewBox="-160 -170 320 320" className="h-full w-full" aria-hidden>
+    <svg viewBox="-160 -170 320 320" overflow="visible" className="h-full w-full" aria-hidden>
       {blocks.map((b) => {
         const on = lit >= b.n;
         const s = 70;
@@ -174,7 +176,7 @@ export function FigPlates({ pointer }: { pointer: number | null }) {
 
   const peak = heights.indexOf(Math.max(...heights));
   return (
-    <svg viewBox="-170 -150 340 300" className="h-full w-full" aria-hidden>
+    <svg viewBox="-170 -150 340 300" overflow="visible" className="h-full w-full" aria-hidden>
       <g transform="translate(0 70)">
         {heights.map((h, i) => {
           // Plates run along x, each thin in x and deep in y
