@@ -58,10 +58,8 @@ PRIVACY_DEFAULT_STRICT: bool = (
 # Free-tier caps act as a circuit breaker so one user cannot exhaust the
 # shared LLM quota. Pro caps are generous headroom, not a real ceiling.
 FREE_MAX_UPLOADS_PER_MONTH: int = int(os.getenv("FREE_MAX_UPLOADS_PER_MONTH", "50"))
-FREE_MAX_TRANSFORMS_PER_MONTH: int = int(os.getenv("FREE_MAX_TRANSFORMS_PER_MONTH", "200"))
 FREE_MAX_CHAT_PER_MONTH: int = int(os.getenv("FREE_MAX_CHAT_PER_MONTH", "200"))
 PRO_MAX_UPLOADS_PER_MONTH: int = int(os.getenv("PRO_MAX_UPLOADS_PER_MONTH", "1000"))
-PRO_MAX_TRANSFORMS_PER_MONTH: int = int(os.getenv("PRO_MAX_TRANSFORMS_PER_MONTH", "5000"))
 PRO_MAX_CHAT_PER_MONTH: int = int(os.getenv("PRO_MAX_CHAT_PER_MONTH", "5000"))
 # Total saved recipes (not monthly). 0 = unlimited. Recipes are the Pro hook.
 FREE_MAX_RECIPES: int = int(os.getenv("FREE_MAX_RECIPES", "1"))

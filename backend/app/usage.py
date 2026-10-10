@@ -26,11 +26,9 @@ import logging
 from app.config import (
     FREE_MAX_CHAT_PER_MONTH,
     FREE_MAX_RECIPES,
-    FREE_MAX_TRANSFORMS_PER_MONTH,
     FREE_MAX_UPLOADS_PER_MONTH,
     PRO_MAX_CHAT_PER_MONTH,
     PRO_MAX_RECIPES,
-    PRO_MAX_TRANSFORMS_PER_MONTH,
     PRO_MAX_UPLOADS_PER_MONTH,
 )
 from app import db
@@ -42,12 +40,10 @@ _ZERO = {"uploads": 0, "transforms": 0, "chat_requests": 0, "rows_processed": 0}
 TIER_LIMITS: dict[str, dict[str, int]] = {
     "free": {
         "uploads": FREE_MAX_UPLOADS_PER_MONTH,
-        "transforms": FREE_MAX_TRANSFORMS_PER_MONTH,
         "chat_requests": FREE_MAX_CHAT_PER_MONTH,
     },
     "pro": {
         "uploads": PRO_MAX_UPLOADS_PER_MONTH,
-        "transforms": PRO_MAX_TRANSFORMS_PER_MONTH,
         "chat_requests": PRO_MAX_CHAT_PER_MONTH,
     },
 }

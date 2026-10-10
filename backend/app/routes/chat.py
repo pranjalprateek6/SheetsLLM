@@ -275,7 +275,7 @@ async def chat(request: Request):
         sent=sent,
     )
     # The step is saved, so this chat turn was a transform: meter it as one,
-    # with the rows it produced, the same as POST /transform does.
+    # with the rows it produced, the same as a one-click fix (/transform/op).
     usage.record(user_id, transforms=1, rows_processed=result["total_rows"])
     try:
         db.update_file(

@@ -60,8 +60,6 @@ def seams(monkeypatch, parquet):
     monkeypatch.setattr(usage, "enforce", lambda *a, **kw: None)
     monkeypatch.setattr(usage, "record", lambda uid, **c: st.usage.append(c))
     monkeypatch.setattr(events, "record", lambda uid, name, **p: st.events.append((name, p)))
-    with cache._sql_lock:
-        cache._sql_cache.clear()
     st.client = TestClient(app, raise_server_exceptions=False)
     st.file = file_rec
     return st
@@ -253,17 +251,6 @@ def test_receipt_never_holds_values():
               "samples": [["93000"]]}
     receipt = sent_receipt(schema, privacy_mode=False)
     assert "93000" not in str(receipt)
-
-
-def test_cache_hit_records_no_ai_call(seams, monkeypatch):
-    llm = LLM("SELECT DISTINCT * FROM data")
-    monkeypatch.setattr(transform_module, "get_llm", lambda: llm)
-    schema = {"columns": [{"name": "a", "dtype": "INTEGER"}]}
-    first, second = {}, {}
-    transform_module._generate_or_cache_sql("u1", "dedupe", schema, meta=first)
-    transform_module._generate_or_cache_sql("u1", "dedupe", schema, meta=second)
-    assert first == {} and second == {"cache": True}
-    assert len(llm.calls) == 1
 
 
 def test_done_message():

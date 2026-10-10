@@ -7,7 +7,7 @@ user message. The chat route builds that message as "Previous conversation:"
 followed by the history, then "New request:" followed by the current turn.
 When that marker is present only the text after its last occurrence is
 matched, so a phrase from an earlier turn never answers this one; without the
-marker (the transform route) the whole message is. Among the rules that match,
+marker (a first turn, with no history) the whole message is. Among the rules that match,
 the one whose phrase occurs latest wins. A rule may also set "delay_ms" to
 answer that long after the call, for exercising Stop and slow-request paths.
 Two sentinel replies stand in for provider behaviour the routes have to
