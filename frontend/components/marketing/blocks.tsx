@@ -49,14 +49,29 @@ export function SectionHead({
 }
 
 /** A picture on the black page, fading into it at its edges. */
-export function Stage({ children, className, tight }: { children: React.ReactNode; className?: string; tight?: boolean }) {
+export function Stage({
+  children,
+  className,
+  tight,
+  wide,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  tight?: boolean;
+  /** A full-width scene: runs a little past the text edges and fades out
+   *  at the sides and the foot, the way the reference's pictures do */
+  wide?: boolean;
+}) {
   return (
-    <div className={cn("group relative", className)}>
+    <div className={cn("group relative", wide && "-mx-5 sm:-mx-8 lg:-mx-12", className)}>
       <div
         className={cn(
-          "relative flex justify-center px-4 sm:px-10",
-          tight ? "py-10" : "py-12 sm:py-16",
-          "[mask-image:radial-gradient(85%_85%_at_50%_40%,black_60%,transparent)]",
+          "relative flex justify-center",
+          wide ? "px-5 pb-4 pt-10 sm:px-8 lg:px-12" : "px-4 sm:px-10",
+          !wide && (tight ? "py-10" : "py-12 sm:py-16"),
+          wide
+            ? "[mask-image:radial-gradient(120%_100%_at_50%_20%,black_62%,transparent_92%)]"
+            : "[mask-image:radial-gradient(85%_85%_at_50%_40%,black_60%,transparent)]",
         )}
       >
         {children}

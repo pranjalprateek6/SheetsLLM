@@ -509,3 +509,16 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* Chef at work: the stage text breathes, gently, while the glyph beside it
+   cycles. A pulse in opacity, not a moving gradient. */
+@keyframes chef-working {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+.chef-working {
+  animation: chef-working 1.6s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .chef-working { animation: none; }
+}

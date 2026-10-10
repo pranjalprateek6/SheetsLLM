@@ -11,15 +11,30 @@ import { GhostCursor, useScene, type Frame } from "@/components/marketing/ghost"
    a recipe. The rail fills in and the change bar counts what each step did.
    Reduced motion shows the finished state. All figures are sample data. */
 
-type Row = { id: string; order: string; date: string; region: string | null; amount: string; dup?: boolean };
+type Row = { id: string; order: string; customer: string; date: string; region: string | null; amount: string; status: string; dup?: boolean };
 
 const ROWS: Row[] = [
-  { id: "1", order: "ORD-1041", date: "03/10/2026", region: "North", amount: "1,240.50" },
-  { id: "2", order: "ORD-1042", date: "2026-10-04", region: null, amount: "890.00" },
-  { id: "3", order: "ORD-1042", date: "2026-10-04", region: null, amount: "890.00", dup: true },
-  { id: "4", order: "ORD-1043", date: "Oct 5, 2026", region: "East", amount: "2,310.75" },
-  { id: "5", order: "ORD-1044", date: "2026-10-06", region: "West", amount: "1,105.25" },
-  { id: "6", order: "ORD-1045", date: "07.10.2026", region: null, amount: "460.00" },
+  { id: "1", order: "ORD-1041", customer: "Northwind", date: "03/10/2026", region: "North", amount: "1,240.50", status: "Paid" },
+  { id: "2", order: "ORD-1042", customer: "Contoso", date: "2026-10-04", region: null, amount: "890.00", status: "Pending" },
+  { id: "3", order: "ORD-1042", customer: "Contoso", date: "2026-10-04", region: null, amount: "890.00", status: "Pending", dup: true },
+  { id: "4", order: "ORD-1043", customer: "Fabrikam", date: "Oct 5, 2026", region: "East", amount: "2,310.75", status: "Paid" },
+  { id: "5", order: "ORD-1044", customer: "Tailspin", date: "2026-10-06", region: "West", amount: "1,105.25", status: "Refunded" },
+  { id: "6", order: "ORD-1045", customer: "Litware", date: "07.10.2026", region: null, amount: "460.00", status: "Paid" },
+];
+
+// The rest of the sheet in the tall hero frame: real-looking rows that sit
+// still while the six above change, so the frame reads as a full file
+const MORE: Row[] = [
+  { id: "7", order: "ORD-1046", customer: "Adventure Works", date: "2026-10-07", region: "South", amount: "3,120.00", status: "Paid" },
+  { id: "8", order: "ORD-1047", customer: "Wingtip", date: "2026-10-08", region: "North", amount: "742.40", status: "Pending" },
+  { id: "9", order: "ORD-1048", customer: "Proseware", date: "2026-10-08", region: null, amount: "1,980.00", status: "Paid" },
+  { id: "10", order: "ORD-1049", customer: "Lucerne", date: "2026-10-09", region: "East", amount: "615.75", status: "Paid" },
+  { id: "11", order: "ORD-1050", customer: "Margie's Travel", date: "2026-10-10", region: "West", amount: "2,045.10", status: "Pending" },
+  { id: "12", order: "ORD-1051", customer: "Coho Winery", date: "2026-10-11", region: "South", amount: "388.00", status: "Refunded" },
+  { id: "13", order: "ORD-1052", customer: "Fourth Coffee", date: "2026-10-12", region: null, amount: "1,410.60", status: "Paid" },
+  { id: "14", order: "ORD-1053", customer: "Datum Corp", date: "2026-10-13", region: "North", amount: "954.20", status: "Paid" },
+  { id: "15", order: "ORD-1054", customer: "Trey Research", date: "2026-10-14", region: "East", amount: "2,760.00", status: "Pending" },
+  { id: "16", order: "ORD-1055", customer: "Alpine Ski", date: "2026-10-15", region: null, amount: "512.90", status: "Paid" },
 ];
 
 const ISO: Record<string, string> = {
@@ -71,17 +86,20 @@ function MiniMenu({ item, id }: { item: string; id: string }) {
 }
 
 /** `bare` drops the frame so the workstation can embed it as its main pane. */
-export default function HeroWorkspace({ bare = false }: { bare?: boolean }) {
+export default function HeroWorkspace({ bare = false, tall = false }: { bare?: boolean; tall?: boolean }) {
   const frame = useRef<HTMLElement>(null);
   const s = useScene(SCENE, TOTAL, INITIAL, frame);
   const { applied } = s;
 
-  const rows = ROWS.filter((r) => !(applied >= 1 && r.dup));
+  const rows = (tall ? [...ROWS, ...MORE] : ROWS).filter((r) => !(applied >= 1 && r.dup));
+  const headers = tall
+    ? (["Order ID", "Customer", "Order Date", "Region", "Amount", "Status"] as const)
+    : (["Order ID", "Order Date", "Region", "Amount"] as const);
   const last = applied > 0 ? STEPS[applied - 1] : null;
   const done = applied === STEPS.length;
 
   return (
-    <figure ref={frame} className={cn("relative overflow-hidden bg-card text-left", !bare && "rounded-xl border shadow-lg")}>
+    <figure ref={frame} className={cn("relative overflow-hidden bg-card text-left", bare ? "flex h-full flex-col" : "rounded-xl border shadow-lg")}>
       <figcaption className="sr-only">
         The SheetsLLM workspace cleaning a sample orders file: duplicates removed, dates standardised and empty
         regions filled, each saved as a step you can undo, then saved as a recipe.
@@ -102,7 +120,7 @@ export default function HeroWorkspace({ bare = false }: { bare?: boolean }) {
         </div>
       </div>
 
-      <div className="flex" aria-hidden>
+      <div className={cn("flex", bare && "min-h-0 flex-1")} aria-hidden>
         {/* Steps rail */}
         <div className="hidden w-[188px] shrink-0 border-r bg-canvas p-2 sm:block">
           <p className="px-1.5 pb-1.5 pt-0.5 text-[11px] font-medium text-muted-foreground">
@@ -183,16 +201,24 @@ export default function HeroWorkspace({ bare = false }: { bare?: boolean }) {
             <thead>
               <tr className="border-b text-left text-[11px] text-muted-foreground">
                 <th className="hidden w-9 py-1.5 pl-3 font-normal sm:table-cell" />
-                {(["Order ID", "Order Date", "Region", "Amount"] as const).map((h) => {
+                {headers.map((h) => {
                   const key = h === "Order Date" ? "date" : h === "Region" ? "region" : null;
                   const pressed = key && (s.menu === key || (s.click && s.cursor === `h-${key}`));
                   return (
-                    <th key={h} className={cn("relative py-1.5 pr-3 font-medium", h === "Order ID" && "pl-3 sm:pl-0", h === "Amount" && "text-right")}>
+                    <th
+                      key={h}
+                      className={cn(
+                        "relative py-1.5 pr-3 font-medium",
+                        h === "Order ID" && "pl-3 sm:pl-0",
+                        h === "Amount" && "text-right",
+                        (h === "Customer" || h === "Status") && "hidden xl:table-cell",
+                      )}
+                    >
                       <span
                         data-ghost={key ? `h-${key}` : undefined}
                         className={cn("-mx-1 inline-flex items-center gap-1 rounded px-1 transition-colors", pressed && "bg-accent text-foreground")}
                       >
-                        {h} {h !== "Amount" && <ChevronDown className="h-3 w-3 opacity-50" />}
+                        {h} {h !== "Amount" && h !== "Status" && <ChevronDown className="h-3 w-3 opacity-50" />}
                       </span>
                       {s.menu === "date" && key === "date" && <MiniMenu item="Standardise dates…" id="m-date" />}
                       {s.menu === "region" && key === "region" && <MiniMenu item="Fill empty cells…" id="m-region" />}
@@ -210,19 +236,32 @@ export default function HeroWorkspace({ bare = false }: { bare?: boolean }) {
                   <tr key={r.id} className={cn("border-b border-border/60 transition-colors", r.dup && applied === 0 && "bg-warning/[0.07]")}>
                     <td className="hidden py-1.5 pl-3 tabular-nums text-muted-foreground/70 sm:table-cell">{i + 1}</td>
                     <td className="truncate py-1.5 pl-3 pr-3 tabular-nums sm:pl-0">{r.order}</td>
+                    {tall && <td className="hidden truncate py-1.5 pr-3 text-muted-foreground xl:table-cell">{r.customer}</td>}
                     {/* Keyed on the change so the wash replays every loop */}
                     <td key={`d-${dateFixed}`} className={cn("truncate py-1.5 pr-3 tabular-nums", dateFixed && "cell-changed")}>{date}</td>
                     <td key={`r-${regionFilled}`} className={cn("truncate py-1.5 pr-3", regionFilled && "cell-changed")}>
                       {r.region ?? (regionFilled ? "Unknown" : <span className="rounded bg-muted px-1 text-[10px] text-muted-foreground">empty</span>)}
                     </td>
                     <td className="truncate py-1.5 pr-3 text-right tabular-nums">{r.amount}</td>
+                    {tall && (
+                      <td className="hidden py-1.5 pr-3 xl:table-cell">
+                        <span
+                          className={cn(
+                            "rounded-full px-1.5 py-px text-[10.5px]",
+                            r.status === "Paid" ? "bg-success/10 text-success-text" : r.status === "Pending" ? "bg-warning/10 text-warning-text" : "bg-muted text-muted-foreground",
+                          )}
+                        >
+                          {r.status}
+                        </span>
+                      </td>
+                    )}
                   </tr>
                 );
               })}
             </tbody>
           </table>
           <div className="px-3 py-2 text-[11px] tabular-nums text-muted-foreground">
-            {applied >= 1 ? "1,000" : "1,012"} rows × 4 cols{applied > 0 && ` · step ${applied}`}
+            {applied >= 1 ? "1,000" : "1,012"} rows × {tall ? 6 : 4} cols{applied > 0 && ` · step ${applied}`}
           </div>
         </div>
       </div>

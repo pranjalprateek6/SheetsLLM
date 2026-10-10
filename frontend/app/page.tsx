@@ -100,7 +100,7 @@ export default function LandingPage() {
                 />
               </Container>
               <Container className="mt-10">
-                <Stage>
+                <Stage wide>
                   <Picture />
                 </Stage>
                 <FeaturesRow items={page.features} />

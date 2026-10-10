@@ -59,7 +59,7 @@ export function FixSlice() {
     { id: "dates", icon: CalendarDays, label: "Standardise dates…" },
   ];
   return (
-    <Frame ref={ref} className="min-h-[300px] bg-canvas p-5">
+    <Frame ref={ref} className="min-h-[340px] bg-canvas p-5">
       <div className="overflow-hidden rounded-lg border bg-card shadow-xs">
         <div className="grid grid-cols-[84px_1fr_64px] whitespace-nowrap border-b text-[12px] font-medium text-muted-foreground">
           <span className="px-3 py-2">Order ID</span>
