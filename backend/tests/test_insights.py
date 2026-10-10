@@ -80,3 +80,14 @@ def test_a_column_name_cannot_break_out_of_its_quotes(tmp_path):
     insights = generate_insights(str(path))
     assert insights["duplicate_rows"] == 1
     assert [c["column"] for c in insights["null_columns"]] == ['b") FROM data; --']
+
+
+def test_only_date_like_columns_get_the_full_date_count(tmp_path, monkeypatch):
+    import app.insights as ins
+
+    counted = []
+    real = ins._mixed_dates
+    monkeypatch.setattr(ins, "_mixed_dates", lambda con, col: counted.append(col) or real(con, col))
+    path = _dates(tmp_path, ["2026-10-14", "28/10/2026"])  # a is a number, b dates
+    generate_insights(path)
+    assert counted == ["b"]

@@ -6,7 +6,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from app.engine import get_connection
+from app.engine import _run_with_timeout, get_connection
 from app.ops import quote_ident  # column names come from the file
 
 logger = logging.getLogger("sheetsllm.insights")
@@ -17,7 +17,7 @@ def generate_insights(local_path: str | Path) -> dict[str, Any]:
     Run a set of DuckDB queries against a local Parquet file to produce
     auto-insights: null counts, duplicates, numeric stats, and suggestions.
     """
-    con = get_connection()
+    con = get_connection(read=(local_path,))
     lp = str(local_path).replace("\\", "/")
     con.execute(f"CREATE VIEW data AS SELECT * FROM read_parquet('{lp}')")
 
@@ -121,12 +121,15 @@ def generate_insights(local_path: str | Path) -> dict[str, Any]:
                 "detail": f"{col_info['null_pct']}% of {col_info['column']} is empty",
             })
 
-        # Mixed date formats in a text column: "2026-10-14" beside "10/10/2026"
-        for col_name, col_type in zip(col_names, col_types):
-            if not col_type.upper().startswith("VARCHAR"):
-                continue
+        # Mixed date formats in a text column: "2026-10-14" beside "10/10/2026".
+        # Bounded: a cheap look at the first rows picks the date-like columns,
+        # and only those few are counted in full, under a time limit.
+        text_cols = [c for c, t in zip(col_names, col_types) if t.upper().startswith("VARCHAR")]
+        for col_name in _date_like(con, text_cols):
             try:
-                found = _mixed_dates(con, col_name)
+                found = _run_with_timeout(
+                    _mixed_dates, con, col_name, timeout=_DATE_PROBE_SECONDS, interrupt=(con,)
+                )
             except Exception:
                 found = None
             if found:
@@ -140,6 +143,27 @@ def generate_insights(local_path: str | Path) -> dict[str, Any]:
 
 _ISO = r"^\d{4}-\d{1,2}-\d{1,2}$"
 _SLASHED = r"^\d{1,2}/\d{1,2}/\d{4}$"
+
+
+_DATE_PROBE_ROWS = 1000
+_DATE_PROBE_COLUMNS = 10
+_DATE_PROBE_SECONDS = 5
+
+
+def _date_like(con, text_cols: list[str]) -> list[str]:
+    """Text columns whose first rows are mostly dates, at most a handful."""
+    if not text_cols:
+        return []
+    either = f"'{_ISO}|{_SLASHED}'"
+    parts = ", ".join(
+        f"COUNT(*) FILTER (WHERE regexp_matches(TRIM(CAST({quote_ident(c)} AS VARCHAR)), {either}))"
+        f" / GREATEST(COUNT({quote_ident(c)}), 1)"
+        for c in text_cols
+    )
+    shares = con.execute(
+        f"SELECT {parts} FROM (SELECT * FROM data LIMIT {_DATE_PROBE_ROWS})"
+    ).fetchone()
+    return [c for c, share in zip(text_cols, shares) if (share or 0) >= 0.5][:_DATE_PROBE_COLUMNS]
 
 
 def _mixed_dates(con, col_name: str) -> dict[str, str] | None:

@@ -229,3 +229,45 @@ def test_a_file_over_the_row_limit_is_refused_not_cut(monkeypatch):
     # At the limit is fine
     _, rows, _ = engine.convert_to_parquet(b"a\n1\n2\n3\n", "ok.csv")
     assert rows == 3
+
+
+def test_a_timeout_stops_the_query_instead_of_waiting_for_it():
+    import time
+
+    from app.engine import QueryTimeoutError, _run_with_timeout, get_connection
+
+    def heavy():
+        con = get_connection()
+        return con.execute(
+            "SELECT sum(a.range * b.range) FROM range(200000) a, range(20000) b"
+        ).fetchall()
+
+    started = time.time()
+    with pytest.raises(QueryTimeoutError):
+        _run_with_timeout(heavy, timeout=1)
+    # It used to raise only after the ~17s query had finished by itself
+    assert time.time() - started < 5
+
+
+def test_a_connection_reaches_only_the_files_it_was_given(tmp_path):
+    import duckdb
+
+    from app.engine import get_connection
+
+    mine, other = tmp_path / "mine.parquet", tmp_path / "other.parquet"
+    for p in (mine, other):
+        duckdb.connect().execute(f"COPY (SELECT 1 AS a) TO '{_sql_path(p)}' (FORMAT PARQUET)")
+    out = tmp_path / "out.json"
+    con = get_connection(read=(mine,), write=(out,))
+    assert con.execute(f"SELECT * FROM read_parquet('{_sql_path(mine)}')").fetchall() == [(1,)]
+    con.execute(f"COPY (SELECT 1 AS a) TO '{_sql_path(out)}' (FORMAT JSON, ARRAY true)")
+    assert out.exists()
+    for sql in (
+        f"SELECT * FROM read_parquet('{_sql_path(other)}')",
+        f"SELECT * FROM glob('{_sql_path(tmp_path)}/*')",
+        f"COPY (SELECT 1) TO '{_sql_path(tmp_path / 'x.csv')}'",
+        f"ATTACH '{_sql_path(tmp_path / 'x.db')}'",
+        "SET enable_external_access = true",
+    ):
+        with pytest.raises(duckdb.Error):
+            con.execute(sql)
