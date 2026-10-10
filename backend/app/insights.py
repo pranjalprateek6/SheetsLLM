@@ -108,13 +108,16 @@ def generate_insights(local_path: str | Path) -> dict[str, Any]:
             insights["suggestions"].append({
                 "text": f"Remove {n} duplicate row{'s' if n != 1 else ''}",
                 "instruction": "remove duplicate rows",
+                "detail": f"{n} row{'s repeat' if n != 1 else ' repeats'} another row exactly",
             })
 
         high_null_cols = [c for c in insights["null_columns"] if c["null_pct"] > 10]
         for col_info in high_null_cols[:3]:  # max 3 suggestions
             insights["suggestions"].append({
-                "text": f"Column '{col_info['column']}' has {col_info['null_pct']}% null values",
+                # Lead with what clicking does; the finding is the reason
+                "text": f"Drop rows where {col_info['column']} is empty",
                 "instruction": f"drop rows where {col_info['column']} is null",
+                "detail": f"{col_info['null_pct']}% of {col_info['column']} is empty",
             })
 
     except Exception as exc:

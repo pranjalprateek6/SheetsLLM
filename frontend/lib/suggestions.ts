@@ -1,5 +1,6 @@
-/** A suggested next step: what the chip says, and what clicking it sends. */
-export type Suggestion = { text: string; instruction: string };
+/** A suggested next step: what clicking it does, what it sends, and the
+ *  finding behind it ("21% of Region is empty"), when there is one. */
+export type Suggestion = { text: string; instruction: string; detail?: string };
 
 const MAX_SUGGESTIONS = 6;
 
@@ -24,11 +25,12 @@ export function toSuggestions(source: unknown): Suggestion[] {
     if (typeof item === "string" && item.trim()) {
       out.push({ text: item, instruction: item });
     } else if (item && typeof item === "object") {
-      const { text, instruction } = item as Record<string, unknown>;
+      const { text, instruction, detail } = item as Record<string, unknown>;
       if (typeof text === "string" && text.trim()) {
         out.push({
           text,
           instruction: typeof instruction === "string" && instruction.trim() ? instruction : text,
+          ...(typeof detail === "string" && detail.trim() ? { detail } : {}),
         });
       }
     }

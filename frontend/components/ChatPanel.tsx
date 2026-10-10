@@ -409,7 +409,7 @@ export default function ChatPanel({
 
       {/* Welcome: the file is ready, what Chef can see, and where to start */}
       {fileId && messages.length === 0 && (
-        <div className="flex-shrink-0 border-b px-4 pb-5 pt-5">
+        <div className="flex-shrink-0 px-4 pb-6 pt-5">
           <p className="text-[15px] font-medium tracking-[-0.01em]">{fileName || "Your file"} is ready</p>
           <p className="mt-1 text-[13px] text-muted-foreground">Ask a question about it, or describe a change.</p>
           {strict !== null && (
@@ -435,16 +435,19 @@ export default function ChatPanel({
                       <li key={i}>
                         <button
                           onClick={() => (fix && onOp ? onOp(fix, "insight") : sendMessage(s.instruction))}
-                          className="group flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left text-[13px] text-foreground/90 transition-colors hover:bg-accent hover:text-foreground"
+                          className="group flex w-full items-start justify-between gap-3 px-3 py-2.5 text-left transition-colors hover:bg-accent"
                         >
-                          <span>{s.text}</span>
+                          <span className="min-w-0">
+                            <span className="block text-[13px] font-medium text-foreground/90 group-hover:text-foreground">{s.text}</span>
+                            {s.detail && <span className="mt-0.5 block text-[12px] text-muted-foreground">{s.detail}</span>}
+                          </span>
                           <span
                             className={cn(
-                              "flex-shrink-0 rounded-full border px-1.5 py-px text-[10px] font-medium",
+                              "mt-px flex-shrink-0 rounded-full border px-1.5 py-px text-[10px] font-medium",
                               fix ? "border-border text-muted-foreground" : "border-primary/30 text-primary-accent",
                             )}
                           >
-                            {fix ? "no AI" : "asks Chef"}
+                            {fix ? "One click" : "Asks Chef"}
                           </span>
                         </button>
                       </li>

@@ -24,6 +24,7 @@ def test_counts_exact_duplicate_rows(tmp_path):
     assert insights["suggestions"][0] == {
         "text": "Remove 3 duplicate rows",
         "instruction": "remove duplicate rows",
+        "detail": "3 rows repeat another row exactly",
     }
 
 
