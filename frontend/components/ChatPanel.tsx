@@ -2,8 +2,8 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
-import { ChefHat, ChevronDown, Code2, Eraser, RotateCcw, Square, Undo2, User } from "lucide-react";
-import { SendIcon, type SendIconHandle } from "@/components/icons/send";
+import { useReducedMotion } from "framer-motion";
+import { ArrowDown, ArrowUp, Check, ChefHat, ChevronDown, Code2, Eraser, RotateCcw, Square, Undo2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
@@ -12,12 +12,13 @@ import {
 import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { TextShimmer } from "@/components/ui/text-shimmer";
 import { cn } from "@/lib/utils";
 import { toSuggestions, type Suggestion } from "@/lib/suggestions";
 import { explainError } from "@/lib/errors";
 import { matchVerb, type ColumnInfo } from "@/lib/verbs";
 import type { OpRequest } from "@/lib/ops";
+import ChatText from "@/components/ChatText";
+import { ChefMark, CopyButton, SqlBlock, Thinking } from "@/components/chat-parts";
 import ErrorBubble from "@/components/ErrorBubble";
 import PrivacyChip from "@/components/PrivacyChip";
 import SentDisclosure, { type SentReceipt } from "@/components/SentDisclosure";
@@ -92,6 +93,9 @@ export default function ChatPanel({
   const [suggestionsChecked, setSuggestionsChecked] = useState(false);
   const [stage, setStage] = useState(0);
   const [confirmClear, setConfirmClear] = useState(false);
+  // Scrolled up away from the newest message: offer a way back
+  const [awayFromEnd, setAwayFromEnd] = useState(false);
+  const reduced = useReducedMotion() ?? false;
   // What Chef sees, from the privacy chip; null until the setting loads
   const [strict, setStrict] = useState<boolean | null>(null);
   // After RATE_LIMITED, Send waits until this time
@@ -108,7 +112,6 @@ export default function ChatPanel({
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
-  const sendIconRef = useRef<SendIconHandle>(null);
   // Terminal-style recall: ArrowUp in an empty input restores the last
   // prompt for quick "same thing, but…" iteration.
   const lastSentRef = useRef<string>("");
@@ -193,6 +196,21 @@ export default function ChatPanel({
     }
     fetchSuggestions();
   }, [fileId, open, starterSuggestions, initialInsights, fetchSuggestions]);
+
+  // The file changed under the suggestions (a fix, a Chef step, an undo or a
+  // recipe run): ask again, so a fix already made is never offered twice.
+  const seenStep = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    if (latestStep === undefined) return;
+    if (seenStep.current === undefined) {
+      seenStep.current = latestStep;
+      return;
+    }
+    if (latestStep !== seenStep.current) {
+      seenStep.current = latestStep;
+      if (open) fetchSuggestions();
+    }
+  }, [latestStep, open, fetchSuggestions]);
 
   // A stopped request may still save its step. Watch history for a step
   // past the one we started from, and hand it to the workspace.
@@ -318,11 +336,21 @@ export default function ChatPanel({
     [input, fileId, sending, onPreview, clearLateChecks, watchForLateStep]
   );
 
+  // Escape stops Chef, as the working line says
+  useEffect(() => {
+    if (!sending) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") abortRef.current?.abort();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [sending]);
+
   // Auto-resize textarea
   const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInput(e.target.value);
     e.target.style.height = "auto";
-    e.target.style.height = Math.min(e.target.scrollHeight, 120) + "px";
+    e.target.style.height = Math.min(e.target.scrollHeight, 160) + "px";
   };
 
   if (!open) return null;
@@ -379,61 +407,63 @@ export default function ChatPanel({
         </div>
       </div>
 
-      {/* Welcome state when no messages */}
+      {/* Welcome: the file is ready, what Chef can see, and where to start */}
       {fileId && messages.length === 0 && (
-        <div className="flex-shrink-0 space-y-4 border-b px-4 py-6">
-          <div className="space-y-2 text-center">
-            <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-md bg-primary/10">
-              <ChefHat className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <p className="text-sm font-medium">{fileName || "Your file"} is ready</p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Ask a question or describe a change.
-              </p>
-              {strict !== null && (
-                <p className="mt-1 text-[11px] text-muted-foreground">
-                  {strict
-                    ? "Chef sees column names and types, never your values."
-                    : "Chef sees column names, types and a few sample rows."}
-                </p>
-              )}
-            </div>
-          </div>
-
-          {loadingSuggestions ? (
-            <div className="flex justify-center py-2">
-              <TextShimmer className="text-xs" duration={1.2}>Analyzing your data…</TextShimmer>
-            </div>
-          ) : suggestions.length > 0 ? (
-            <div className="space-y-1.5">
-              <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                Try one of these
-              </p>
-              {suggestions.map((s, i) => {
-                const fix = columns && onOp ? matchVerb(s.instruction, columns) : null;
-                return (
-                  <button
-                    key={i}
-                    onClick={() => (fix && onOp ? onOp(fix, "insight") : sendMessage(s.instruction))}
-                    className="flex w-full items-center justify-between gap-2 rounded-lg border bg-background px-3 py-2 text-left text-xs text-foreground/80 transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-foreground"
-                  >
-                    <span>{s.text}</span>
-                    <span className="flex-shrink-0 text-[10px] text-muted-foreground">{fix ? "no AI" : "asks Chef"}</span>
-                  </button>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="space-y-1.5">
-              {suggestionsChecked && (
-                <p className="text-center text-xs text-muted-foreground">Nothing to suggest yet.</p>
-              )}
-              <Button variant="outline" size="sm" className="w-full" onClick={fetchSuggestions}>
-                Suggest next steps
-              </Button>
-            </div>
+        <div className="flex-shrink-0 px-4 pb-6 pt-5">
+          <p className="text-[15px] font-medium tracking-[-0.01em]">{fileName || "Your file"} is ready</p>
+          <p className="mt-1 text-[13px] text-muted-foreground">Ask a question about it, or describe a change.</p>
+          {strict !== null && (
+            <p className="mt-0.5 text-[12px] text-muted-foreground">
+              {strict
+                ? "Chef sees column names and types, never your values."
+                : "Chef sees column names, types and a few sample rows."}
+            </p>
           )}
+
+          <div className="mt-4">
+            {loadingSuggestions ? (
+              <div className="py-1">
+                <Thinking label="Reading your columns…" reduced={reduced} />
+              </div>
+            ) : suggestions.length > 0 ? (
+              <>
+                <p className="mb-2 text-[12px] font-medium text-muted-foreground">Try one of these</p>
+                <ul className="divide-y overflow-hidden rounded-lg border bg-background">
+                  {suggestions.map((s, i) => {
+                    const fix = columns && onOp ? matchVerb(s.instruction, columns) : null;
+                    return (
+                      <li key={i}>
+                        <button
+                          onClick={() => (fix && onOp ? onOp(fix, "insight") : sendMessage(s.instruction))}
+                          className="group flex w-full items-start justify-between gap-3 px-3 py-2.5 text-left transition-colors hover:bg-accent"
+                        >
+                          <span className="min-w-0">
+                            <span className="block text-[13px] font-medium text-foreground/90 group-hover:text-foreground">{s.text}</span>
+                            {s.detail && <span className="mt-0.5 block text-[12px] text-muted-foreground">{s.detail}</span>}
+                          </span>
+                          <span
+                            className={cn(
+                              "mt-px flex-shrink-0 rounded-full border px-1.5 py-px text-[10px] font-medium",
+                              fix ? "border-border text-muted-foreground" : "border-primary/30 text-primary-accent",
+                            )}
+                          >
+                            {fix ? "One click" : "Asks Chef"}
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </>
+            ) : (
+              <div className="flex items-center justify-between gap-3">
+                {suggestionsChecked && <p className="text-[12px] text-muted-foreground">Nothing to suggest yet.</p>}
+                <Button variant="outline" size="sm" className="ml-auto" onClick={fetchSuggestions}>
+                  Suggest next steps
+                </Button>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -447,109 +477,133 @@ export default function ChatPanel({
             ? `Chef replied: ${messages[messages.length - 1].content}`
             : ""}
       </div>
-      <div ref={scrollRef} aria-busy={sending} className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
-        {messages.map((msg, i) => (
-          <div key={i} className={cn("flex gap-2", msg.role === "user" ? "justify-end" : "justify-start")}>
-            {msg.role === "assistant" && (
-              <div className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md bg-primary/10">
-                <ChefHat className="h-3 w-3 text-primary" />
-              </div>
-            )}
-            <div
-              className={cn(
-                "max-w-[85%] rounded-md px-3 py-2 text-[13px]",
-                msg.role === "user"
-                  ? "bg-primary text-primary-foreground"
-                  : msg.message_type === "error"
-                  ? "border border-destructive/30 bg-destructive/5 text-destructive-text"
-                  : msg.message_type === "transform"
-                  ? "border border-primary/20 bg-primary/5"
-                  : "border border-border/60 bg-card/85"
-              )}
-            >
-              {msg.message_type === "error" && msg.role === "assistant" && msg.metadata?.code ? (
-                <ErrorBubble
-                  error={explainError({
-                    ...((msg.metadata.payload as object) ?? {}),
-                    code: String(msg.metadata.code),
-                  })}
-                  instruction={
-                    (msg.metadata.instruction as string | undefined) ??
-                    (messages[i - 1]?.role === "user" ? messages[i - 1].content : undefined)
-                  }
-                  onEditRetry={(text) => {
-                    setInput(text);
-                    setTimeout(() => inputRef.current?.focus(), 0);
-                  }}
-                  onRetry={(text) => sendMessage(text)}
-                  onOpenRecipes={onOpenRecipes}
-                />
-              ) : (
-                <p className="whitespace-pre-wrap">{msg.content}</p>
-              )}
-
-              {msg.message_type === "insight" && msg.metadata?.strict === true && (
-                <p className="mt-1 text-[10px] text-muted-foreground">From column names and types only</p>
-              )}
-
-              {msg.message_type === "transform" && !!msg.metadata?.sql && (
-                <div className="mt-1.5 flex flex-wrap items-start gap-x-3">
-                  <SentDisclosure sent={msg.metadata.sent as SentReceipt | undefined} />
-                  <button
-                    onClick={() => setExpandedSql(expandedSql === String(i) ? null : String(i))}
-                    aria-expanded={expandedSql === String(i)}
-                    aria-controls={`sql-${i}`}
-                    className="inline-flex min-h-6 items-center gap-1 text-[11px] font-medium text-primary-accent transition-colors hover:text-primary"
-                  >
-                    <Code2 className="h-3 w-3" /> SQL
-                    <ChevronDown className={cn("h-3 w-3 transition-transform", expandedSql === String(i) && "rotate-180")} />
-                  </button>
-                  {expandedSql === String(i) && (
-                    <pre id={`sql-${i}`} tabIndex={0} role="region" aria-label="Generated SQL" className="mt-1 overflow-x-auto rounded-md bg-muted p-2 font-mono text-[11px]">
-                      {String(msg.metadata.sql)}
-                    </pre>
-                  )}
+      <div className="relative min-h-0 flex-1">
+        <div
+          ref={scrollRef}
+          aria-busy={sending}
+          onScroll={(e) => {
+            const el = e.currentTarget;
+            setAwayFromEnd(el.scrollHeight - el.scrollTop - el.clientHeight > 160);
+          }}
+          className="h-full space-y-5 overflow-y-auto px-4 py-5"
+        >
+          {messages.map((msg, i) => {
+            const isUser = msg.role === "user";
+            const startsTurn = !isUser && messages[i - 1]?.role !== "assistant";
+            if (isUser) {
+              return (
+                <div key={i} className="flex justify-end">
+                  <p className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-muted px-3.5 py-2 text-[13px] leading-relaxed">
+                    {msg.content}
+                  </p>
                 </div>
-              )}
-
-              {msg.message_type === "clarification" && Array.isArray(msg.metadata?.suggestions) && (
-                <div className="mt-2 flex flex-wrap gap-1">
-                  {(msg.metadata.suggestions as string[]).map((s, j) => (
-                    <button
-                      key={j}
-                      onClick={() => sendMessage(s)}
-                      className="rounded-md border border-primary/25 bg-primary/5 px-2 py-1 text-[11px] text-primary transition-colors hover:bg-primary/10"
-                    >
-                      {s}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            {msg.role === "user" && (
-              <div className="mt-0.5 flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md bg-muted">
-                <User className="h-3 w-3 text-muted-foreground" />
+              );
+            }
+            const isError = msg.message_type === "error";
+            const isStep = msg.message_type === "transform";
+            const stepNumber = typeof msg.metadata?.step_number === "number" ? (msg.metadata.step_number as number) : null;
+            return (
+              <div key={i} className="group">
+                {startsTurn && <ChefMark />}
+                {isError && msg.metadata?.code ? (
+                  <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-[13px] text-destructive-text">
+                    <ErrorBubble
+                      error={explainError({
+                        ...((msg.metadata.payload as object) ?? {}),
+                        code: String(msg.metadata.code),
+                      })}
+                      instruction={
+                        (msg.metadata.instruction as string | undefined) ??
+                        (messages[i - 1]?.role === "user" ? messages[i - 1].content : undefined)
+                      }
+                      onEditRetry={(text) => {
+                        setInput(text);
+                        setTimeout(() => inputRef.current?.focus(), 0);
+                      }}
+                      onRetry={(text) => sendMessage(text)}
+                      onOpenRecipes={onOpenRecipes}
+                    />
+                  </div>
+                ) : isError ? (
+                  <p className="text-[13px] text-muted-foreground">{msg.content}</p>
+                ) : isStep ? (
+                  // A change to the file: a card with the step, what it did, and its detail
+                  <div className="overflow-hidden rounded-xl border bg-card shadow-xs">
+                    <div className="flex items-start gap-2.5 px-3 py-2.5">
+                      <span className="mt-0.5 grid h-5 w-5 flex-shrink-0 place-items-center rounded-full bg-success/15">
+                        <Check className="h-3 w-3 text-success-text" />
+                      </span>
+                      <div className="min-w-0 text-[13px] leading-relaxed">
+                        {stepNumber !== null && (
+                          <p className="text-[11px] font-medium text-muted-foreground">Step {stepNumber} applied</p>
+                        )}
+                        <ChatText text={msg.content} />
+                      </div>
+                    </div>
+                    {!!msg.metadata?.sql && (
+                      <div className="border-t px-3 py-1.5">
+                        <div className="flex flex-wrap items-center gap-x-3">
+                          <SentDisclosure sent={msg.metadata.sent as SentReceipt | undefined} />
+                          <button
+                            onClick={() => setExpandedSql(expandedSql === String(i) ? null : String(i))}
+                            aria-expanded={expandedSql === String(i)}
+                            aria-controls={`sql-${i}`}
+                            className="inline-flex min-h-6 items-center gap-1 text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+                          >
+                            <Code2 className="h-3 w-3" /> SQL
+                            <ChevronDown className={cn("h-3 w-3 transition-transform", expandedSql === String(i) && "rotate-180")} />
+                          </button>
+                          {expandedSql !== String(i) && (
+                            <CopyButton text={String(msg.metadata.sql)} label="Copy SQL" className="ml-auto opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100" />
+                          )}
+                        </div>
+                        {expandedSql === String(i) && <SqlBlock sql={String(msg.metadata.sql)} id={`sql-${i}`} />}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-[13px] leading-relaxed">
+                    <ChatText text={msg.content} />
+                    {msg.message_type === "insight" && msg.metadata?.strict === true && (
+                      <p className="mt-1.5 text-[11px] text-muted-foreground">From column names and types only</p>
+                    )}
+                    {msg.message_type === "clarification" && Array.isArray(msg.metadata?.suggestions) && (
+                      <div className="mt-2.5 flex flex-wrap gap-1.5">
+                        {(msg.metadata.suggestions as string[]).map((s, j) => (
+                          <button
+                            key={j}
+                            onClick={() => sendMessage(s)}
+                            className="rounded-full border bg-card px-3 py-1 text-[12px] transition-colors hover:border-foreground/25 hover:bg-accent"
+                          >
+                            {s}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <div className="mt-1 flex h-6 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+                      <CopyButton text={msg.content} className="-ml-1.5" />
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        ))}
+            );
+          })}
 
-        {sending && (
-          <div className="flex gap-2">
-            <div className="flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-md bg-primary/10">
-              <ChefHat className="h-3 w-3 text-primary" />
+          {sending && (
+            <div>
+              {messages[messages.length - 1]?.role !== "assistant" && <ChefMark />}
+              <Thinking label={STAGES[stage]} reduced={reduced} />
             </div>
-            <div className="flex items-center gap-2 rounded-md bg-muted px-3 py-2">
-              <TextShimmer className="text-xs" duration={1}>{STAGES[stage]}</TextShimmer>
-              <button
-                onClick={() => abortRef.current?.abort()}
-                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card/70 px-2.5 py-1 text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground"
-                aria-label="Stop"
-              >
-                <Square className="h-2.5 w-2.5 fill-current" /> Stop
-              </button>
-            </div>
-          </div>
+          )}
+        </div>
+        {awayFromEnd && (
+          <button
+            type="button"
+            onClick={() => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" })}
+            className="absolute bottom-3 left-1/2 inline-flex -translate-x-1/2 items-center gap-1 rounded-full border bg-popover px-3 py-1 text-[12px] text-muted-foreground shadow-md transition-colors hover:text-foreground"
+          >
+            <ArrowDown className="h-3 w-3" /> Latest
+          </button>
         )}
       </div>
 
@@ -582,23 +636,26 @@ export default function ChatPanel({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Input */}
-      <div className="flex-shrink-0 border-t px-3 py-3">
-        <div className="mb-2 flex flex-wrap items-center gap-2">
-          <PrivacyChip onChange={setStrict} />
-          {intercept && onOp && (
-            <button
-              type="button"
-              onClick={async () => {
-                if (await onOp(intercept, "intercept")) setInput("");
-              }}
-              className="inline-flex h-6 items-center gap-1 rounded-full border border-primary/30 bg-primary/5 px-2 text-[11px] font-medium text-primary transition-colors hover:bg-primary/10"
-            >
-              Apply without AI: {intercept.label}
-            </button>
+      {/* Composer: one rounded box holding the text, what Chef will see, and
+          Send, which becomes Stop while Chef works */}
+      <div className="flex-shrink-0 px-3 pb-3 pt-2">
+        {intercept && onOp && (
+          <button
+            type="button"
+            onClick={async () => {
+              if (await onOp(intercept, "intercept")) setInput("");
+            }}
+            className="mb-2 inline-flex h-7 items-center gap-1.5 rounded-full border border-primary/30 bg-primary/[0.06] px-2.5 text-[12px] font-medium text-primary-accent transition-colors hover:bg-primary/10"
+          >
+            Apply without AI: {intercept.label}
+          </button>
+        )}
+        <div
+          className={cn(
+            "rounded-2xl border bg-card shadow-xs transition-[border-color,box-shadow]",
+            "focus-within:border-primary/50 focus-within:ring-[3px] focus-within:ring-primary/15",
           )}
-        </div>
-        <div className="flex items-end gap-2">
+        >
           <textarea
             ref={inputRef}
             value={input}
@@ -617,21 +674,40 @@ export default function ChatPanel({
                 }, 0);
               }
             }}
-            aria-label="Ask Chef anything" placeholder="Ask Chef anything…"
-            className="max-h-[100px] min-h-[40px] flex-1 resize-none rounded-lg border bg-background px-3 py-2 text-sm outline-none transition-shadow placeholder:text-muted-foreground focus:ring-2 focus:ring-ring/30"
+            aria-label="Ask Chef anything"
+            placeholder={sending ? "Chef is working…" : "Ask Chef anything…"}
+            className="block max-h-[160px] min-h-[44px] w-full resize-none bg-transparent px-3.5 pb-1 pt-3 text-[13px] leading-relaxed outline-none placeholder:text-muted-foreground disabled:opacity-60"
             disabled={sending}
             rows={1}
           />
-          <Button
-            size="icon"
-            onClick={() => sendMessage()}
-            onMouseEnter={() => sendIconRef.current?.startAnimation()}
-            onMouseLeave={() => sendIconRef.current?.stopAnimation()}
-            disabled={sending || coolingDown || !input.trim()}
-            aria-label={coolingDown ? "Send (waiting out the rate limit)" : "Send"}
-          >
-            <SendIcon ref={sendIconRef} size={16} />
-          </Button>
+          <div className="flex items-center justify-between gap-2 px-2 pb-2">
+            <PrivacyChip onChange={setStrict} />
+            <div className="flex items-center gap-2">
+              {!sending && input.trim() && (
+                <span className="hidden text-[11px] text-muted-foreground sm:inline">Enter to send · Shift+Enter for a new line</span>
+              )}
+              {sending ? (
+                <button
+                  type="button"
+                  onClick={() => abortRef.current?.abort()}
+                  aria-label="Stop"
+                  className="grid h-8 w-8 place-items-center rounded-full bg-foreground text-background transition-opacity hover:opacity-85"
+                >
+                  <Square className="h-3 w-3 fill-current" />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => sendMessage()}
+                  disabled={coolingDown || !input.trim()}
+                  aria-label={coolingDown ? "Send (waiting out the rate limit)" : "Send"}
+                  className="grid h-8 w-8 place-items-center rounded-full bg-foreground text-background transition-[opacity,background-color] hover:opacity-85 disabled:bg-muted disabled:text-muted-foreground"
+                >
+                  <ArrowUp className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>

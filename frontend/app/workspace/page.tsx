@@ -822,6 +822,13 @@ function WorkspaceContent() {
 
   const latestStep = steps.reduce((n, s) => Math.max(n, s.step_number), 0);
 
+  // The upload's insights describe the file as uploaded. Once it has a step
+  // (a fix, a Chef change, a recipe run on it) they are out of date, so drop
+  // them and let Chef ask for the file as it is now.
+  useEffect(() => {
+    if (latestStep > 0) setUploadInsights(null);
+  }, [latestStep]);
+
   return (
     <ErrorBoundary>
       <div className="relative bg-background">
@@ -847,7 +854,7 @@ function WorkspaceContent() {
         {/* Bad ?file_id= — dead-end recovery */}
         {fileLoadError && !fileReady && (
           <div className="flex min-h-[calc(100vh-56px)] items-center justify-center px-4">
-            <div className="w-full max-w-md rounded-md border bg-card p-8 text-center shadow-sm">
+            <div className="w-full max-w-md rounded-xl border bg-card p-8 text-center shadow-sm">
               {/* eslint-disable-next-line @next/next/no-img-element -- static SVG */}
               <img src="/logo.svg" className="mx-auto mb-3 h-10 w-10 opacity-50" alt="" />
               <h2 className="text-lg font-semibold tracking-tight">This file couldn&apos;t be loaded</h2>
@@ -874,7 +881,7 @@ function WorkspaceContent() {
                 workspace uses gives this phase the left edge instead, and says
                 which of the two states you are looking at. */}
             <div className="flex h-9 items-center gap-3 border-b bg-card px-4 sm:px-6">
-              <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
+              <span className="text-xs font-medium text-muted-foreground">
                 Workspace
               </span>
               <span className="text-xs text-muted-foreground">No file open</span>
@@ -907,7 +914,7 @@ function WorkspaceContent() {
               <div className="grid gap-5 md:grid-cols-2">
                 <div className="space-y-5">
                 <RerunCard recipes={recipes} armedId={armedRecipeId} disabled={loading} onRun={handleRerun} />
-                <div className="rounded-md border bg-card p-6">
+                <div className="rounded-xl border bg-card p-6 shadow-sm">
                   <h2 className="mb-4 text-lg font-semibold tracking-tight">Upload a spreadsheet</h2>
                   <DropZone disabled={loading} onDropFile={onUpload} />
                   {uploadError && (
@@ -916,7 +923,7 @@ function WorkspaceContent() {
                     </div>
                   )}
                   <div className="mt-5 border-t pt-4">
-                    <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    <p className="mb-2 text-xs font-medium text-muted-foreground">
                       No file handy? Try a sample
                     </p>
                     {/* One-frame gate: render the list only after saved intents
@@ -951,7 +958,7 @@ function WorkspaceContent() {
                 </div>
                 <div className="space-y-4">
                   <GettingStarted />
-                  <div className="rounded-md border bg-card p-5">
+                  <div className="rounded-xl border bg-card p-5 shadow-sm">
                     <div className="flex items-start gap-3">
                       <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-primary/10">
                         <Lightbulb className="h-4 w-4 text-primary" />
@@ -1119,7 +1126,7 @@ function WorkspaceContent() {
                   complete it is. Nulls read as the gap and drain as you clean. */}
               {healthColumns.length > 0 && (
                 <div className="flex h-9 flex-shrink-0 items-center gap-3 border-b bg-card px-3">
-                  <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
+                  <span className="text-xs font-medium text-muted-foreground">
                     Columns
                   </span>
                   <ColumnHealth
@@ -1133,10 +1140,10 @@ function WorkspaceContent() {
                   {/* The segments are proportional to column width, so on a
                       phone the narrow ones compress to 14px: too small to read
                       and too small to tap. The row states the count instead. */}
-                  <span className="flex-1 font-mono text-[10px] tabular-nums text-muted-foreground sm:hidden">
+                  <span className="flex-1 text-[11px] tabular-nums text-muted-foreground sm:hidden">
                     {healthColumns.length}
                   </span>
-                  <span className="shrink-0 font-mono text-[10px] tabular-nums text-muted-foreground">
+                  <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
                     {healthColumns.filter((c) => (c.null_pct ?? 0) > 0).length} with gaps
                   </span>
                 </div>

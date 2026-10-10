@@ -2,345 +2,116 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
+import { ArrowRight } from "lucide-react";
+
 import { useAuth } from "@/contexts/AuthContext";
-import {
-  ArrowRight, BookMarked, FileSpreadsheet, History, Lock, MessageSquare, RefreshCw, ShieldCheck, Upload,
-} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import HeroDemo from "@/components/marketing/HeroDemo";
-import ProductShot from "@/components/marketing/ProductShot";
+import Workstation from "@/components/marketing/Workstation";
+import { FigRow } from "@/components/marketing/figs";
+import { COMPOSITES } from "@/components/marketing/visuals";
+import { PRODUCT_PAGES } from "@/components/marketing/product-pages";
+import { Container, FeaturesRow, Prefooter, SectionHead, SiteFooter, Stage } from "@/components/marketing/blocks";
 
-const fadeUp = {
-  initial: { opacity: 0, y: 16 },
-  whileInView: { opacity: 1, y: 0 },
-  viewport: { once: true, margin: "-80px" },
-  transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] as const },
-};
-
-const PILLARS = [
-  {
-    icon: BookMarked,
-    title: "Reusable recipes",
-    body: "Describe the cleanup once. Every future export runs the exact same steps in one click. No re-prompting, no AI drift.",
-  },
-  {
-    icon: Lock,
-    title: "Private by design",
-    body: "By default only column names and types go to the AI, never a value from your file. Strict privacy is on from the start, a guarantee you can show your auditor.",
-  },
-  {
-    icon: History,
-    title: "Every change auditable",
-    body: "Each step stores the instruction, the exact SQL, and row counts before and after. Undo one, or go back to any step.",
-  },
-];
-
-const STEPS = [
-  {
-    icon: Upload,
-    step: "1",
-    title: "Upload any export",
-    body: "CSV, Excel, JSON, or Parquet up to 1M rows. Schema detected instantly, preview in seconds.",
-  },
-  {
-    icon: MessageSquare,
-    step: "2",
-    title: "Describe the cleanup",
-    body: "“Remove duplicates, fix the dates, total by region.” Chef writes validated, read-only SQL and shows you the result live.",
-  },
-  {
-    icon: RefreshCw,
-    step: "3",
-    title: "Save it as a recipe",
-    body: "Next month's file? One click re-applies every step deterministically, with no AI call at all.",
-  },
-];
-
-const SCHEMA_CHIPS = [
-  ["order_id", "VARCHAR"],
-  ["order_date", "DATE"],
-  ["region", "VARCHAR"],
-  ["units", "BIGINT"],
-  ["revenue", "DOUBLE"],
+// Each product page gets a section on the home page, in this order, with a
+// two-line head the way the reference sets them.
+const SECTIONS: { slug: string; title: [string, string]; picture: keyof typeof COMPOSITES }[] = [
+  { slug: "clean", title: ["Fixes", "in one click"], picture: "clean" },
+  { slug: "chef", title: ["Chef", "and plain English"], picture: "chef" },
+  { slug: "recipes", title: ["Recipes", "and replays"], picture: "recipes" },
+  { slug: "privacy", title: ["Privacy", "and history"], picture: "privacy" },
 ];
 
 export default function LandingPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
 
-  // Signed-in users live in the app — the marketing page is for prospects.
-  // The only way back here is signing out.
+  // Signed-in users live in the app; the marketing page is for prospects.
   useEffect(() => {
     if (!loading && user) router.replace("/dashboard");
   }, [user, loading, router]);
 
   return (
     <div className="overflow-x-clip">
-      {/* ── Hero ─────────────────────────────────────────────────── */}
-      <section className="relative">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[480px]"
-          style={{
-            background:
-              "radial-gradient(60% 50% at 50% 0%, hsl(var(--primary) / 0.06), transparent 70%)",
-          }}
-        />
-        <div className="mx-auto max-w-5xl px-4 pb-16 pt-8 text-center sm:px-6 sm:pt-12">
-          <motion.div {...fadeUp}>
-            <Badge variant="secondary" className="mb-4 font-normal text-muted-foreground">
-              For the messy export that lands every month
-            </Badge>
-          </motion.div>
-          <motion.h1
-            {...fadeUp}
-            transition={{ ...fadeUp.transition, delay: 0.05 }}
-            className="mx-auto max-w-3xl text-balance text-4xl font-semibold leading-[1.1] tracking-tight sm:text-6xl"
-          >
-            Clean the same spreadsheet <span className="text-gradient">once. Never again.</span>
-          </motion.h1>
-          <motion.p
-            {...fadeUp}
-            transition={{ ...fadeUp.transition, delay: 0.1 }}
-            className="mx-auto mt-4 max-w-xl text-balance text-lg text-muted-foreground"
-          >
-            Describe your cleanup in plain English, save it as a recipe, and re-run it on every
-            new export in one click. By default the AI sees column names and types, never your values.
-          </motion.p>
-          <motion.div
-            {...fadeUp}
-            transition={{ ...fadeUp.transition, delay: 0.15 }}
-            className="mt-6 flex items-center justify-center gap-3"
-          >
-            <Button size="lg" asChild>
-              <Link href="/auth?mode=signup">
-                Start free <ArrowRight className="ml-1.5 h-4 w-4" />
-              </Link>
-            </Button>
-            <Button size="lg" variant="outline" asChild>
-              <Link href="#how">See how it works</Link>
-            </Button>
-          </motion.div>
-          <motion.p
-            {...fadeUp}
-            transition={{ ...fadeUp.transition, delay: 0.2 }}
-            className="mt-3 text-xs text-muted-foreground"
-          >
-            Free plan · No credit card · First clean file in 2 minutes
-          </motion.p>
-
-          <motion.div {...fadeUp} transition={{ ...fadeUp.transition, delay: 0.25 }} className="mt-10">
-            <HeroDemo />
-          </motion.div>
-        </div>
-      </section>
-
-      {/* ── Pillars ──────────────────────────────────────────────── */}
-      <section id="product" className="border-t bg-card">
-        <div className="mx-auto grid max-w-5xl gap-8 px-4 py-16 sm:grid-cols-3 sm:px-6 sm:py-20">
-          {PILLARS.map((p, i) => (
-            <motion.div key={p.title} {...fadeUp} transition={{ ...fadeUp.transition, delay: 0.06 * i }}>
-              <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg border bg-background">
-                <p.icon className="h-5 w-5 text-primary" />
-              </div>
-              <h3 className="font-medium">{p.title}</h3>
-              <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{p.body}</p>
-            </motion.div>
-          ))}
-        </div>
-      </section>
-
-      {/* ── How it works ─────────────────────────────────────────── */}
-      <section id="how" className="mx-auto max-w-5xl px-4 py-20 sm:px-6 sm:py-24">
-        <motion.div {...fadeUp} className="mb-12 text-center">
-          <h2 className="text-3xl font-semibold tracking-tight">Three steps, then it&apos;s automatic</h2>
-          <p className="mt-3 text-muted-foreground">
-            The first cleanup takes two minutes. Every one after that takes one click.
-          </p>
-        </motion.div>
-        <div className="grid gap-6 sm:grid-cols-3">
-          {STEPS.map((s, i) => (
-            <motion.div
-              key={s.step}
-              {...fadeUp}
-              transition={{ ...fadeUp.transition, delay: 0.08 * i }}
-              className="rounded-lg border bg-card p-6"
-            >
-              <div className="mb-4 flex items-center gap-3">
-                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary-accent">
-                  {s.step}
-                </span>
-                <s.icon className="h-5 w-5 text-muted-foreground" />
-              </div>
-              <h3 className="font-medium">{s.title}</h3>
-              <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{s.body}</p>
-            </motion.div>
-          ))}
-        </div>
-      </section>
-
-      {/* ── The workspace ────────────────────────────────────────── */}
-      <section className="border-t bg-card">
-        <div className="mx-auto max-w-5xl px-4 py-20 sm:px-6 sm:py-24">
-          <motion.div {...fadeUp} className="mb-10 text-center">
-            <h2 className="text-3xl font-semibold tracking-tight">
-              Your data on the left, Chef on the right
-            </h2>
-            <p className="mx-auto mt-3 max-w-xl text-muted-foreground">
-              A live grid of your file next to a chat that edits it. Every change previews
-              instantly, saves as a step, and stays one click from undone.
-            </p>
-          </motion.div>
-          <motion.div {...fadeUp} transition={{ ...fadeUp.transition, delay: 0.1 }}>
-            <ProductShot />
-          </motion.div>
-        </div>
-      </section>
-
-      {/* ── Privacy ──────────────────────────────────────────────── */}
-      <section id="privacy" className="border-t bg-card">
-        <div className="mx-auto grid max-w-5xl items-center gap-10 px-4 py-20 sm:px-6 sm:py-24 md:grid-cols-2">
-          <motion.div {...fadeUp}>
-            <div className="mb-3 inline-flex items-center gap-1.5 rounded-full border bg-background px-3 py-1 text-xs font-medium text-success-text">
-              <ShieldCheck className="h-3.5 w-3.5" /> Privacy first
-            </div>
-            <h2 className="text-3xl font-semibold tracking-tight">
-              By default, the AI never sees your values
-            </h2>
-            <p className="mt-4 leading-relaxed text-muted-foreground">
-              ChatGPT-style tools upload your whole file to the model. SheetsLLM sends a schema
-              summary (column names, types and counts) and runs generated, validated SQL on your
-              data in our sandbox. <span className="font-medium text-foreground">Strict privacy mode</span> is
-              on from the start, so that summary is all that leaves.
-            </p>
-            <p className="mt-3 leading-relaxed text-muted-foreground">
-              For a hard request you can switch sample rows on, and Chef also sees a handful of
-              example rows, never the whole file. Every step shows exactly what it sent, and
-              recipes and one-click fixes send nothing at all.
-            </p>
-          </motion.div>
-          <motion.div {...fadeUp} transition={{ ...fadeUp.transition, delay: 0.1 }}>
-            <div className="rounded-lg border bg-card p-6">
-              <p className="mb-3 text-xs font-medium text-muted-foreground">WHAT THE AI SEES</p>
-              <div className="flex flex-wrap gap-2">
-                {SCHEMA_CHIPS.map(([name, type]) => (
-                  <span
-                    key={name}
-                    className="inline-flex items-center gap-1.5 rounded-lg border bg-muted/60 px-2.5 py-1.5 font-mono text-xs"
-                  >
-                    {name} <span className="text-muted-foreground">{type}</span>
-                  </span>
-                ))}
-              </div>
-              <p className="mb-3 mt-6 text-xs font-medium text-muted-foreground">WHAT STAYS WITH YOU</p>
-              <div className="relative overflow-hidden rounded-lg border">
-                <div className="select-none space-y-0 blur-[5px]" aria-hidden>
-                  {[1, 2, 3].map((r) => (
-                    <div key={r} className="grid grid-cols-4 gap-2 border-b border-border/60 px-3 py-2 font-mono text-xs text-muted-foreground">
-                      <span>ORD-10{r}</span><span>2025-02-0{r}</span><span>North</span><span>1,240.50</span>
-                    </div>
-                  ))}
-                </div>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-background/95 px-3 py-1.5 text-xs font-medium shadow-sm">
-                    <Lock className="h-3.5 w-3.5" /> Your rows stay yours
-                  </span>
-                </div>
+      <div className="relative">
+        {/* Hero: the promise, then the whole product at work */}
+        <section>
+          <Container className="pt-20 sm:pt-[190px]">
+            <h1 className="max-w-[1040px] text-[42px] font-medium leading-[1.02] tracking-[-0.022em] sm:text-[64px] sm:leading-[1]">
+              Clean the same spreadsheet once.
+              <span className="block text-muted-foreground">Never again.</span>
+            </h1>
+            <div className="mt-9 flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+              <p className="max-w-[600px] text-[15px] leading-relaxed text-muted-foreground">
+                Describe the cleanup in plain English or fix it in one click. SheetsLLM keeps every step, and next
+                month&apos;s export runs through the same recipe with no AI call.
+              </p>
+              <div className="flex shrink-0 items-center gap-4">
+                <Button variant="inverse" className="h-9 px-4" asChild>
+                  <Link href="/auth?mode=signup">Start free</Link>
+                </Button>
+                <Link href="/tools" className="group inline-flex items-center gap-1 text-[15px] text-muted-foreground transition-colors hover:text-foreground">
+                  <span className="font-medium text-foreground">Free</span> CSV tools
+                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                </Link>
               </div>
             </div>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* ── Audit trail ──────────────────────────────────────────── */}
-      <section className="mx-auto max-w-5xl px-4 py-20 sm:px-6 sm:py-24">
-        <div className="grid items-center gap-10 md:grid-cols-2">
-          <motion.div {...fadeUp} className="order-2 md:order-1">
-            <div className="rounded-lg border bg-card p-6">
-              <p className="mb-4 text-xs font-medium text-muted-foreground">STEP 2 OF 3</p>
-              <div className="space-y-3 text-sm">
-                <div className="rounded-lg bg-muted/60 px-3 py-2">
-                  <p className="text-xs text-muted-foreground">Instruction</p>
-                  <p className="mt-0.5">&ldquo;Standardize all dates to ISO format&rdquo;</p>
-                </div>
-                <div className="rounded-lg bg-muted/60 px-3 py-2">
-                  <p className="text-xs text-muted-foreground">Generated SQL</p>
-                  <p className="mt-0.5 font-mono text-xs">SELECT * REPLACE(strptime(date, &apos;%d/%m/%Y&apos;)::DATE AS date) FROM data</p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <span className="rounded-lg bg-muted/60 px-3 py-2 text-xs tabular-nums">
-                    <span className="text-muted-foreground">Rows before</span> 4,982
-                  </span>
-                  <span className="rounded-lg bg-muted/60 px-3 py-2 text-xs tabular-nums">
-                    <span className="text-muted-foreground">after</span> 4,982
-                  </span>
-                  <span className="rounded-lg border border-success/30 bg-success/5 px-3 py-2 text-xs font-medium text-success-text">
-                    Reversible
-                  </span>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-          <motion.div {...fadeUp} transition={{ ...fadeUp.transition, delay: 0.1 }} className="order-1 md:order-2">
-            <div className="mb-3 inline-flex items-center gap-1.5 rounded-full border bg-background px-3 py-1 text-xs font-medium">
-              <History className="h-3.5 w-3.5" /> Audit trail
-            </div>
-            <h2 className="text-3xl font-semibold tracking-tight">Show your work</h2>
-            <p className="mt-4 leading-relaxed text-muted-foreground">
-              Every change is stored as an inspectable step: the instruction you gave, the SQL that
-              ran, and the row counts it changed. Undo one step, or go back to any of them.
-              The original file is never touched.
-            </p>
-            <p className="mt-3 leading-relaxed text-muted-foreground">
-              When finance asks &ldquo;what happened to this column?&rdquo;, you have the answer.
-            </p>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* ── Final CTA ────────────────────────────────────────────── */}
-      <section className="px-4 pb-24 sm:px-6">
-        <motion.div
-          {...fadeUp}
-          className="relative mx-auto max-w-4xl overflow-hidden rounded-lg border p-12 text-center"
-        >
-          <div aria-hidden className="absolute inset-0 -z-10 bg-gradient-brand opacity-[0.06]" />
-          <FileSpreadsheet className="mx-auto mb-4 h-8 w-8 text-primary" />
-          <h2 className="text-balance text-3xl font-semibold tracking-tight">
-            Two minutes to your first clean file
-          </h2>
-          <p className="mx-auto mt-3 max-w-md text-muted-foreground">
-            Try it on a sample file before you upload anything of your own.
-          </p>
-          <Button size="lg" className="mt-7" asChild>
-            <Link href="/auth?mode=signup">
-              Start free <ArrowRight className="ml-1.5 h-4 w-4" />
-            </Link>
-          </Button>
-        </motion.div>
-      </section>
-
-      {/* ── Footer ───────────────────────────────────────────────── */}
-      <footer className="border-t">
-        <div className="mx-auto flex max-w-5xl flex-col items-center justify-between gap-4 px-4 py-10 sm:flex-row sm:px-6">
-          <div className="flex items-center gap-2">
-            {/* eslint-disable-next-line @next/next/no-img-element -- static SVG, no optimizer needed */}
-            <img src="/logo.svg" alt="" width={22} height={22} className="h-[22px] w-[22px]" />
-            <span className="text-sm font-medium">SheetsLLM</span>
+          </Container>
+          {/* The frame stands whole on the black page: no panel, no light, no
+              fade. Only the pictures further down fade at their edges. */}
+          <div className="mx-auto mt-12 w-full max-w-[1344px] px-3 sm:mt-10 sm:px-8">
+            <Workstation />
           </div>
-          <nav className="flex items-center gap-6 text-sm text-muted-foreground">
-            <Link href="/pricing" className="hover:text-foreground">Pricing</Link>
-            <Link href="/tools" className="hover:text-foreground">Free tools</Link>
-            <Link href="/#privacy" className="hover:text-foreground">Privacy</Link>
-            <Link href="/auth" className="hover:text-foreground">Sign in</Link>
-          </nav>
-          <p className="text-xs text-muted-foreground">
-            © {new Date().getFullYear()} SheetsLLM
-          </p>
-        </div>
-      </footer>
+        </section>
+
+        {/* Statement: what kind of tool this is, first sentence loud */}
+        <section>
+          <Container className="py-24 sm:py-[128px]">
+            <p className="max-w-[1250px] text-[28px] font-medium leading-[1.12] tracking-[-0.022em] text-muted-foreground sm:text-[48px] sm:leading-[1.05]">
+              <span className="text-foreground">A spreadsheet tool that remembers.</span> Describe a cleanup once, with a
+              click or a sentence. SheetsLLM keeps every step, so next month&apos;s export cleans itself.
+            </p>
+          </Container>
+        </section>
+
+        {/* Figures */}
+        <section>
+          <Container className="pb-24 sm:pb-32">
+            <FigRow />
+          </Container>
+        </section>
+
+        {/* One section per product page */}
+        {SECTIONS.map(({ slug, title, picture }) => {
+          const page = PRODUCT_PAGES.find((p) => p.slug === slug)!;
+          const Picture = COMPOSITES[picture];
+          return (
+            <section key={slug} id={slug} className="scroll-mt-16 border-t">
+              <Container className="pt-20 sm:pt-[136px]">
+                <SectionHead
+                  title={
+                    <>
+                      {title[0]}
+                      <span className="block">{title[1]}</span>
+                    </>
+                  }
+                  body={page.pitch}
+                  href={page.href}
+                  large
+                />
+              </Container>
+              <Container className="mt-10">
+                <Stage wide>
+                  <Picture />
+                </Stage>
+                <FeaturesRow items={page.features} />
+              </Container>
+            </section>
+          );
+        })}
+
+        <Prefooter />
+        <SiteFooter />
+      </div>
     </div>
   );
 }

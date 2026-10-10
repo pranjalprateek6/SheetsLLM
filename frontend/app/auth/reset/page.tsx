@@ -76,7 +76,7 @@ export default function ResetPasswordPage() {
         transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
         className="w-full max-w-sm"
       >
-        <div className="rounded-lg border bg-card p-8">
+        <div className="rounded-xl border bg-card p-8 shadow-sm">
           <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
             <KeyRound className="h-5 w-5 text-primary" />
           </div>

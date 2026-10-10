@@ -9,15 +9,33 @@ import { ONBOARDING_DISMISSED_KEY } from "@/components/GettingStarted";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import UpgradeCta from "@/components/UpgradeCta";
 import { Switch } from "@/components/ui/switch";
-import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+
+function Row({
+  title,
+  description,
+  children,
+}: {
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="grid gap-4 border-t py-7 md:grid-cols-[220px_1fr] md:gap-10">
+      <div>
+        <h2 className="text-sm font-medium">{title}</h2>
+        {description && <p className="mt-1 text-[13px] leading-relaxed text-muted-foreground">{description}</p>}
+      </div>
+      <div className="min-w-0">{children}</div>
+    </section>
+  );
+}
 
 function AccountContent() {
   const { user, signOut } = useAuth();
@@ -105,9 +123,9 @@ function AccountContent() {
   const isPro = tier === "pro";
 
   return (
-    <div className="mx-auto max-w-2xl px-4 pb-16 pt-10 sm:px-6">
-      <h1 className="text-xl font-semibold tracking-tight">Account</h1>
-      <p className="mt-0.5 text-sm text-muted-foreground">
+    <div className="mx-auto max-w-3xl px-4 pb-16 pt-10 sm:px-6">
+      <h1 className="text-2xl font-semibold tracking-[-0.02em]">Account</h1>
+      <p className="mt-1 text-sm text-muted-foreground">
         Your profile, plan, and privacy settings.
       </p>
 
@@ -122,66 +140,60 @@ function AccountContent() {
         </div>
       )}
 
-      {/* Profile */}
-      <section className="mt-8">
-        <h2 className="mb-2.5 font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">Profile</h2>
-        <div className="rounded-md border bg-card p-5">
-          <p className="text-xs text-muted-foreground">Email</p>
-          <p className="mt-0.5 text-sm font-medium">{user?.email}</p>
-        </div>
-      </section>
+      {/* No cards: one hairline per section, the label on the left edge and
+          what you can do on the right, so the page scans down two edges. */}
+      <div className="mt-8 border-b">
+        <Row title="Profile" description="The address you sign in with.">
+          <p className="text-sm font-medium">{user?.email}</p>
+        </Row>
 
-      {/* Plan & usage */}
-      <section className="mt-8">
-        <h2 className="mb-2.5 font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">Plan &amp; usage</h2>
-        <div className="rounded-md border bg-card p-5">
+        <Row
+          title="Plan & usage"
+          description={
+            tier === null
+              ? undefined
+              : isPro
+              ? "1,000 uploads and 5,000 AI requests a month, and unlimited saved recipes."
+              : "50 uploads and 200 AI requests a month, and 1 saved recipe."
+          }
+        >
           {tier === null ? (
             <div className="space-y-3">
               <Skeleton className="h-5 w-32" />
               <Skeleton className="h-4 w-64" />
             </div>
           ) : (
-          <>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <p className="text-sm font-medium">{isPro ? "Pro" : "Free"} plan</p>
-              <Badge variant="secondary" className="font-mono text-[10px] uppercase tracking-wide">{tier ?? "…"}</Badge>
-            </div>
-            {isPro ? (
-              <Button variant="outline" size="sm" onClick={() => setConfirmCancel(true)} disabled={busy}>
-                {busy ? "Working…" : "Cancel subscription"}
-              </Button>
-            ) : (
-              <UpgradeCta reason="account" />
-            )}
-          </div>
-          <p className="mt-1.5 text-xs text-muted-foreground">
-            {isPro
-              ? "1,000 uploads and 5,000 AI requests a month, and unlimited saved recipes."
-              : "50 uploads and 200 AI requests a month, and 1 saved recipe."}
-          </p>
-          <Separator className="my-4" />
-          <UsageCard embedded />
-          </>
-          )}
-        </div>
-      </section>
-
-      {/* Privacy */}
-      <section className="mt-8">
-        <h2 className="mb-2.5 font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">Privacy</h2>
-        <div className="rounded-md border bg-card p-5">
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex items-start gap-3">
-              <ShieldCheck className={`mt-0.5 h-5 w-5 ${privacyMode ? "text-success-text" : "text-muted-foreground"}`} />
-              <div>
-                <p className="text-sm font-medium">Strict privacy mode</p>
-                <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-                  On by default: the AI sees column names and types only, never a value from your
-                  file. Off: it also sees a handful of sample rows to write better SQL.
-                </p>
+            <>
+              <div className="mb-5 flex items-center justify-between gap-3">
+                <p className="text-sm font-medium">{isPro ? "Pro" : "Free"} plan</p>
+                {isPro ? (
+                  <Button variant="outline" size="sm" onClick={() => setConfirmCancel(true)} disabled={busy}>
+                    {busy ? "Working…" : "Cancel subscription"}
+                  </Button>
+                ) : (
+                  <UpgradeCta reason="account" />
+                )}
               </div>
-            </div>
+              <UsageCard embedded />
+            </>
+          )}
+        </Row>
+
+        <Row
+          title="Privacy"
+          description="On by default: the AI sees column names and types only, never a value from your file. Off: it also sees a handful of sample rows to write better SQL."
+        >
+          <div className="flex items-center justify-between gap-4">
+            <p className="flex items-center gap-2 text-sm font-medium">
+              <ShieldCheck
+                className={`h-4 w-4 ${privacyMode === false ? "text-warning-text" : "text-muted-foreground"}`}
+                aria-hidden
+              />
+              Strict privacy mode
+              {privacyMode === false && (
+                <span className="text-xs font-normal text-warning-text">Off: sample rows are sent</span>
+              )}
+            </p>
             <Switch
               checked={!!privacyMode}
               onCheckedChange={togglePrivacy}
@@ -189,32 +201,27 @@ function AccountContent() {
               aria-label="Toggle strict privacy mode"
             />
           </div>
-        </div>
-      </section>
+        </Row>
 
-      {/* Preferences */}
-      {checklistDismissed && (
-        <section className="mt-8">
-          <h2 className="mb-2.5 font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">Preferences</h2>
-          <div className="flex items-center justify-between rounded-md border bg-card p-5">
-            <p className="text-sm text-muted-foreground">Getting-started checklist</p>
-            <Button variant="outline" size="sm" onClick={restoreChecklist}>
-              Show again
+        {checklistDismissed && (
+          <Row title="Preferences" description="Bring back the steps shown to new accounts.">
+            <div className="flex items-center justify-between gap-4">
+              <p className="text-sm font-medium">Getting-started checklist</p>
+              <Button variant="outline" size="sm" onClick={restoreChecklist}>
+                Show again
+              </Button>
+            </div>
+          </Row>
+        )}
+
+        <Row title="Session" description="Sign out of SheetsLLM on this device.">
+          <div className="flex justify-end">
+            <Button variant="outline" size="sm" onClick={handleSignOut}>
+              <LogOut className="h-4 w-4" /> Sign out
             </Button>
           </div>
-        </section>
-      )}
-
-      {/* Session */}
-      <section className="mt-8">
-        <h2 className="mb-2.5 font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">Session</h2>
-        <div className="flex items-center justify-between rounded-md border bg-card p-5">
-          <p className="text-sm text-muted-foreground">Sign out of SheetsLLM on this device.</p>
-          <Button variant="outline" size="sm" onClick={handleSignOut}>
-            <LogOut className="mr-1.5 h-4 w-4" /> Sign out
-          </Button>
-        </div>
-      </section>
+        </Row>
+      </div>
 
       <AlertDialog open={confirmCancel} onOpenChange={setConfirmCancel}>
         <AlertDialogContent>

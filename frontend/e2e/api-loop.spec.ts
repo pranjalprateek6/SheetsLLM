@@ -32,7 +32,12 @@ test("upload, transform, undo, recipe, apply, export", async ({ request }) => {
   expect(up.insights?.suggestions).toContainEqual({
     text: "Remove 12 duplicate rows",
     instruction: "remove duplicate rows",
+    detail: "12 rows repeat another row exactly",
   });
+  // Each suggestion leads with what clicking does; the finding is the detail
+  expect(up.insights?.suggestions).toContainEqual(
+    expect.objectContaining({ text: "Drop rows where Region is empty", instruction: "drop rows where Region is null" }),
+  );
 
   const insights = await (await request.get(`/api/insights/${up.file_id}`)).json();
   expect(Array.isArray(insights.insights?.suggestions)).toBe(true);

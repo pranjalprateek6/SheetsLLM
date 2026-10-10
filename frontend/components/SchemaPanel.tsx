@@ -50,7 +50,7 @@ export default function SchemaPanel({
                   title={onJumpToColumn ? `Show "${col.name}" in the grid` : undefined}
                 >
                   <div className="min-w-0">
-                    <p className="truncate font-mono text-sm">{col.name}</p>
+                    <p className="truncate text-sm font-medium">{col.name}</p>
                     {(col.null_pct !== undefined || col.unique_count !== undefined) && (
                       <p className="mt-0.5 text-xs tabular-nums text-muted-foreground">
                         {col.null_pct !== undefined && `${col.null_pct}% nulls`}
