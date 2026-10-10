@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowRight, Lock } from "lucide-react";
 
 import { Container, Prefooter, SiteFooter } from "@/components/marketing/blocks";
-import { TOOLS } from "@/components/tools/catalog";
+import { relatedTools, TOOLS, type Tool } from "@/components/tools/catalog";
 
 /* Shared shell for the free /tools pages, on the site's system: the 1280px
    measure, a two-column hero (headline left, what it does and the privacy
@@ -22,24 +22,24 @@ export function BrowserOnly({ className }: { className?: string }) {
   );
 }
 
-/** The free tools as a hairline row; `current` is left out. */
-export function ToolRow({ current }: { current?: string }) {
-  const tools = TOOLS.filter((t) => t.href !== current);
+/** Free tools as a hairline row: `tools`, or four related to `current`. */
+export function ToolRow({ current, tools: given }: { current?: string; tools?: Tool[] }) {
+  const tools = given ?? (current ? relatedTools(current) : TOOLS.slice(0, 4));
   return (
-    <div className={`grid border-y sm:grid-cols-2 ${tools.length === 4 ? "lg:grid-cols-4" : "lg:grid-cols-3"} lg:divide-x`}>
+    <div className={`grid border-y sm:grid-cols-2 ${tools.length >= 4 ? "lg:grid-cols-4" : "lg:grid-cols-3"} lg:divide-x`}>
       {tools.map((t) => (
         <Link
           key={t.href}
           href={t.href}
-          className="group flex min-h-[200px] flex-col justify-between gap-8 border-b p-6 transition-colors hover:bg-white/[0.02] lg:border-b-0"
+          className="group flex min-h-[220px] flex-col border-b p-6 transition-colors hover:bg-white/[0.02] lg:border-b-0"
         >
+          {/* Icon, then every title on the same line across the row, and Open
+              pinned to the foot however long the description runs */}
           <t.icon className="h-5 w-5 text-muted-foreground transition-colors group-hover:text-primary-accent" aria-hidden />
-          <span>
-            <span className="block text-[17px] font-medium tracking-[-0.01em]">{t.name}</span>
-            <span className="mt-1.5 block text-[14px] leading-relaxed text-muted-foreground">{t.desc}</span>
-            <span className="mt-4 inline-flex items-center gap-1.5 text-[13px] text-muted-foreground transition-colors group-hover:text-foreground">
-              Open <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
-            </span>
+          <span className="mt-10 block text-[17px] font-medium tracking-[-0.01em]">{t.name}</span>
+          <span className="mt-1.5 block text-[14px] leading-relaxed text-muted-foreground">{t.desc}</span>
+          <span className="mt-auto inline-flex items-center gap-1.5 pt-4 text-[13px] text-muted-foreground transition-colors group-hover:text-foreground">
+            Open <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
           </span>
         </Link>
       ))}

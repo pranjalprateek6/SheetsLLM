@@ -12,6 +12,8 @@ export type Table = {
   rows: string[][];
   /** Non-fatal problems worth telling the user about before they download. */
   warnings: string[];
+  /** The separator papaparse detected, when the table came from a file. */
+  delimiter?: string;
 };
 
 /** Reports how far along a long job is, 0 to 1. */
@@ -86,7 +88,7 @@ function stripBom(s: string): string {
   return s.charCodeAt(0) === 0xfeff ? s.slice(1) : s;
 }
 
-function assembleTable(data: string[][], errs: Papa.ParseError[]): Table {
+function assembleTable(data: string[][], errs: Papa.ParseError[], delimiter?: string): Table {
   if (!data.length) {
     throw new Error("The file appears to be empty. Check that it has at least a header row.");
   }
@@ -119,13 +121,14 @@ function assembleTable(data: string[][], errs: Papa.ParseError[]): Table {
     );
   }
 
-  return { headers, rows, warnings };
+  return { headers, rows, warnings, delimiter };
 }
 
 export function parseCsvFile(file: File, onProgress?: Progress): Promise<Table> {
   return new Promise((resolve, reject) => {
     const data: string[][] = [];
     const errors: Papa.ParseError[] = [];
+    let delimiter: string | undefined;
     let settled = false;
 
     Papa.parse<string[]>(file, {
@@ -135,6 +138,7 @@ export function parseCsvFile(file: File, onProgress?: Progress): Promise<Table> 
         // A fresh parser runs per chunk, so error row numbers restart at zero
         // each time. Rebase them onto the file before they reach the user.
         const offset = data.length;
+        delimiter ??= result.meta.delimiter;
         for (const e of result.errors) {
           errors.push(typeof e.row === "number" ? { ...e, row: e.row + offset } : e);
         }
@@ -150,7 +154,7 @@ export function parseCsvFile(file: File, onProgress?: Progress): Promise<Table> 
         settled = true;
         onProgress?.(1);
         try {
-          resolve(assembleTable(data, errors));
+          resolve(assembleTable(data, errors, delimiter));
         } catch (e) {
           reject(e);
         }
@@ -167,13 +171,14 @@ export function parseCsvFile(file: File, onProgress?: Progress): Promise<Table> 
 /** Serialises in slices so a large table does not block the frame. */
 export async function toCsvAsync(
   table: Pick<Table, "headers" | "rows">,
-  onProgress?: Progress
+  onProgress?: Progress,
+  delimiter = ","
 ): Promise<string> {
   const width = table.headers.length;
   // Papa.unparse ends a header-only table with a line break, and the join
   // below adds its own, which put an empty line after every header until
   // the first unit test for this module caught it.
-  const parts = [Papa.unparse({ fields: table.headers, data: [] }).replace(/\r?\n$/, "")];
+  const parts = [Papa.unparse({ fields: table.headers, data: [] }, { delimiter }).replace(/\r?\n$/, "")];
 
   await inSlices(
     table.rows.length,
@@ -183,7 +188,7 @@ export async function toCsvAsync(
         // the header width the way the {fields, data} form would have.
         r.length === width ? r : Array.from({ length: width }, (_, i) => r[i] ?? "")
       );
-      parts.push(Papa.unparse(slice));
+      parts.push(Papa.unparse(slice, { delimiter }));
     },
     onProgress
   );

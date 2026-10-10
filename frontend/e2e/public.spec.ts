@@ -15,9 +15,13 @@ test("pricing shows both plans", async ({ page }) => {
   await expect(page.getByText("₹499", { exact: false })).toBeVisible();
 });
 
-test("the tools index lists the four free tools", async ({ page }) => {
+test("the tools index lists all twelve free tools", async ({ page }) => {
   await page.goto("/tools");
-  for (const href of ["/tools/csv-cleaner", "/tools/csv-deduplicate", "/tools/csv-splitter", "/tools/json-to-csv"]) {
+  for (const href of [
+    "/tools/csv-cleaner", "/tools/csv-deduplicate", "/tools/csv-find-replace", "/tools/change-case",
+    "/tools/merge-csv", "/tools/csv-splitter", "/tools/csv-columns", "/tools/split-column",
+    "/tools/excel-to-csv", "/tools/json-to-csv", "/tools/csv-to-json", "/tools/csv-delimiter",
+  ]) {
     await expect(page.locator(`a[href="${href}"]`).first()).toBeVisible();
   }
 });

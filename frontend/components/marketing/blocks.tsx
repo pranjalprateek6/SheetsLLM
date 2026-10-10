@@ -154,7 +154,7 @@ export function Prefooter() {
 
 const FOOTER = [
   { title: "Product", links: PRODUCT_PAGES.map((p) => [p.name, p.href] as const).concat([["Pricing", "/pricing"]]) },
-  { title: "Free tools", links: TOOLS.map((t) => [t.short, t.href] as const).concat([["All free tools", "/tools"]]) },
+  { title: "Free tools", links: TOOLS.filter((t) => t.popular).map((t) => [t.short, t.href] as const).concat([["All free tools", "/tools"]]) },
   {
     title: "Account",
     links: [
