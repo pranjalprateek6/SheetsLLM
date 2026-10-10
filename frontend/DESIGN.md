@@ -145,13 +145,10 @@ Duration, easing and distance tokens live at the bottom of `globals.css`.
   the hero and every section fragment loop their real flow like a muted video,
   with a ghost cursor that moves, presses and opens menus (`marketing/ghost.tsx`).
   Each loop plays only while on screen; reduced motion shows the last frame.
-- **The dot ripple.** The whole landing stands on a field of dots at the
-  intersections of a 32px grid (`marketing/GridBackdrop.tsx`, one canvas fixed
-  to the viewport, so the ripples travel with the reader). Slow rings spread from random points and brighten
-  the dots they pass in violet, like a change moving through a sheet. Base dots
-  are `--muted-foreground` at 30%; colours follow the theme; it pauses offscreen
-  and is still under reduced motion. Chosen over beams, a drifting spotlight and
-  filling cells.
+- **Pictures and fades.** The hero's product frame stands whole in a lit panel
+  (a grey wash rising to its foot) and never fades. Every picture below it sits
+  on a spotlight stage whose edges fade into the page (`Stage` in
+  `marketing/blocks.tsx`). There is no animated backdrop: the page is black.
 - Dropdowns and modals animate through `data-state` keyframes, because Radix
   only keeps a closing surface mounted while a CSS *animation* runs.
 - Nothing loops except an explicit loading state (WCAG 2.2.2).
@@ -208,7 +205,7 @@ rather than filled.
   the account is an initial avatar.
 - **Landing.** A two-line 64px headline over a row of subline and calls to
   action; then the whole product in one frame (sidebar, the open file looping
-  its fixes, Chef), fading into a pool of light. Then a 48px statement, the
+  its fixes, Chef), shown whole in a lit panel. Then a 48px statement, the
   figure row (FIG 0.1 to 0.3: isometric line drawings that open, replay and
   follow the cursor), one section per product page (two-line head, copy and
   Learn more, a composite picture on a spotlight stage, and a Features row whose
@@ -248,6 +245,8 @@ rather than filled.
 - **Eyebrows or kickers above headings, and mono uppercase micro-labels.**
 - **Same-size icon cards as page structure.**
 - **An identical entrance animation on every section.**
+- **Animated page backdrops** (the dot ripple, beams, a drifting light). Tried and removed: the page is black, and motion belongs to the product pictures.
+- **A fade on the hero frame.** The first picture is shown whole.
 - **The previous world:** warm paper neutrals, Archivo and JetBrains Mono, 6px
   radius, the emerald-cyan-violet gradient.
 - **Colour as the only carrier of series identity, and any dual-axis chart.**

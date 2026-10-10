@@ -1,6 +1,6 @@
 "use client";
 import { useRef } from "react";
-import { BookMarked, ChefHat, ChevronDown, Clock, FileSpreadsheet, Files, Lock, Search, SquarePen } from "lucide-react";
+import { BookMarked, ChefHat, ChevronDown, FileSpreadsheet, Files, Lock, Search, SquarePen } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import HeroWorkspace from "@/components/marketing/HeroWorkspace";
@@ -8,7 +8,8 @@ import { useScene, type Frame } from "@/components/marketing/ghost";
 
 /* The whole product in one frame, the way the reference opens: the app's
    sidebar, the open file with its steps (the looping HeroWorkspace scene),
-   and Chef beside it. Its foot fades into the page over a soft pool of light.
+   and Chef beside it, shown whole: unlike the pictures further down the page,
+   the hero frame does not fade.
    Sample data throughout. */
 
 type S = { saved: boolean };
@@ -40,9 +41,6 @@ function Sidebar() {
       </div>
       <div className={cn(item, "text-muted-foreground")}>
         <BookMarked className="h-3.5 w-3.5" /> Recipes
-      </div>
-      <div className={cn(item, "text-muted-foreground")}>
-        <Clock className="h-3.5 w-3.5" /> History
       </div>
       <p className="px-2 pb-1 pt-4 text-[11px] font-medium text-faint">Recent files</p>
       {[
@@ -106,12 +104,7 @@ export default function Workstation() {
   const s = useScene(SCENE, 11400, { saved: false }, ref);
   return (
     <div ref={ref} className="relative">
-      {/* The pool of light the frame stands in */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute -inset-x-16 -bottom-24 top-1/3 -z-0 [background:radial-gradient(60%_55%_at_50%_70%,hsl(var(--foreground)/0.09),transparent_70%)]"
-      />
-      <div className="relative [mask-image:linear-gradient(to_bottom,black_72%,transparent)]">
+      <div className="relative">
         <div className="flex overflow-hidden rounded-xl border bg-card shadow-[0_0_0_1px_rgb(0_0_0/0.5),0_40px_80px_-20px_rgb(0_0_0/0.8)]">
           <Sidebar />
           <div className="min-w-0 flex-1">

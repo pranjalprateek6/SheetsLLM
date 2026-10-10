@@ -238,8 +238,10 @@ export default function Header() {
       <div
         className={cn(
           "relative flex items-center justify-between px-4",
-          marketing ? "h-16" : "h-14",
-          fullBleed ? "w-full" : "mx-auto max-w-6xl sm:px-6",
+          marketing ? "h-[72px]" : "h-14",
+          // The public header shares the page's 1280px measure, so the mark and
+          // the nav line up with the content edges below
+          fullBleed ? "w-full" : marketing ? "mx-auto max-w-[1344px] px-5 sm:px-8" : "mx-auto max-w-6xl sm:px-6",
         )}
       >
         {/* Logo: home for prospects, dashboard for signed-in users */}

@@ -80,13 +80,17 @@ export default function ColumnHealth({
               onClick={nullPct > 0 && onFix ? undefined : () => onSelect?.(col.name)}
               aria-label={`${col.name}, ${col.dtype ?? "unknown type"}, ${nullPct}% missing${nullPct > 0 && onFix ? ", fixes" : ""}`}
               style={{ flexGrow: widths?.[col.name] ?? 140, flexBasis: 0, minWidth: 3 }}
-              className="group relative h-full overflow-hidden rounded-[1px] bg-muted transition-colors hover:bg-muted-foreground/25 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+              className={cn(
+                "group relative h-full overflow-hidden rounded-[1px] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring",
+                // The missing share is the exception, so it is the only part with colour
+                nullPct > 0 ? "bg-warning/35 hover:bg-warning/50" : "bg-muted hover:bg-muted-foreground/25",
+              )}
             >
               <span
                 aria-hidden
                 className={cn(
                   "absolute inset-x-0 bottom-0 transition-[height] duration-500 ease-out",
-                  changed ? "bg-primary" : "bg-foreground/45 group-hover:bg-foreground/70"
+                  changed ? "bg-primary" : "bg-foreground/[0.16] group-hover:bg-foreground/30"
                 )}
                 style={{ height: `${complete}%` }}
               />

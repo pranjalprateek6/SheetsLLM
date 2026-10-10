@@ -6,7 +6,6 @@ import { ArrowRight, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Wordmark } from "@/components/Header";
 import { PRODUCT_PAGES } from "@/components/marketing/product-pages";
 
 /* The pieces every public page is built from, after the reference's
@@ -15,18 +14,31 @@ import { PRODUCT_PAGES } from "@/components/marketing/product-pages";
    a features row, a closing call to action and a plain footer. */
 
 export function Container({ className, children }: { className?: string; children: React.ReactNode }) {
-  return <div className={cn("mx-auto w-full max-w-[1200px] px-5 sm:px-8", className)}>{children}</div>;
+  return <div className={cn("mx-auto w-full max-w-[1344px] px-5 sm:px-8", className)}>{children}</div>;
 }
 
 /** Heading on the left, what it means and where to read more on the right. */
-export function SectionHead({ title, body, href, as: H = "h2" }: { title: React.ReactNode; body: string; href?: string; as?: "h1" | "h2" }) {
+export function SectionHead({
+  title,
+  body,
+  href,
+  large,
+  as: H = "h2",
+}: {
+  title: React.ReactNode;
+  body: string;
+  href?: string;
+  /** The home page's section leads run at 22px, as the reference's do */
+  large?: boolean;
+  as?: "h1" | "h2";
+}) {
   return (
     <div className="grid gap-6 md:grid-cols-2 md:gap-12">
-      <H className="max-w-[540px] text-[34px] font-medium leading-[1.05] tracking-[-0.022em] sm:text-[48px]">{title}</H>
-      <div className="max-w-[520px] md:pt-2">
-        <p className="text-[17px] leading-relaxed text-soft">{body}</p>
+      <H className="max-w-[540px] text-[34px] font-medium leading-none tracking-[-0.022em] sm:text-[48px]">{title}</H>
+      <div className="max-w-[560px]">
+        <p className={cn("text-soft", large ? "text-[19px] leading-[1.45] sm:text-[22px]" : "text-[17px] leading-relaxed")}>{body}</p>
         {href && (
-          <Link href={href} className="group mt-6 inline-flex items-center gap-1.5 text-[15px] text-foreground/90 transition-colors hover:text-foreground">
+          <Link href={href} className="group mt-8 inline-flex items-center gap-1.5 text-base text-muted-foreground transition-colors hover:text-foreground">
             Learn more <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
           </Link>
         )}
@@ -74,7 +86,7 @@ export function FeaturesRow({ items }: { items: { name: string; detail: string }
                   <button
                     type="button"
                     onClick={() => setOpen(i)}
-                    className="group inline-flex items-center gap-1.5 rounded-md py-0.5 text-[15px] text-foreground/90 transition-colors hover:text-foreground"
+                    className="group inline-flex items-center gap-1.5 rounded-md py-0.5 text-base text-foreground/90 transition-colors hover:text-foreground"
                   >
                     {f.name}
                     <Plus className="h-3.5 w-3.5 text-muted-foreground transition-transform duration-200 group-hover:rotate-90 group-hover:text-foreground" />
@@ -126,7 +138,7 @@ export function CrossLinks({ current }: { current?: string }) {
 export function Prefooter() {
   return (
     <section className="border-t">
-      <Container className="flex flex-col items-center py-24 text-center sm:py-32">
+      <Container className="flex flex-col items-center py-24 text-center sm:py-[140px]">
         <h2 className="max-w-[760px] text-[40px] font-medium leading-[1] tracking-[-0.022em] sm:text-[72px]">
           Clean it once. Cleaned every month.
         </h2>
@@ -168,10 +180,9 @@ export function SiteFooter() {
     <footer className="border-t">
       <Container className="grid gap-10 py-14 sm:grid-cols-2 lg:grid-cols-[1.6fr_1fr_1fr_1fr]">
         <div>
-          <Wordmark />
-          <p className="mt-3 max-w-[240px] text-[13px] leading-relaxed text-muted-foreground">
-            Clean a spreadsheet once, then let the recipe do it every month.
-          </p>
+          {/* The mark alone, the way the reference signs its footer */}
+          {/* eslint-disable-next-line @next/next/no-img-element -- static SVG */}
+          <img src="/logo.svg" alt="SheetsLLM" width={20} height={20} className="h-5 w-5" />
         </div>
         {FOOTER.map((col) => (
           <div key={col.title}>

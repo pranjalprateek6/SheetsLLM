@@ -44,13 +44,13 @@ export const PRODUCT_PAGES: ProductPage[] = [
     menu: "One-click fixes for the mess every export brings",
     label: "Clean",
     headline: "Fix the usual mess in one click",
-    lead: "Trim, dedupe, fill, rename, sort and change types from any column. The common fixes cost no AI request and show the result before anything is saved.",
+    lead: "Trim, dedupe, fill, rename, sort and change types from any column. The common fixes cost no AI request, and every one is a step you can undo.",
     pitch: "Insights find the duplicates, gaps and odd formats for you, and every fix is one click from the column it belongs to.",
     features: [
       { name: "Column menu", detail: "Every column carries its own fixes: trim, fill, drop empty rows, dedupe, standardise dates, rename." },
       { name: "Insights", detail: "On upload, SheetsLLM counts duplicates, empty cells and mixed formats, and offers the fix beside each." },
       { name: "Column health", detail: "A strip above the grid shows how complete every column is, so the gaps are visible before you scroll." },
-      { name: "Preview first", detail: "Each fix shows the rows before and after, and nothing is saved until you keep it." },
+      { name: "Undo in one click", detail: "Every fix is saved as a step with the rows before and after, so undoing it is one click." },
     ],
     blocks: [
       {
@@ -63,7 +63,7 @@ export const PRODUCT_PAGES: ProductPage[] = [
         ],
       },
       {
-        heading: "See it before you keep it",
+        heading: "See exactly what changed",
         body: "A fix shows exactly what it changed: rows before and after, and the cells it touched wash in violet for a moment so you can find them.",
         visual: "history",
         cells: [
@@ -80,7 +80,7 @@ export const PRODUCT_PAGES: ProductPage[] = [
     menu: "Describe a change in a sentence and get checked SQL",
     label: "Chef, the AI",
     headline: "Say it in a sentence, get checked SQL",
-    lead: "For everything a column menu cannot do, ask Chef. It writes read-only SQL against your file, validates it, and shows the result before you keep it.",
+    lead: "For everything a column menu cannot do, ask Chef. It writes read-only SQL against your file, validates it, and applies it as a step you can undo.",
     pitch: "Chef reads the shape of your file, not its contents, and writes validated read-only SQL you can inspect on every step.",
     features: [
       { name: "Plain English", detail: "Ask for a margin column, a split name, a filter or a pivot, in your own words." },

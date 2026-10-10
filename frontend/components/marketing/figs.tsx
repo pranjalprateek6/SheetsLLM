@@ -224,11 +224,11 @@ export function FigRow() {
   const [hover, setHover] = useState<number | null>(null);
   const [pointer, setPointer] = useState<number | null>(null);
   return (
-    <div className="grid border-y md:grid-cols-3 md:divide-x">
+    <div className="grid md:grid-cols-3 md:divide-x">
       {FIGS.map((f, i) => (
         <div
           key={f.n}
-          className="relative px-6 pb-10 pt-6 md:px-8"
+          className="relative px-6 pb-10 pt-6 md:px-8 md:first:pl-0"
           onMouseEnter={() => setHover(i)}
           onMouseLeave={() => {
             setHover(null);
