@@ -136,63 +136,104 @@ export function FigSteps({ active }: { active: boolean }) {
 
 /* ---------------------------------------------------------- FIG 0.3 */
 
-const PLATES = 15;
+// Column plates standing side by side along x, each thin in x and deep in y.
+// Their geometry lives in the drawing's own units, so the cursor is converted
+// into the same units and every plate answers to its true distance from it.
+const PLATES = 16;
+const PITCH = 15;
+const THICK = 5;
+const DEPTH = 88;
+const X0 = -((PLATES - 1) * PITCH) / 2 - THICK / 2;
+const plateX = (i: number) => X0 + i * PITCH;
+/** Where a plate's centre falls across the drawing, in viewBox units */
+const plateScreenX = (i: number) => (plateX(i) + THICK / 2) * C30;
+
+const LOW = 12; // what the plates settle to beside the cursor
+const PEAK = 128; // the tallest a plate rises under it
+const REACH = 34; // how far the bump spreads, in viewBox units
+
+/** The resting skyline: a soft hill a little behind the middle */
 const REST = Array.from({ length: PLATES }, (_, i) => {
-  // A resting skyline: tallest a third of the way in, falling away
   const t = i / (PLATES - 1);
-  return 18 + 120 * Math.exp(-Math.pow((t - 0.62) / 0.28, 2));
+  return 22 + 70 * Math.exp(-Math.pow((t - 0.4) / 0.32, 2));
 });
 
-/** Column plates whose heights follow the cursor across the drawing. */
-export function FigPlates({ pointer }: { pointer: number | null }) {
+/** Column plates that rise under the cursor and settle back when it leaves. */
+export function FigPlates({ pointer }: { pointer: { x: number; y: number } | null }) {
   const reduced = useReducedMotion();
+  const svg = useRef<SVGSVGElement>(null);
   const [heights, setHeights] = useState(REST);
-  const target = useRef(REST);
+  const h = useRef(REST.slice());
+  const v = useRef(REST.map(() => 0));
+  const target = useRef(REST.slice());
   const raf = useRef(0);
+  const [cursorX, setCursorX] = useState<number | null>(null);
 
   useEffect(() => {
+    // The cursor, in the drawing's units
+    let cx: number | null = null;
+    const el = svg.current;
+    if (pointer && el && !reduced) {
+      const m = el.getScreenCTM();
+      if (m) {
+        const pt = new DOMPoint(pointer.x, pointer.y).matrixTransform(m.inverse());
+        cx = pt.x;
+      }
+    }
+    setCursorX(cx);
     target.current =
-      pointer === null || reduced
+      cx === null
         ? REST
         : REST.map((_, i) => {
-            const t = i / (PLATES - 1);
-            return 14 + 132 * Math.exp(-Math.pow((t - pointer) / 0.16, 2));
+            const d = plateScreenX(i) - cx!;
+            return LOW + (PEAK - LOW) * Math.exp(-(d * d) / (2 * REACH * REACH));
           });
+
+    if (reduced) {
+      h.current = target.current.slice();
+      setHeights(h.current);
+      return;
+    }
+    // A light spring per plate: quick to answer, a touch of give, then still
     cancelAnimationFrame(raf.current);
     const step = () => {
       let moving = false;
-      setHeights((h) =>
-        h.map((v, i) => {
-          const d = target.current[i] - v;
-          if (Math.abs(d) > 0.4) moving = true;
-          return v + d * 0.16;
-        }),
-      );
+      for (let i = 0; i < PLATES; i++) {
+        v.current[i] = (v.current[i] + (target.current[i] - h.current[i]) * 0.16) * 0.7;
+        h.current[i] += v.current[i];
+        if (Math.abs(v.current[i]) > 0.05 || Math.abs(target.current[i] - h.current[i]) > 0.3) moving = true;
+      }
+      setHeights(h.current.slice());
       if (moving) raf.current = requestAnimationFrame(step);
     };
     raf.current = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf.current);
   }, [pointer, reduced]);
 
-  const peak = heights.indexOf(Math.max(...heights));
+  // The plate nearest the cursor is the one marked in violet
+  let nearest = -1;
+  if (cursorX !== null) {
+    let best = Infinity;
+    for (let i = 0; i < PLATES; i++) {
+      const d = Math.abs(plateScreenX(i) - cursorX);
+      if (d < best) {
+        best = d;
+        nearest = i;
+      }
+    }
+  }
+
+  // Tallest point: a back corner at full height. viewBox leaves room for it.
   return (
-    <svg viewBox="-170 -150 340 300" overflow="visible" className="h-full w-full" aria-hidden>
-      <g transform="translate(0 70)">
-        {heights.map((h, i) => {
-          // Plates run along x, each thin in x and deep in y
-          const x = -130 + i * 15;
-          return (
-            <Box
-              key={i}
-              x={x}
-              y={-40 + i * -2}
-              z={0}
-              w={5}
-              d={90}
-              h={h}
-              stroke={pointer !== null && i === peak ? VIOLET : h > 60 ? LINE_HI : LINE}
-            />
-          );
+    <svg ref={svg} viewBox="-160 -170 320 320" overflow="visible" className="h-full w-full" aria-hidden>
+      <g transform="translate(0 40)">
+        {heights.map((ht, i) => {
+          const lit = Math.min(1, Math.max(0, (ht - LOW) / (PEAK - LOW)));
+          const stroke =
+            i === nearest && ht > 60
+              ? VIOLET
+              : `hsl(var(--foreground) / ${(0.26 + lit * 0.5).toFixed(3)})`;
+          return <Box key={i} x={plateX(i)} y={-DEPTH / 2} z={0} w={THICK} d={DEPTH} h={ht} stroke={stroke} />;
         })}
       </g>
     </svg>
@@ -224,7 +265,7 @@ const FIGS = [
 
 export function FigRow() {
   const [hover, setHover] = useState<number | null>(null);
-  const [pointer, setPointer] = useState<number | null>(null);
+  const [pointer, setPointer] = useState<{ x: number; y: number } | null>(null);
   return (
     <div className="grid md:grid-cols-3 md:divide-x">
       {FIGS.map((f, i) => (
@@ -237,9 +278,7 @@ export function FigRow() {
             if (f.kind === "plates") setPointer(null);
           }}
           onMouseMove={(e) => {
-            if (f.kind !== "plates") return;
-            const r = e.currentTarget.getBoundingClientRect();
-            setPointer(Math.min(1, Math.max(0, (e.clientX - r.left - 32) / (r.width - 64))));
+            if (f.kind === "plates") setPointer({ x: e.clientX, y: e.clientY });
           }}
         >
           <p className="font-mono text-[11px] text-faint">{f.n}</p>
