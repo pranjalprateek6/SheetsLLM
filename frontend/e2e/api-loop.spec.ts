@@ -95,3 +95,52 @@ test("upload, transform, undo, recipe, apply, export", async ({ request }) => {
   await request.delete(`/api/files/${up.file_id}`);
   await request.delete(`/api/files/${up2.file_id}`);
 });
+
+test("month two with a renamed column: matched, reported, remembered", async ({ request }) => {
+  const upload = async (name: string) =>
+    (
+      await request.post("/api/upload", {
+        multipart: { file: { name, mimeType: "text/csv", buffer: readFileSync(join(fixtures, name)) } },
+      })
+    ).json();
+
+  const oct = await upload("orders_oct.csv");
+  const fix = await request.post("/api/transform/op", { data: { file_id: oct.file_id, op: "dedupe" } });
+  expect(fix.ok()).toBe(true);
+  const recipe = await (await request.post("/api/recipes", { data: { file_id: oct.file_id, name: "Drift check (e2e)" } })).json();
+
+  try {
+    // November renamed Customer Email to Email: a question, with a guess
+    const drift = await upload("orders_nov_drift.csv");
+    const asked = await request.post(`/api/recipes/${recipe.recipe_id}/apply`, { data: { file_id: drift.file_id } });
+    expect(asked.status()).toBe(400);
+    const question = await asked.json();
+    expect(question.code).toBe("RECIPE_INCOMPATIBLE");
+    expect(question.missing).toEqual(["Customer Email"]);
+    expect(question.suggested_map).toEqual({ "Customer Email": "Email" });
+
+    // Run with the match: the output keeps the recipe's name, and the report
+    // sets each step beside October
+    const ran = await request.post(`/api/recipes/${recipe.recipe_id}/apply`, {
+      data: { file_id: drift.file_id, column_map: { "Customer Email": "Email" }, remember: true },
+    });
+    expect(ran.ok()).toBe(true);
+    const run = await ran.json();
+    expect(run.preview.columns).toContain("Customer Email");
+    expect(run.preview.columns).not.toContain("Email");
+    expect(run.remembered).toBe(true);
+    expect(run.report.steps.map((s: { instruction: string }) => s.instruction)).toEqual([
+      "Match columns: Email as Customer Email",
+      "Remove duplicate rows",
+    ]);
+    expect(run.report.compared_with.kind).toBe("source");
+
+    // Remembered: the next file with the new name just runs
+    const again = await upload("orders_nov_drift.csv");
+    const next = await request.post(`/api/recipes/${recipe.recipe_id}/apply`, { data: { file_id: again.file_id } });
+    expect(next.ok()).toBe(true);
+    expect((await next.json()).report.compared_with.kind).toBe("last_run");
+  } finally {
+    await request.delete(`/api/recipes/${recipe.recipe_id}`);
+  }
+});

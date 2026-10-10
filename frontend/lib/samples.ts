@@ -8,10 +8,25 @@ export type SampleDataset = {
   file: string; // path under /public
   uploadName: string; // filename recorded on upload
   description: string;
+  /** Curated starter prompts; empty to show the upload's own fixes instead */
   suggestions: string[];
+  /** Next month's file, offered once a recipe is saved from this one */
+  next?: { file: string; uploadName: string; label: string };
 };
 
 export const SAMPLE_DATASETS: SampleDataset[] = [
+  {
+    // The product in one minute: fix October, save the recipe, run it on
+    // November. From frontend/e2e/fixtures/generate.mjs --samples, the same
+    // files the end-to-end tests use.
+    id: "orders",
+    name: "Monthly orders",
+    file: "/samples/orders_oct.csv",
+    uploadName: "orders_oct.csv",
+    description: "October's export: duplicate orders, empty regions, two date formats. November's is ready for your recipe.",
+    suggestions: [],
+    next: { file: "/samples/orders_nov.csv", uploadName: "orders_nov.csv", label: "November's orders" },
+  },
   {
     id: "sales",
     name: "Sales Data",

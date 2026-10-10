@@ -5,7 +5,7 @@ import { BookOpen } from "lucide-react";
 
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
 import { track } from "@/lib/track";
-import type { RecipeApplyResult } from "@/components/RecipesDrawer";
+import { applyRecipe, type MatchNeeded, type RecipeApplyResult, type RunSource } from "@/lib/recipe-run";
 
 type HintRecipe = { id: string; name: string; steps: number };
 
@@ -29,11 +29,13 @@ export default function RecipeHint({
   fileId,
   enabled,
   onApplied,
+  onNeedsMatch,
 }: {
   fileId?: string;
   /** False once the file has steps, or while another change bar is showing. */
   enabled: boolean;
   onApplied: (result: RecipeApplyResult) => void;
+  onNeedsMatch?: (need: MatchNeeded, from: RunSource) => void;
 }) {
   const [recipe, setRecipe] = useState<HintRecipe | null>(null);
   const [applying, setApplying] = useState(false);
@@ -68,20 +70,14 @@ export default function RecipeHint({
   const apply = async () => {
     setApplying(true);
     try {
-      const res = await fetchWithAuth(`/api/recipes/${recipe.id}/apply`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ file_id: fileId, from: "hint" }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        toast.error(data.message || "Couldn't apply the recipe.");
+      const out = await applyRecipe(recipe, fileId, { from: "hint" });
+      if (out.kind === "error") {
+        toast.error(out.text);
         return;
       }
       setRecipe(null);
-      onApplied(data as RecipeApplyResult);
-    } catch {
-      toast.error("Couldn't apply the recipe. Check your connection.");
+      if (out.kind === "match") onNeedsMatch?.(out.need, "hint");
+      else onApplied(out.result);
     } finally {
       setApplying(false);
     }
