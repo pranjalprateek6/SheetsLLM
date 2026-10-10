@@ -12,6 +12,7 @@ export const metadata: Metadata = {
 export default function Page() {
   return (
     <ToolShell
+      href="/tools/csv-cleaner"
       title="CSV cleaner"
       intro="One-click hygiene for messy exports: trim stray whitespace, drop fully empty rows and columns, and collapse repeated spaces, then download the cleaned file."
       steps={[

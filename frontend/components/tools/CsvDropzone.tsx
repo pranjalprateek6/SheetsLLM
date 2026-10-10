@@ -30,6 +30,9 @@ export default function CsvDropzone({ hint, onTable, onStart }: Props) {
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [oversize, setOversize] = useState<File | null>(null);
+  // Once a file is in, the drop zone steps back to a slim bar so the
+  // tool's options lead; it still takes a new file or a drop
+  const [loaded, setLoaded] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const read = async (file: File) => {
@@ -41,6 +44,7 @@ export default function CsvDropzone({ hint, onTable, onStart }: Props) {
     try {
       const table = await parseCsvFile(file, setProgress);
       onTable(table, file.name);
+      setLoaded(true);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not read the file.");
     } finally {
@@ -64,7 +68,8 @@ export default function CsvDropzone({ hint, onTable, onStart }: Props) {
     <div>
       <label
         className={cn(
-          "group flex cursor-pointer items-center justify-center rounded-xl border-2 border-dashed border-border p-8 transition-colors hover:border-primary/50 hover:bg-primary/[0.03] focus-within:border-primary focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2",
+          "group flex cursor-pointer items-center justify-center rounded-xl border-2 border-dashed border-border transition-colors hover:border-primary/50 hover:bg-primary/[0.03] focus-within:border-primary focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2",
+          loaded && !reading ? "px-4 py-3" : "p-10",
           dragging && "border-primary bg-primary/[0.05]",
           reading && "cursor-progress opacity-60"
         )}
@@ -96,11 +101,18 @@ export default function CsvDropzone({ hint, onTable, onStart }: Props) {
             e.target.value = "";
           }}
         />
-        <div className="text-center">
-          <Upload className="mx-auto mb-2 h-6 w-6 text-primary" />
-          <p className="text-sm font-medium">{reading ? "Reading…" : "Choose a CSV file"}</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>
-        </div>
+        {loaded && !reading ? (
+          <p className="flex items-center gap-2 text-[13px] text-muted-foreground">
+            <Upload className="h-4 w-4 text-primary-accent" aria-hidden />
+            <span className="font-medium text-foreground">Choose another file</span> or drop it here
+          </p>
+        ) : (
+          <div className="text-center">
+            <Upload className="mx-auto mb-2 h-6 w-6 text-primary-accent" />
+            <p className="text-sm font-medium">{reading ? "Reading…" : "Choose a CSV file"}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">{hint}</p>
+          </div>
+        )}
       </label>
 
       {reading && <ProgressBar value={progress} label="Reading the file" />}

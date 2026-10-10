@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { PRODUCT_PAGES } from "@/components/marketing/product-pages";
+import { TOOLS } from "@/components/tools/catalog";
 
 /* The pieces every public page is built from, after the reference's
    system: a 1200px measure, 48px two-line section heads with the copy on the
@@ -153,15 +154,7 @@ export function Prefooter() {
 
 const FOOTER = [
   { title: "Product", links: PRODUCT_PAGES.map((p) => [p.name, p.href] as const).concat([["Pricing", "/pricing"]]) },
-  {
-    title: "Free tools",
-    links: [
-      ["CSV cleaner", "/tools/csv-cleaner"],
-      ["Remove duplicates", "/tools/csv-deduplicate"],
-      ["Split a CSV", "/tools/csv-splitter"],
-      ["JSON to CSV", "/tools/json-to-csv"],
-    ] as const,
-  },
+  { title: "Free tools", links: TOOLS.map((t) => [t.short, t.href] as const).concat([["All free tools", "/tools"]]) },
   {
     title: "Account",
     links: [

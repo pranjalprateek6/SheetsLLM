@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { ArrowRight, Copy, FileJson, Scissors, Sparkles } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { SiteFooter } from "@/components/marketing/blocks";
+import { Container, Prefooter, SiteFooter } from "@/components/marketing/blocks";
+import { BrowserOnly, ToolRow } from "@/components/tools/ToolShell";
 
 export const metadata: Metadata = {
   title: "Free CSV & JSON Tools: Private, In-Browser, No Signup",
@@ -11,81 +9,32 @@ export const metadata: Metadata = {
   alternates: { canonical: "/tools" },
 };
 
-const TOOLS = [
-  {
-    href: "/tools/csv-deduplicate",
-    icon: Copy,
-    name: "CSV duplicate remover",
-    desc: "Delete duplicate rows, matching on the whole row or specific columns.",
-  },
-  {
-    href: "/tools/json-to-csv",
-    icon: FileJson,
-    name: "JSON to CSV converter",
-    desc: "Flatten a JSON array into a spreadsheet-ready CSV, nested keys included.",
-  },
-  {
-    href: "/tools/csv-splitter",
-    icon: Scissors,
-    name: "CSV splitter",
-    desc: "Split a huge CSV into Excel-safe parts, each keeping the header row.",
-  },
-  {
-    href: "/tools/csv-cleaner",
-    icon: Sparkles,
-    name: "CSV cleaner",
-    desc: "Trim whitespace, drop empty rows and columns, collapse double spaces.",
-  },
-];
-
 export default function ToolsIndex() {
   return (
-    <>
-    <div className="mx-auto max-w-3xl px-4 pb-20 pt-14 sm:px-6">
-      <h1 className="text-[40px] font-medium leading-none tracking-[-0.022em] sm:text-[48px]">Free CSV &amp; JSON tools</h1>
-      <p className="mt-3 max-w-xl text-[17px] leading-relaxed text-muted-foreground">
-        Quick fixes for messy data files. Every tool runs entirely in your browser.
-        No upload, no signup, no data collection.
-      </p>
-
-      {/* A list, not a wall of icon tiles: the names are what you scan */}
-      <ul className="mt-10 divide-y overflow-hidden rounded-xl border bg-card shadow-sm">
-        {TOOLS.map((t) => (
-          <li key={t.href}>
-            <Link
-              href={t.href}
-              className="group flex items-center gap-4 px-5 py-4 transition-colors hover:bg-accent/60 focus-visible:bg-accent/60 focus-visible:outline-none"
-            >
-              <t.icon className="h-4 w-4 shrink-0 text-muted-foreground transition-colors group-hover:text-primary-accent" aria-hidden />
-              <div className="min-w-0 flex-1">
-                <h2 className="text-[15px] font-medium">{t.name}</h2>
-                <p className="mt-0.5 text-sm text-muted-foreground">{t.desc}</p>
-              </div>
-              <ArrowRight
-                className="h-4 w-4 shrink-0 -translate-x-1 text-muted-foreground opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100"
-                aria-hidden
-              />
-            </Link>
-          </li>
-        ))}
-      </ul>
-
-      <div className="mt-12 flex flex-col items-start gap-5 rounded-xl border bg-canvas p-6 sm:flex-row sm:items-center sm:justify-between sm:p-8">
-        <div className="max-w-md">
-          <h2 className="text-lg font-semibold tracking-[-0.015em]">Same cleanup every week? Stop doing it by hand.</h2>
-          <p className="mt-1.5 text-sm text-muted-foreground">
-            SheetsLLM turns any cleanup into a saved recipe you re-run on every new export,
-            described in plain English. By default the AI sees column names and types, never your values.
-          </p>
-        </div>
-        <Button variant="inverse" className="shrink-0" asChild>
-          <Link href="/auth?mode=signup">
-            Try SheetsLLM free <ArrowRight className="h-4 w-4" />
-          </Link>
-        </Button>
-      </div>
+    <div className="overflow-x-clip">
+      <section>
+        <Container className="pb-14 pt-16 sm:pb-16 sm:pt-24">
+          <div className="grid gap-6 md:grid-cols-2 md:items-end md:gap-12">
+            <h1 className="text-[40px] font-medium leading-none tracking-[-0.022em] sm:text-[56px]">
+              Free CSV &amp; JSON tools
+            </h1>
+            <div className="max-w-[560px]">
+              <p className="text-[17px] leading-relaxed text-soft">
+                Quick fixes for messy data files: clean, dedupe, split and convert. No signup, and nothing is
+                uploaded anywhere.
+              </p>
+              <BrowserOnly className="mt-4" />
+            </div>
+          </div>
+        </Container>
+      </section>
+      <section>
+        <Container className="pb-20 sm:pb-28">
+          <ToolRow />
+        </Container>
+      </section>
+      <Prefooter />
+      <SiteFooter />
     </div>
-    <SiteFooter />
-    </>
   );
 }

@@ -12,6 +12,7 @@ export const metadata: Metadata = {
 export default function Page() {
   return (
     <ToolShell
+      href="/tools/csv-splitter"
       title="CSV splitter"
       intro="Break a large CSV into smaller numbered files, each with the original header row, so they open cleanly in Excel and other tools."
       steps={[
