@@ -24,18 +24,6 @@ const TOOLS = [
   { href: "/tools/json-to-csv", name: "JSON to CSV", body: "Flatten JSON into a spreadsheet." },
 ];
 
-/** A product visual standing on the dot grid, which fades out around it. */
-function OnGrid({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="relative">
-      <GridBackdrop
-        className="-inset-x-10 -inset-y-12 h-[calc(100%+96px)] w-[calc(100%+80px)] [mask-image:radial-gradient(ellipse_closest-side,black_55%,transparent)]"
-      />
-      <div className="relative">{children}</div>
-    </div>
-  );
-}
-
 function Section({
   title,
   body,
@@ -53,11 +41,11 @@ function Section({
 }) {
   return (
     <section id={id} className="scroll-mt-20 border-t">
-      <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 py-20 sm:px-6 md:py-28 lg:grid-cols-2 lg:gap-16">
+      <div className="mx-auto grid max-w-6xl items-center gap-8 px-4 py-10 sm:px-6 md:py-14 lg:grid-cols-2 lg:gap-12">
         <div className={cn("max-w-md", flip && "lg:order-2")}>
-          <h2 className="text-3xl font-semibold tracking-[-0.025em] sm:text-[40px] sm:leading-[1.1]">{title}</h2>
-          <p className="mt-4 text-[17px] leading-relaxed text-muted-foreground">{body}</p>
-          <ul className="mt-6 space-y-2.5">
+          <h2 className="text-[28px] font-semibold leading-[1.15] tracking-[-0.025em] sm:text-[34px]">{title}</h2>
+          <p className="mt-3 text-base leading-relaxed text-muted-foreground">{body}</p>
+          <ul className="mt-5 space-y-2">
             {points.map((p) => (
               <li key={p} className="flex gap-2.5 text-[15px]">
                 <Check className="mt-1 h-4 w-4 shrink-0 text-primary-accent" aria-hidden />
@@ -67,7 +55,7 @@ function Section({
           </ul>
         </div>
         <div className={cn(flip && "lg:order-1")}>
-          <OnGrid>{visual}</OnGrid>
+          {visual}
         </div>
       </div>
     </section>
@@ -85,12 +73,13 @@ export default function LandingPage() {
 
   return (
     <div className="overflow-x-clip">
+      {/* One dot field for the whole page, fixed to the viewport so the
+          ripples travel with you as you scroll. Content stacks above it. */}
+      <GridBackdrop className="fixed inset-0 h-screen w-screen [mask-image:radial-gradient(ellipse_110%_90%_at_60%_35%,black_45%,rgb(0_0_0/0.4))]" />
+      <div className="relative">
       {/* Hero */}
-      <section className="relative">
-        <GridBackdrop
-          className="inset-0 h-full w-full [mask-image:radial-gradient(ellipse_75%_70%_at_70%_40%,black,transparent_80%)]"
-        />
-        <div className="relative mx-auto grid max-w-6xl items-center gap-12 px-4 pb-20 pt-14 sm:px-6 sm:pt-20 lg:grid-cols-[0.9fr_1.1fr] lg:gap-14 lg:pb-28">
+      <section>
+        <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 pb-12 pt-10 sm:px-6 sm:pt-14 lg:grid-cols-[0.9fr_1.1fr] lg:gap-12 lg:pb-16">
           <div>
             <h1 className="text-[44px] font-semibold leading-[1.02] tracking-[-0.035em] sm:text-6xl">
               Clean the same spreadsheet once.
@@ -117,10 +106,10 @@ export default function LandingPage() {
       </section>
 
       {/* Proof strip: three facts, not three cards */}
-      <section className="border-t bg-canvas">
+      <section className="border-t bg-canvas/70 backdrop-blur-[1px]">
         <ul className="mx-auto grid max-w-6xl divide-y px-4 sm:px-6 md:grid-cols-3 md:divide-x md:divide-y-0">
           {PROOF.map((p) => (
-            <li key={p} className="flex items-center gap-2.5 py-5 text-[15px] font-medium md:justify-center md:px-6">
+            <li key={p} className="flex items-center gap-2.5 py-4 text-[15px] font-medium md:justify-center md:px-6">
               <Check className="h-4 w-4 shrink-0 text-primary-accent" aria-hidden /> {p}
             </li>
           ))}
@@ -177,8 +166,8 @@ export default function LandingPage() {
       />
 
       {/* Free tools */}
-      <section className="border-t bg-canvas">
-        <div className="mx-auto max-w-6xl px-4 py-20 sm:px-6 md:py-24">
+      <section className="border-t bg-canvas/70 backdrop-blur-[1px]">
+        <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 md:py-14">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div className="max-w-md">
               <h2 className="text-2xl font-semibold tracking-[-0.02em]">Free tools, no sign-up</h2>
@@ -204,9 +193,9 @@ export default function LandingPage() {
 
       {/* Close */}
       <section className="border-t">
-        <div className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-8 px-4 py-20 sm:px-6 md:flex-row md:items-center md:py-24">
+        <div className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-6 px-4 py-12 sm:px-6 md:flex-row md:items-center md:py-16">
           <div>
-            <h2 className="text-3xl font-semibold tracking-[-0.025em] sm:text-[40px] sm:leading-[1.1]">
+            <h2 className="text-[28px] font-semibold leading-[1.15] tracking-[-0.025em] sm:text-[34px]">
               Two minutes to your first clean file.
             </h2>
             <p className="mt-3 text-[17px] text-muted-foreground">Try it on a sample file before you upload anything of your own.</p>
@@ -225,8 +214,8 @@ export default function LandingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t bg-canvas">
-        <div className="mx-auto grid max-w-6xl gap-10 px-4 py-14 sm:px-6 md:grid-cols-[1.5fr_1fr_1fr_1fr]">
+      <footer className="border-t bg-canvas/70 backdrop-blur-[1px]">
+        <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 sm:px-6 md:grid-cols-[1.5fr_1fr_1fr_1fr]">
           <div>
             <div className="flex items-center gap-2">
               {/* eslint-disable-next-line @next/next/no-img-element -- static SVG */}
@@ -260,6 +249,7 @@ export default function LandingPage() {
           <p className="mx-auto max-w-6xl px-4 py-6 text-xs text-muted-foreground sm:px-6">© {new Date().getFullYear()} SheetsLLM</p>
         </div>
       </footer>
+      </div>
     </div>
   );
 }

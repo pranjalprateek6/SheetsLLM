@@ -2,7 +2,7 @@
 import { forwardRef, useRef, type ReactNode } from "react";
 import {
   ArrowUp, BookMarked, CalendarDays, Check, ChevronDown, Copy, FileSpreadsheet, Filter, Lock,
-  PaintBucket, Pencil, RotateCcw, Scissors, Sparkles, Trash2, Upload,
+  PaintBucket, RotateCcw, Scissors, Sparkles, Upload,
 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -57,11 +57,9 @@ export function FixSlice() {
     { id: "drop", icon: Filter, label: "Drop rows where empty" },
     { id: "dedupe", icon: Copy, label: "Remove duplicate rows" },
     { id: "dates", icon: CalendarDays, label: "Standardise dates…" },
-    { id: "rename", icon: Pencil, label: "Rename…" },
-    { id: "drop-col", icon: Trash2, label: "Drop column" },
   ];
   return (
-    <Frame ref={ref} className="min-h-[352px] bg-canvas p-5">
+    <Frame ref={ref} className="min-h-[300px] bg-canvas p-5">
       <div className="overflow-hidden rounded-lg border bg-card shadow-xs">
         <div className="grid grid-cols-[84px_1fr_64px] whitespace-nowrap border-b text-[12px] font-medium text-muted-foreground">
           <span className="px-3 py-2">Order ID</span>

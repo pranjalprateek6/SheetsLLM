@@ -87,10 +87,10 @@ export default function GridBackdrop({ cell = 32, className }: { cell?: number; 
           }
           ctx!.beginPath();
           if (glow > 0.03) {
-            ctx!.fillStyle = hsl(tokens.accent, 0.35 + glow * 0.65);
-            ctx!.arc(x + 0.5, y + 0.5, 1.6 + glow * 2.2, 0, Math.PI * 2);
+            ctx!.fillStyle = hsl(tokens.accent, 0.25 + glow * 0.5);
+            ctx!.arc(x + 0.5, y + 0.5, 1.5 + glow * 1.7, 0, Math.PI * 2);
           } else {
-            ctx!.fillStyle = hsl(tokens.dot, 0.38);
+            ctx!.fillStyle = hsl(tokens.dot, 0.3);
             ctx!.arc(x + 0.5, y + 0.5, 1.5, 0, Math.PI * 2);
           }
           ctx!.fill();

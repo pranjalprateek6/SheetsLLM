@@ -14,8 +14,8 @@ Signed out (landing, pricing, `/tools`) and signed in (workspace, files,
 recipes, account) share every token. The difference is density and air, never a
 second palette or a second type family.
 
-- **Signed out** has more air: a 60px hero, 40px section heads, py-20 to py-28
-  rhythm, and live product fragments drawn in DOM instead of screenshots.
+- **Signed out** has more air: a 60px hero, 34px section heads, a tight py-10
+  to py-14 section rhythm, and live product fragments drawn in DOM instead of screenshots.
 - **Signed in** is dense and quiet: 13 to 14px text, hairline separation, panels
   that sit on the page rather than float above it.
 
@@ -86,7 +86,7 @@ and no eyebrows above headings.
 | role | size / tracking |
 | --- | --- |
 | Hero | 44px, 60px from `sm`, weight 600, `-0.035em`, second line in muted ink |
-| Section head | 30px, 40px from `sm`, `-0.025em` |
+| Section head | 28px, 34px from `sm`, `-0.025em` |
 | Page title (app) | 24px, `-0.02em` |
 | Lead | 17 to 18px, `leading-relaxed`, muted |
 | Body | 14 to 15px |
@@ -134,11 +134,11 @@ Duration, easing and distance tokens live at the bottom of `globals.css`.
   the hero and every section fragment loop their real flow like a muted video,
   with a ghost cursor that moves, presses and opens menus (`marketing/ghost.tsx`).
   Each loop plays only while on screen; reduced motion shows the last frame.
-- **The dot ripple.** The hero and each section visual stand on a field of dots
-  at the intersections of a 32px grid (`marketing/GridBackdrop.tsx`, one canvas
-  each, masked to fade out). Slow rings spread from random points and brighten
+- **The dot ripple.** The whole landing stands on a field of dots at the
+  intersections of a 32px grid (`marketing/GridBackdrop.tsx`, one canvas fixed
+  to the viewport, so the ripples travel with the reader). Slow rings spread from random points and brighten
   the dots they pass in violet, like a change moving through a sheet. Base dots
-  are `--muted-foreground` at 38%; colours follow the theme; it pauses offscreen
+  are `--muted-foreground` at 30%; colours follow the theme; it pauses offscreen
   and is still under reduced motion. Chosen over beams, a drifting spotlight and
   filling cells.
 - Dropdowns and modals animate through `data-state` keyframes, because Radix
