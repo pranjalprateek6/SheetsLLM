@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useState } from "react";
-import { ArrowRight, Plus } from "lucide-react";
+import { ArrowRight, Check, Plus } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -147,20 +147,107 @@ export function CrossLinks({ current }: { current?: string }) {
   );
 }
 
+// What the closing panel promises, each true of the Free plan today
+const PROMISES = [
+  "Free plan: 50 uploads and 200 AI requests a month",
+  "Strict privacy from the start: the AI sees column names, not values",
+  "A recipe reruns next month with no AI call",
+];
+
+// The run card beside the closing promise: month two, as the product shows it
+const RUN = [
+  { step: "Remove duplicate rows", rows: "1,040 → 1,028", now: "−1.2%", then: "−1.2%" },
+  { step: "Drop rows where Region is empty", rows: "1,028 → 812", now: "−21%", then: "−21.3%" },
+  { step: "Standardise dates in Order Date", rows: "812 → 812", now: "no change", then: "no change" },
+];
+
+function RunCard() {
+  return (
+    <figure className="w-full max-w-[460px] overflow-hidden rounded-xl border bg-background shadow-[0_24px_80px_-32px_rgba(0,0,0,0.8)]">
+      <figcaption className="sr-only">
+        November&apos;s orders cleaned by the recipe saved in October: every step behaved as before, and both checks passed.
+      </figcaption>
+      <div aria-hidden>
+        <div className="flex items-center gap-2 border-b px-4 py-2.5 text-[12px]">
+          <Check className="h-3.5 w-3.5 text-success-text" />
+          <span className="font-medium">Recipe applied: 3 steps</span>
+          <span className="hidden tabular-nums text-muted-foreground sm:inline">1,040 → 812 rows</span>
+          <span className="ml-auto rounded-full border px-1.5 py-px text-[10px] text-muted-foreground">no AI call</span>
+        </div>
+        <div className="px-4 pb-3 pt-2.5">
+          <p className="text-[12px] font-medium">
+            Run report <span className="font-normal text-muted-foreground">· orders_nov.csv beside orders_oct.csv</span>
+          </p>
+          {/* On a phone the Rows column gives way, so the step names fit */}
+          <div className="mt-2 grid grid-cols-[minmax(0,1fr)_auto_auto] gap-x-3 text-[11.5px] sm:grid-cols-[minmax(0,1fr)_auto_auto_auto]">
+            <span className="pb-1 text-[10.5px] text-muted-foreground">Step</span>
+            <span className="hidden pb-1 text-right text-[10.5px] text-muted-foreground sm:block">Rows</span>
+            <span className="pb-1 text-right text-[10.5px] text-muted-foreground">Now</span>
+            <span className="pb-1 text-right text-[10.5px] text-muted-foreground">October</span>
+            {RUN.map((r) => (
+              <div key={r.step} className="contents">
+                <span className="truncate border-t border-border/60 py-1.5">{r.step}</span>
+                <span className="hidden whitespace-nowrap border-t border-border/60 py-1.5 text-right tabular-nums sm:block">{r.rows}</span>
+                <span className="whitespace-nowrap border-t border-border/60 py-1.5 text-right tabular-nums">{r.now}</span>
+                <span className="whitespace-nowrap border-t border-border/60 py-1.5 text-right tabular-nums text-muted-foreground">{r.then}</span>
+              </div>
+            ))}
+          </div>
+          <div className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1 border-t border-border/60 pt-2.5 text-[11.5px]">
+            {["Order ID is unique", "MRP is at least 0"].map((c) => (
+              <span key={c} className="inline-flex items-center gap-1.5">
+                <Check className="h-3 w-3 text-success-text" /> {c}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+    </figure>
+  );
+}
+
 export function Prefooter() {
   return (
     <section className="border-t">
-      <Container className="flex flex-col items-center py-24 text-center sm:py-[140px]">
-        <h2 className="max-w-[760px] text-[40px] font-medium leading-[1] tracking-[-0.022em] sm:text-[72px]">
-          Clean it once. Cleaned every month.
-        </h2>
-        <div className="mt-10 flex flex-wrap justify-center gap-3">
-          <Button variant="inverse" size="lg" className="h-11 px-5 text-[15px]" asChild>
-            <Link href="/auth?mode=signup">Start free</Link>
-          </Button>
-          <Button variant="glass" size="lg" className="h-11 px-5 text-[15px]" asChild>
-            <Link href="/pricing">See pricing</Link>
-          </Button>
+      <Container className="py-16 sm:py-24">
+        <div className="relative grid overflow-hidden rounded-2xl border bg-card/50 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
+          <div className="p-8 sm:p-12">
+            <p className="text-[13px] font-medium text-primary-accent">Month two, in one click</p>
+            <h2 className="mt-4 text-[36px] font-medium leading-[1.02] tracking-[-0.022em] sm:text-[48px]">
+              Clean it once.
+              <span className="block text-muted-foreground">Cleaned every month.</span>
+            </h2>
+            <p className="mt-5 max-w-[480px] text-[15px] leading-relaxed text-muted-foreground">
+              Fix October with a click or a sentence and save the steps. November&apos;s export runs through the same recipe,
+              with a report beside last month and your checks on every row.
+            </p>
+            <div className="mt-8 flex flex-wrap gap-3">
+              <Button variant="inverse" size="lg" className="h-11 px-5 text-[15px]" asChild>
+                <Link href="/auth?mode=signup">Start free</Link>
+              </Button>
+              <Button variant="glass" size="lg" className="h-11 px-5 text-[15px]" asChild>
+                <Link href="/pricing">See pricing</Link>
+              </Button>
+            </div>
+            <ul className="mt-10 space-y-2.5 border-t pt-6">
+              {PROMISES.map((t) => (
+                <li key={t} className="flex items-start gap-2.5 text-[14px] text-muted-foreground">
+                  <Check className="mt-0.5 h-4 w-4 flex-shrink-0 text-foreground/70" aria-hidden />
+                  {t}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="relative flex items-center justify-center border-t bg-background/40 p-6 sm:p-10 lg:border-l lg:border-t-0">
+            {/* A faint grid under the card, so the panel reads as a surface */}
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-0 opacity-[0.35] [background-image:linear-gradient(to_right,hsl(var(--border))_1px,transparent_1px),linear-gradient(to_bottom,hsl(var(--border))_1px,transparent_1px)] [background-size:32px_32px] [mask-image:radial-gradient(ellipse_at_center,black_30%,transparent_75%)]"
+            />
+            <div className="relative flex w-full justify-center">
+              <RunCard />
+            </div>
+          </div>
         </div>
       </Container>
     </section>
@@ -182,11 +269,22 @@ const FOOTER = [
 export function SiteFooter() {
   return (
     <footer className="border-t">
-      <Container className="grid gap-10 py-14 sm:grid-cols-2 lg:grid-cols-[1.6fr_1fr_1fr_1fr]">
-        <div>
-          {/* The mark alone, the way the reference signs its footer */}
-          {/* eslint-disable-next-line @next/next/no-img-element -- static SVG */}
-          <img src="/logo.svg" alt="SheetsLLM" width={20} height={20} className="h-5 w-5" />
+      <Container className="grid grid-cols-2 gap-x-6 gap-y-10 pb-12 pt-14 sm:pt-16 lg:grid-cols-[1.6fr_1fr_1fr_1fr]">
+        <div className="col-span-2 lg:col-span-1">
+          <Link href="/" className="inline-flex items-center gap-2" aria-label="SheetsLLM home">
+            {/* eslint-disable-next-line @next/next/no-img-element -- static SVG */}
+            <img src="/logo.svg" alt="" width={20} height={20} className="h-5 w-5" />
+            <span className="text-[15px] font-medium tracking-[-0.01em]">SheetsLLM</span>
+          </Link>
+          <p className="mt-4 max-w-[300px] text-[13px] leading-relaxed text-muted-foreground">
+            Spreadsheet cleanup that remembers. Fix a file once, and next month&apos;s export runs the same recipe.
+          </p>
+          <Link
+            href="/auth?mode=signup"
+            className="group mt-5 inline-flex items-center gap-1 text-[13px] font-medium text-foreground/90 transition-colors hover:text-foreground"
+          >
+            Start free <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+          </Link>
         </div>
         {FOOTER.map((col) => (
           <div key={col.title}>
@@ -203,9 +301,16 @@ export function SiteFooter() {
           </div>
         ))}
       </Container>
-      <Container className="pb-10">
-        <p className="text-[12px] text-muted-foreground">© {new Date().getFullYear()} SheetsLLM</p>
-      </Container>
+      <div className="border-t">
+        <Container className="flex flex-col gap-3 py-6 text-[12px] text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+          <p>© {new Date().getFullYear()} SheetsLLM. Made for the monthly export.</p>
+          <nav aria-label="Footer" className="flex flex-wrap gap-x-5 gap-y-2">
+            <Link href="/product/privacy" className="transition-colors hover:text-foreground">Privacy &amp; history</Link>
+            <Link href="/pricing" className="transition-colors hover:text-foreground">Pricing</Link>
+            <Link href="/tools" className="transition-colors hover:text-foreground">Free tools</Link>
+          </nav>
+        </Container>
+      </div>
     </footer>
   );
 }

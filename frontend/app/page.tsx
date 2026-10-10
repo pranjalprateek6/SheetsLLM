@@ -35,7 +35,7 @@ export default function LandingPage() {
       <div className="relative">
         {/* Hero: the promise, then the whole product at work */}
         <section>
-          <Container className="pt-20 sm:pt-[190px]">
+          <Container className="pt-14 sm:pt-28">
             <h1 className="max-w-[1040px] text-[42px] font-medium leading-[1.02] tracking-[-0.022em] sm:text-[64px] sm:leading-[1]">
               Clean the same spreadsheet once.
               <span className="block text-muted-foreground">Never again.</span>
@@ -45,14 +45,16 @@ export default function LandingPage() {
                 Describe the cleanup in plain English or fix it in one click. SheetsLLM keeps every step, and next
                 month&apos;s export runs through the same recipe with no AI call.
               </p>
-              <div className="flex shrink-0 items-center gap-4">
+              <div className="flex shrink-0 items-center gap-3">
                 <Button variant="inverse" className="h-9 px-4" asChild>
                   <Link href="/auth?mode=signup">Start free</Link>
                 </Button>
-                <Link href="/tools" className="group inline-flex items-center gap-1 text-[15px] text-muted-foreground transition-colors hover:text-foreground">
-                  <span className="font-medium text-foreground">Free</span> CSV tools
-                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-                </Link>
+                <Button variant="glass" className="group h-9 gap-1.5 px-4" asChild>
+                  <Link href="/tools">
+                    Free CSV tools
+                    <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+                  </Link>
+                </Button>
               </div>
             </div>
           </Container>
@@ -84,9 +86,11 @@ export default function LandingPage() {
         {SECTIONS.map(({ slug, title, picture }) => {
           const page = PRODUCT_PAGES.find((p) => p.slug === slug)!;
           const Picture = COMPOSITES[picture];
+          // The features row ends with 56px of its own, so 96 above the head
+          // matches 40 + 56 below the last row (64 = 8 + 56 on phones)
           return (
-            <section key={slug} id={slug} className="scroll-mt-16 border-t">
-              <Container className="pt-20 sm:pt-[136px]">
+            <section key={slug} id={slug} className="scroll-mt-16 border-t pb-2 sm:pb-10">
+              <Container className="pt-16 sm:pt-24">
                 <SectionHead
                   title={
                     <>
