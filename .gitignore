@@ -37,3 +37,8 @@ frontend/scripts/magic-link.mjs
 .impeccable/questions/
 .impeccable/review/
 .impeccable/mocks/
+
+# Local design-study captures and Playwright MCP scratch
+review/
+.playwright-mcp/
+frontend/.playwright-mcp/

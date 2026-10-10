@@ -12,6 +12,8 @@ const config: Config = {
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         canvas: "hsl(var(--canvas))",
+        soft: "hsl(var(--soft))",
+        faint: "hsl(var(--faint))",
         foreground: "hsl(var(--foreground))",
         primary: {
           DEFAULT: "hsl(var(--primary))",
@@ -55,8 +57,14 @@ const config: Config = {
         },
       },
       fontFamily: {
-        sans: ["var(--font-geist-sans)", "system-ui", "sans-serif"],
+        sans: ["var(--font-inter)", "system-ui", "sans-serif"],
         mono: ["var(--font-geist-mono)", "ui-monospace", "monospace"],
+      },
+      // Inter Variable's in-between weights: what reads as "medium" and
+      // "semibold" on a dark screen without looking heavy
+      fontWeight: {
+        medium: "510",
+        semibold: "590",
       },
       borderRadius: {
         // 12px panels, 8px controls, 6px and 4px inside them

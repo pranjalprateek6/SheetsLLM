@@ -70,7 +70,8 @@ function MiniMenu({ item, id }: { item: string; id: string }) {
   );
 }
 
-export default function HeroWorkspace() {
+/** `bare` drops the frame so the workstation can embed it as its main pane. */
+export default function HeroWorkspace({ bare = false }: { bare?: boolean }) {
   const frame = useRef<HTMLElement>(null);
   const s = useScene(SCENE, TOTAL, INITIAL, frame);
   const { applied } = s;
@@ -80,7 +81,7 @@ export default function HeroWorkspace() {
   const done = applied === STEPS.length;
 
   return (
-    <figure ref={frame} className="relative overflow-hidden rounded-xl border bg-card text-left shadow-lg">
+    <figure ref={frame} className={cn("relative overflow-hidden bg-card text-left", !bare && "rounded-xl border shadow-lg")}>
       <figcaption className="sr-only">
         The SheetsLLM workspace cleaning a sample orders file: duplicates removed, dates standardised and empty
         regions filled, each saved as a step you can undo, then saved as a recipe.
@@ -186,7 +187,7 @@ export default function HeroWorkspace() {
                   const key = h === "Order Date" ? "date" : h === "Region" ? "region" : null;
                   const pressed = key && (s.menu === key || (s.click && s.cursor === `h-${key}`));
                   return (
-                    <th key={h} className={cn("relative py-1.5 pr-3 font-medium first:pl-3 sm:first:pl-0", h === "Amount" && "text-right")}>
+                    <th key={h} className={cn("relative py-1.5 pr-3 font-medium", h === "Order ID" && "pl-3 sm:pl-0", h === "Amount" && "text-right")}>
                       <span
                         data-ghost={key ? `h-${key}` : undefined}
                         className={cn("-mx-1 inline-flex items-center gap-1 rounded px-1 transition-colors", pressed && "bg-accent text-foreground")}

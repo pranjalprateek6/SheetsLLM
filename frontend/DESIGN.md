@@ -2,20 +2,26 @@
 
 Personality: **calm, precise, trustworthy**. The product handles people's finance
 and ops data, for a broad audience that is not necessarily technical. It should
-feel like the category standard, held to the craft of Linear, Vercel, Notion and
-Stripe: the file and what just changed in it are the only loud things on screen.
+feel like the category standard. The public site follows linear.app's system
+closely (studied component by component; captures and measurements live in
+`review/linear/`, untracked): near-black pages, Inter at in-between weights,
+pill calls to action, product pictures that fade into the dark, and quiet
+pointer-driven illustrations. We take the system, never Linear's assets, copy
+or code.
 
 `styles/globals.css` is the source of truth for every value below. If this file
 and that one disagree, that file is right and this one is stale. Fix it.
 
 ## The organizing idea: one world, two densities
 
-Signed out (landing, pricing, `/tools`) and signed in (workspace, files,
-recipes, account) share every token. The difference is density and air, never a
-second palette or a second type family.
+Signed out (landing, `/product/*`, pricing, `/tools`, auth) and signed in
+(workspace, files, recipes, account) share every token. The public site is
+always dark (`forcedTheme` in `theme-provider.tsx`); the app defaults to dark
+and keeps the reader's toggle.
 
-- **Signed out** has more air: a 60px hero, 34px section heads, a tight py-10
-  to py-14 section rhythm, and live product fragments drawn in DOM instead of screenshots.
+- **Signed out** has air: a 64px hero, 48px two-line section heads with the copy
+  on the right, py-20 to py-28 sections split by full-width hairlines, and live
+  product fragments drawn in DOM instead of screenshots.
 - **Signed in** is dense and quiet: 13 to 14px text, hairline separation, panels
   that sit on the page rather than float above it.
 
@@ -31,11 +37,12 @@ flipped.
 
 ### Colour
 
-**Neutrals: cool zinc.** Light is pure white (`--background: 0 0% 100%`) with a
-barely-grey `--canvas` (`240 5% 98.5%`) for recessed bands, rails, footers and
-empty states, and near-black ink (`240 10% 4%`). Dark is near-black with no blue
-cast (`--background: 240 5% 5%`, `--canvas: 240 5% 4%`), and surfaces step up in
-lightness: `--card 8%`, `--popover 10%`, `--muted 12%`.
+**Neutrals.** Dark, the default, is the reference's near-black: `#08090a` page,
+`#0f1011` panels (`--card`), `#141516` popovers, `#1c1c1f` fills (`--muted`) and
+`#23252a` hairlines. Text steps down in four: `--foreground` `#f7f8f8`, `--soft`
+`#d0d6e0` for lead copy, `--muted-foreground` `#8a8f98`, and `--faint` `#62666d`,
+which is decorative only (figure labels, separators; it is under 4.5:1). Light is
+pure white with a barely-grey `--canvas` and near-black ink, for the app only.
 
 **Primary: the violet of the mark.** `--primary` (`251 70% 57%` light,
 `251 72% 60%` dark) is the fill white text sits on. `--primary-accent`
@@ -74,19 +81,20 @@ surfaces. Re-run it before changing any value.
 
 ### Typography
 
-**Geist Sans** for everything a person reads, **Geist Mono** only for what is
-literally code: SQL, column types (`VARCHAR`, `DOUBLE`), and inline code in
-Chef's answers. Both come from the `geist` package (pinned 1.7.2) through
-`next/font`, so they are self-hosted with no layout shift.
+**Inter** (variable, via `next/font/google`) for everything a person reads, at
+the in-between weights the reference uses: Tailwind's `font-medium` is 510 and
+`font-semibold` 590. **Geist Mono** only for what is literally code: SQL, column
+types, inline code in Chef's answers, and the figure numbers (FIG 0.1).
 
 Mono is not a costume. Labels, file names, counts and grid values are sans with
-`tabular-nums`, which Geist Sans supports. There are no uppercase micro-labels
-and no eyebrows above headings.
+`tabular-nums`. There are no uppercase micro-labels.
 
 | role | size / tracking |
 | --- | --- |
-| Hero | 44px, 60px from `sm`, weight 600, `-0.035em`, second line in muted ink |
-| Section head | 28px, 34px from `sm`, `-0.025em` |
+| Hero | 42px, 64px from `sm`, 510, `-0.022em`, second line in muted ink |
+| Statement | 28px, 48px from `sm`, 510, first sentence white, the rest muted |
+| Section head | 34px, 48px from `sm`, 510, `-0.022em`, two lines |
+| Prefooter | 40px, 72px from `sm`, 510, centered |
 | Page title (app) | 24px, `-0.02em` |
 | Lead | 17 to 18px, `leading-relaxed`, muted |
 | Body | 14 to 15px |
@@ -114,8 +122,11 @@ dialogs and the landing's product frames use `shadow-md` or `shadow-lg`. Dark
 cannot separate near-black surfaces with a black spread, so every dark level
 also carries a faint light top rim.
 
-The primary button is a raised fill: an inset top highlight plus a short
-contact shadow. Overlays are `bg-black/40` with a 2px backdrop blur.
+In the app the primary button is a raised violet fill. On the public site the
+one primary call to action is the `inverse` light pill, beside a `glass` pill
+(white at 5% with an inset hairline and a black outer ring); nav items are 13px
+muted pills that brighten on a faint fill. Hovers run 100 to 160ms on
+`cubic-bezier(.25,.46,.45,.94)`. Overlays are `bg-black/40` with a 2px blur.
 
 ### The parts nobody draws
 
@@ -188,14 +199,25 @@ rather than filled.
 
 ## Surface guidelines
 
-- **Header.** Translucent background with blur and saturation, a 22px mark.
-  Signed out, the menu is centered on the page axis. Signed in, the location
-  sits beside the mark (Files, Recipes, then the open file) and the account is an
-  initial avatar.
-- **Landing.** Split hero: the headline in two weights on the left and the live
-  workspace frame on the right. Then a three-fact proof strip, four alternating
-  sections each anchored on a DOM fragment of the real UI, the free tools as one
-  hairline grid, a closing call to action, and a four-column footer.
+- **Header.** 64px on the public site, translucent near-black with blur, the
+  20px mark and name on the left. Signed out, the right side holds Product (a
+  wide panel of the four product pages, two-line descriptions, a column of plain
+  links and a footer strip; it opens on hover or click and closes on Escape),
+  Pricing, Free tools, a divider, Sign in and the Get started light pill. Signed
+  in, the location sits beside the mark (Files, Recipes, then the open file) and
+  the account is an initial avatar.
+- **Landing.** A two-line 64px headline over a row of subline and calls to
+  action; then the whole product in one frame (sidebar, the open file looping
+  its fixes, Chef), fading into a pool of light. Then a 48px statement, the
+  figure row (FIG 0.1 to 0.3: isometric line drawings that open, replay and
+  follow the cursor), one section per product page (two-line head, copy and
+  Learn more, a composite picture on a spotlight stage, and a Features row whose
+  items open a short detail), the 72px prefooter and the footer.
+- **Product pages** (`/product/clean`, `chef`, `recipes`, `privacy`, data in
+  `marketing/product-pages.ts`). A label and 64px headline at the bottom-left of
+  a dark hero over a dimmed, blurred piece of the product; then blocks of head,
+  picture and two captioned cells split by a hairline; then the four pages as
+  cross-links, the prefooter and the footer.
 - **Files.** A real data table in a 12px panel: names in sans medium, the format
   as a small bordered type mark, right-aligned tabular numbers, one violet
   action.
@@ -206,7 +228,7 @@ rather than filled.
 - **Tools.** Left-aligned title and lead, the tool in a 12px panel, how-it-works
   as three ruled steps, the recipe call to action on `--canvas`. The index is a
   list, not a wall of icon tiles.
-- **Pricing.** Two cards; Pro carries `border-primary`, a ring and `shadow-md`.
+- **Pricing.** A 56px centered head, two cards; Pro carries `border-primary`, a ring and `shadow-md`, and its call to action is the light pill. The shared footer closes it, as it closes the tools pages.
 - **Account.** Hairline-separated rows, label and description on the left edge, controls on the right; no cards.
 
 ## Accessibility bar

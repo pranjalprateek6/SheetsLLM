@@ -8,6 +8,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
 import { Button } from "@/components/ui/button";
+import { SiteFooter } from "@/components/marketing/blocks";
 import { Badge } from "@/components/ui/badge";
 import UpgradeCta from "@/components/UpgradeCta";
 import { TextShimmer } from "@/components/ui/text-shimmer";
@@ -237,10 +238,10 @@ function PricingContent() {
   return (
     <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6">
       <div className="mb-10 text-center">
-        <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
+        <h1 className="text-[40px] font-medium leading-none tracking-[-0.022em] sm:text-[56px]">
           Simple pricing
         </h1>
-        <p className="mx-auto mt-3 max-w-xl text-balance text-muted-foreground">
+        <p className="mx-auto mt-5 max-w-xl text-balance text-[17px] leading-relaxed text-muted-foreground">
           A saved recipe turns a 30-minute monthly cleanup into one click.
           Start free. Upgrade when the cleanups become a routine.
         </p>
@@ -313,7 +314,7 @@ function PricingContent() {
           <div className="mt-7">
             {signedOut ? (
               <>
-                <Button variant="outline" className="w-full" asChild>
+                <Button variant="glass" className="w-full" asChild>
                   <Link href="/auth?mode=signup">
                     Start free <ArrowRight className="ml-1 h-4 w-4" />
                   </Link>
@@ -359,7 +360,7 @@ function PricingContent() {
                 {busy ? "Working…" : "Cancel subscription"}
               </Button>
             ) : signedOut ? (
-              <Button className="w-full" asChild>
+              <Button variant="inverse" className="w-full" asChild>
                 <Link href="/auth?mode=signup">
                   Start with Pro <ArrowRight className="ml-1 h-4 w-4" />
                 </Link>
@@ -504,6 +505,7 @@ export default function PricingPage() {
       }
     >
       <PricingContent />
+      <SiteFooter />
     </Suspense>
   );
 }

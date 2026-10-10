@@ -160,7 +160,7 @@ export function RerunSlice() {
   const hovering = s.carry && s.cursor === "dropzone";
   return (
     <Frame ref={ref} className="p-5">
-      <span data-ghost="start" className="absolute right-6 top-3 h-4 w-4" />
+      <span data-ghost="start" className="absolute right-32 top-3 h-4 w-4" />
       <div className="flex items-center gap-2 text-[13px] font-semibold">
         <BookMarked className="h-4 w-4 text-primary-accent" /> Monthly orders cleanup
         <span className="ml-auto text-[12px] font-normal text-muted-foreground">from orders_oct.csv</span>

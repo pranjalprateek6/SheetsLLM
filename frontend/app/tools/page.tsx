@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, Copy, FileJson, Scissors, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { SiteFooter } from "@/components/marketing/blocks";
 
 export const metadata: Metadata = {
   title: "Free CSV & JSON Tools: Private, In-Browser, No Signup",
@@ -39,8 +40,9 @@ const TOOLS = [
 
 export default function ToolsIndex() {
   return (
+    <>
     <div className="mx-auto max-w-3xl px-4 pb-20 pt-14 sm:px-6">
-      <h1 className="text-4xl font-semibold tracking-[-0.03em]">Free CSV &amp; JSON tools</h1>
+      <h1 className="text-[40px] font-medium leading-none tracking-[-0.022em] sm:text-[48px]">Free CSV &amp; JSON tools</h1>
       <p className="mt-3 max-w-xl text-[17px] leading-relaxed text-muted-foreground">
         Quick fixes for messy data files. Every tool runs entirely in your browser.
         No upload, no signup, no data collection.
@@ -76,12 +78,14 @@ export default function ToolsIndex() {
             described in plain English. By default the AI sees column names and types, never your values.
           </p>
         </div>
-        <Button className="shrink-0" asChild>
+        <Button variant="inverse" className="shrink-0" asChild>
           <Link href="/auth?mode=signup">
             Try SheetsLLM free <ArrowRight className="h-4 w-4" />
           </Link>
         </Button>
       </div>
     </div>
+    <SiteFooter />
+    </>
   );
 }

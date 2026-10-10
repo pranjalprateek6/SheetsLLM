@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, Lock, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { SiteFooter } from "@/components/marketing/blocks";
 
 /* Shared shell for the free /tools pages: SEO-friendly intro copy, the
    interactive widget, how-it-works, FAQ, and the recipe CTA into the app. */
@@ -21,9 +22,10 @@ export default function ToolShell({
   children: React.ReactNode;
 }) {
   return (
+    <>
     <div className="mx-auto max-w-3xl px-4 pb-20 pt-14 sm:px-6">
       <div className="mb-8">
-        <h1 className="text-4xl font-semibold tracking-[-0.03em]">{title}</h1>
+        <h1 className="text-[40px] font-medium leading-none tracking-[-0.022em] sm:text-[48px]">{title}</h1>
         <p className="mt-3 max-w-xl text-[17px] leading-relaxed text-muted-foreground">{intro}</p>
         <p className="mt-4 inline-flex items-center gap-1.5 text-[13px] font-medium text-success-text">
           <Lock className="h-3.5 w-3.5" />
@@ -56,7 +58,7 @@ export default function ToolShell({
           then re-run it on every new file in one click. By default the AI sees column names and
           types, never your values.
         </p>
-        <Button className="mt-5" asChild>
+        <Button variant="inverse" className="mt-5" asChild>
           <Link href="/auth?mode=signup">
             Automate it free <ArrowRight className="h-4 w-4" />
           </Link>
@@ -83,5 +85,7 @@ export default function ToolShell({
         More free tools: <Link href="/tools" className="font-medium text-primary hover:underline">CSV &amp; JSON toolbox</Link>
       </p>
     </div>
+    <SiteFooter />
+    </>
   );
 }

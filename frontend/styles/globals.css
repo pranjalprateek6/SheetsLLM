@@ -19,6 +19,8 @@
     --foreground: 240 10% 4%;
     --muted: 240 5% 96%;
     --muted-foreground: 240 4% 42%;
+    --soft: 240 6% 22%;
+    --faint: 240 4% 46%;
     --card: 0 0% 100%;
     --card-foreground: 240 10% 4%;
     --popover: 0 0% 100%;
@@ -82,27 +84,31 @@
 
   .dark {
     color-scheme: dark;
-    /* Near-black with no blue cast; surfaces step up in lightness, and
-       hairlines stay barely there. Selected for dark, not flipped. */
-    --background: 240 5% 5%;
-    --canvas: 240 5% 4%;
-    --foreground: 240 5% 93%;
-    --muted: 240 4% 12%;
-    --muted-foreground: 240 5% 65%;
-    --card: 240 4% 8%;
-    --card-foreground: 240 5% 93%;
-    --popover: 240 4% 10%;
-    --popover-foreground: 240 5% 93%;
-    --border: 240 4% 16%;
-    --input: 240 4% 40%;
+    /* The near-black of the reference set: #08090a page, #0f1011 panels,
+       #141516 popovers, #1c1c1f fills, #23252a hairlines; text steps
+       #f7f8f8, #d0d6e0, #8a8f98, #62666d. Selected for dark, not flipped. */
+    --background: 210 11% 3.5%;
+    --canvas: 210 8% 4.5%;
+    --foreground: 180 7% 97%;
+    --soft: 217 22% 85%;
+    --muted: 240 5% 11.6%;
+    --muted-foreground: 219 6% 57%;
+    --faint: 218 5% 41%;
+    --card: 210 6% 6.3%;
+    --card-foreground: 180 7% 97%;
+    --popover: 210 5% 8.2%;
+    --popover-foreground: 180 7% 97%;
+    --border: 223 9% 15%;
+    /* 3:1 against the panel, the WCAG 1.4.11 bound for a control */
+    --input: 220 5% 34%;
     --ring: 251 85% 70%;
     --primary: 251 72% 60%;
     --primary-accent: 251 90% 76%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 240 4% 12%;
-    --secondary-foreground: 240 5% 93%;
-    --accent: 240 4% 13%;
-    --accent-foreground: 240 5% 93%;
+    --secondary: 240 5% 11.6%;
+    --secondary-foreground: 180 7% 97%;
+    --accent: 225 6% 12%;
+    --accent-foreground: 180 7% 97%;
     --destructive: 0 66% 56%;
     --destructive-foreground: 0 0% 100%;
     --success: 160 70% 42%;

@@ -1,14 +1,15 @@
 import "@/styles/globals.css";
-import { GeistSans } from "geist/font/sans";
+import { Inter } from "next/font/google";
 import { GeistMono } from "geist/font/mono";
 import { AuthProvider } from "@/contexts/AuthContext";
 import Header from "@/components/Header";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 
-// Geist Sans for every word of interface and prose, Geist Mono only where a
-// string is data: SQL, cell values in code views, file names in tables.
-// Self-hosted by the geist package (next/font/local), so no layout shift.
+// Inter (variable, so the in-between 510 and 590 weights exist) for every
+// word of interface and prose; Geist Mono only for code: SQL and column types.
+// next/font self-hosts both, so there is no layout shift.
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 
 export const metadata = {
   metadataBase: new URL("https://sheets-llm.vercel.app"),
@@ -19,9 +20,9 @@ export const metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`} suppressHydrationWarning>
+    <html lang="en" className={`${inter.variable} ${GeistMono.variable}`} suppressHydrationWarning>
       <body className="min-h-dvh font-sans">
-        <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} disableTransitionOnChange>
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} disableTransitionOnChange>
           <AuthProvider>
             <a
               href="#main"
