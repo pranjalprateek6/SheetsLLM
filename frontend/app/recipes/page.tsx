@@ -37,6 +37,7 @@ function RecipesContent() {
   const [failed, setFailed] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
   const [steps, setSteps] = useState<Record<string, RecipeStep[]>>({});
+  const [stepsFailed, setStepsFailed] = useState<Record<string, boolean>>({});
   const [applyFor, setApplyFor] = useState<Recipe | null>(null);
   const [files, setFiles] = useState<FileRow[] | null>(null);
   const [applying, setApplying] = useState<string | null>(null);
@@ -57,12 +58,15 @@ function RecipesContent() {
     }
     setOpen(r.id);
     if (steps[r.id]) return;
+    setStepsFailed((f) => ({ ...f, [r.id]: false }));
     try {
       const res = await fetchWithAuth(`/api/recipes/${r.id}`);
+      if (!res.ok) throw new Error(String(res.status));
       const d = await res.json();
       setSteps((s) => ({ ...s, [r.id]: d.recipe?.steps ?? [] }));
     } catch {
-      setSteps((s) => ({ ...s, [r.id]: [] }));
+      // An empty list would read as "this recipe has no steps"
+      setStepsFailed((f) => ({ ...f, [r.id]: true }));
     }
   };
 
@@ -172,7 +176,8 @@ function RecipesContent() {
               </div>
               {open === r.id && (
                 <ol className="border-t px-4 py-3 text-sm">
-                  {!steps[r.id] && <li className="text-muted-foreground">Loading…</li>}
+                  {!steps[r.id] && !stepsFailed[r.id] && <li className="text-muted-foreground">Loading…</li>}
+                  {stepsFailed[r.id] && <li className="text-muted-foreground">Couldn&apos;t load the steps. Close and open the recipe to try again.</li>}
                   {steps[r.id]?.map((s) => (
                     <li key={s.step_number} className="flex gap-2 py-0.5">
                       <span className="w-5 flex-shrink-0 text-right text-[13px] tabular-nums text-muted-foreground">
@@ -196,7 +201,14 @@ function RecipesContent() {
           </DialogHeader>
           <div className="max-h-80 space-y-1 overflow-y-auto">
             {files === null && <Skeleton className="h-10 w-full" />}
-            {files?.length === 0 && <p className="text-sm text-muted-foreground">No files yet.</p>}
+            {files?.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                No files yet.{" "}
+                <Link href={applyFor ? `/workspace?recipe_id=${applyFor.id}` : "/workspace"} className="font-medium text-foreground underline-offset-2 hover:underline">
+                  Upload one and run the recipe on it
+                </Link>
+              </p>
+            )}
             {files?.map((f) => (
               <button
                 key={f.id}

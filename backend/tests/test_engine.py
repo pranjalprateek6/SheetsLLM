@@ -206,3 +206,26 @@ def test_schema_after_steps_reflects_dropped_columns(local_parquet):
     steps = [{"sql_query": "SELECT name, age FROM data"}]
     schema = get_schema_after_steps(local_parquet, steps)
     assert [c["name"] for c in schema["columns"]] == ["name", "age"]
+
+
+def test_title_case_works_under_the_names_models_use():
+    # DuckDB has no initcap; the model reaches for it (then title) first
+    from app.engine import get_connection
+
+    con = get_connection()
+    rows = con.execute(
+        "SELECT initcap('north'), title('nEW yORK city'), initcap(NULL), initcap('')"
+    ).fetchall()
+    assert rows == [("North", "New York City", None, "")]
+
+
+def test_a_file_over_the_row_limit_is_refused_not_cut(monkeypatch):
+    import app.engine as engine
+
+    monkeypatch.setattr(engine, "MAX_ROWS", 3)
+    csv = b"a\n1\n2\n3\n4\n"
+    with pytest.raises(engine.TooManyRowsError, match="4 rows, over the 3 row limit"):
+        engine.convert_to_parquet(csv, "big.csv")
+    # At the limit is fine
+    _, rows, _ = engine.convert_to_parquet(b"a\n1\n2\n3\n", "ok.csv")
+    assert rows == 3

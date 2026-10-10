@@ -120,7 +120,62 @@ def generate_insights(local_path: str | Path) -> dict[str, Any]:
                 "detail": f"{col_info['null_pct']}% of {col_info['column']} is empty",
             })
 
+        # Mixed date formats in a text column: "2026-10-14" beside "10/10/2026"
+        for col_name, col_type in zip(col_names, col_types):
+            if not col_type.upper().startswith("VARCHAR"):
+                continue
+            try:
+                found = _mixed_dates(con, col_name)
+            except Exception:
+                found = None
+            if found:
+                insights["suggestions"].append(found)
+
     except Exception as exc:
         logger.error("Insights generation failed: %s", exc)
 
     return insights
+
+
+_ISO = r"^\d{4}-\d{1,2}-\d{1,2}$"
+_SLASHED = r"^\d{1,2}/\d{1,2}/\d{4}$"
+
+
+def _mixed_dates(con, col_name: str) -> dict[str, str] | None:
+    """A suggestion when a text column holds dates written two ways.
+
+    Day-first slashed dates ("28/10/2026") are what the one-click fix assumes
+    when it has to guess, so it is offered only when a day over 12 proves
+    that order. Otherwise Chef gets the job, told which order the data shows.
+    """
+    q = f'"{col_name}"'
+    v = f"TRIM(CAST({q} AS VARCHAR))"
+    row = con.execute(f"""
+        SELECT
+            COUNT({q}) AS filled,
+            COUNT(*) FILTER (WHERE regexp_matches({v}, '{_ISO}')) AS iso,
+            COUNT(*) FILTER (WHERE regexp_matches({v}, '{_SLASHED}')) AS slashed,
+            COUNT(*) FILTER (WHERE regexp_matches({v}, '{_SLASHED}')
+                AND TRY_CAST(split_part({v}, '/', 1) AS INTEGER) > 12) AS day_first,
+            COUNT(*) FILTER (WHERE regexp_matches({v}, '{_SLASHED}')
+                AND TRY_CAST(split_part({v}, '/', 2) AS INTEGER) > 12) AS month_first
+        FROM data
+    """).fetchone()
+    filled, iso, slashed, day_first, month_first = (int(x or 0) for x in row)
+    # Mostly dates, and both ways of writing them present
+    if not filled or not iso or not slashed or (iso + slashed) < 0.9 * filled:
+        return None
+    if day_first and not month_first:
+        order, instruction = "DD/MM/YYYY", f"standardise dates in {col_name}"
+    elif month_first and not day_first:
+        order = "MM/DD/YYYY"
+        instruction = f"Convert {col_name} to YYYY-MM-DD. The slashed dates are month/day/year"
+    else:
+        order = "with slashes"
+        instruction = f"Convert {col_name} to YYYY-MM-DD"
+    # Non-breaking hyphens (U+2011) keep "YYYY-MM-DD" on one line in the chip
+    return {
+        "text": f"Standardise dates in {col_name}",
+        "instruction": instruction,
+        "detail": f"{slashed:,} written {order}, {iso:,} as YYYY‑MM‑DD",
+    }

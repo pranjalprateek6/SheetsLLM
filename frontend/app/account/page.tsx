@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { LogOut, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
@@ -41,6 +41,7 @@ function AccountContent() {
   const { user, signOut } = useAuth();
   const router = useRouter();
   const [tier, setTier] = useState<string | null>(null);
+  const [tierFailed, setTierFailed] = useState(false);
   const [privacyMode, setPrivacyMode] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -54,18 +55,26 @@ function AccountContent() {
     } catch {}
   }, []);
 
-  useEffect(() => {
+  // The plan: unknown is shown as unknown with a retry, never guessed as "free"
+  const loadTier = useCallback(() => {
+    setTierFailed(false);
     fetchWithAuth("/api/billing/status")
-      .then((r) => r.json())
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((d) => {
-        setTier(d.tier ?? "free");
+        if (typeof d?.tier !== "string") throw new Error("no tier");
+        setTier(d.tier);
       })
-      .catch(() => setTier(null)); // unknown plan: render the loading state, never guess "free"
-    fetchWithAuth("/api/settings")
-      .then((r) => r.json())
-      .then((d) => setPrivacyMode(!!d.privacy_mode))
-      .catch(() => setPrivacyMode(null)); // unknown, not "off"
+      .catch(() => setTierFailed(true));
   }, []);
+
+  useEffect(() => {
+    loadTier();
+    // A failed load leaves the switch unknown, never "off"
+    fetchWithAuth("/api/settings")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setPrivacyMode(typeof d?.privacy_mode === "boolean" ? d.privacy_mode : null))
+      .catch(() => setPrivacyMode(null));
+  }, [loadTier]);
 
   const togglePrivacy = async () => {
     const next = !privacyMode;
@@ -157,7 +166,14 @@ function AccountContent() {
               : "50 uploads and 200 AI requests a month, and 1 saved recipe."
           }
         >
-          {tier === null ? (
+          {tier === null && tierFailed ? (
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm text-muted-foreground">Couldn&apos;t load your plan.</p>
+              <Button variant="outline" size="sm" onClick={loadTier}>
+                Try again
+              </Button>
+            </div>
+          ) : tier === null ? (
             <div className="space-y-3">
               <Skeleton className="h-5 w-32" />
               <Skeleton className="h-4 w-64" />

@@ -41,7 +41,19 @@ def get_connection() -> duckdb.DuckDBPyConnection:
     con = duckdb.connect(":memory:")
     con.execute(f"SET threads={DUCKDB_THREADS}")
     con.execute(f"SET max_memory='{DUCKDB_MEMORY_LIMIT}'")
+    # Title case under the names models reach for first (Postgres' initcap,
+    # Python's title). DuckDB has neither, so "north" -> "North" used to fail
+    # twice and end the turn with an error.
+    for name in _TITLE_CASE_NAMES:
+        con.execute(f"CREATE OR REPLACE TEMP MACRO {name}(s) AS {_TITLE_CASE_SQL}")
     return con
+
+
+_TITLE_CASE_NAMES = ("initcap", "title")
+_TITLE_CASE_SQL = (
+    "array_to_string(list_transform(string_split(lower(s), ' '), "
+    "lambda w: upper(left(w, 1)) || substr(w, 2)), ' ')"
+)
 
 
 class QueryTimeoutError(Exception):
@@ -430,6 +442,17 @@ class UnreadableFileError(Exception):
     """File could not be parsed even leniently. str() is safe to show users."""
 
 
+class TooManyRowsError(UnreadableFileError):
+    """The file is over the per-file row limit. Refused whole: keeping the
+    first MAX_ROWS rows would quietly drop the rest of someone's data."""
+
+    def __init__(self, rows: int):
+        super().__init__(
+            f"This file has {rows:,} rows, over the {MAX_ROWS:,} row limit per file. "
+            "Split it into smaller files and upload each one."
+        )
+
+
 def _read_csv_lenient(con, tmp_path: str, *, delim: str | None = None) -> None:
     """CSV ingest with a lenient second attempt.
 
@@ -483,13 +506,7 @@ def convert_to_parquet(
             # Already parquet — enforce the row cap, else pass through
             arrow_table = pq.read_table(tmp.name)
             if arrow_table.num_rows > MAX_ROWS:
-                arrow_table = arrow_table.slice(0, MAX_ROWS)
-                buf = io.BytesIO()
-                pq.write_table(arrow_table, buf, compression="zstd")
-                logger.warning(
-                    "Parquet upload truncated to MAX_ROWS=%d", MAX_ROWS
-                )
-                return buf.getvalue(), arrow_table.num_rows, arrow_table.num_columns
+                raise TooManyRowsError(arrow_table.num_rows)
             return file_bytes, arrow_table.num_rows, arrow_table.num_columns
 
         if lower.endswith(".xlsx") or lower.endswith(".xls"):
@@ -520,10 +537,9 @@ def convert_to_parquet(
     if clean_names != original_names:
         arrow_table = arrow_table.rename_columns(clean_names)
 
-    # Enforce the row cap for real — metadata and stored data must agree
+    # The row cap refuses the file rather than keeping only part of it
     if arrow_table.num_rows > MAX_ROWS:
-        arrow_table = arrow_table.slice(0, MAX_ROWS)
-        logger.warning("Upload truncated to MAX_ROWS=%d", MAX_ROWS)
+        raise TooManyRowsError(arrow_table.num_rows)
 
     row_count = arrow_table.num_rows
     col_count = arrow_table.num_columns

@@ -5,7 +5,7 @@ import { expect, test } from "@playwright/test";
 test("the landing page leads with the promise", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1 })).toContainText(/Clean the same spreadsheet once/);
-  await expect(page.getByRole("link", { name: /Get started|Sign in/ }).first()).toBeVisible();
+  await expect(page.getByRole("link", { name: /Start free|Sign in/ }).first()).toBeVisible();
 });
 
 test("pricing shows both plans", async ({ page }) => {

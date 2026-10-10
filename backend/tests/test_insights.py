@@ -38,3 +38,31 @@ def test_no_duplicates_no_suggestion(tmp_path):
 def test_singular_wording(tmp_path):
     path = _parquet(tmp_path, "(1, 'x'), (1, 'x'), (2, 'y')")
     assert generate_insights(path)["suggestions"][0]["text"] == "Remove 1 duplicate row"
+
+
+def _dates(tmp_path, dates: list[str]) -> str:
+    rows = ", ".join(f"({i}, '{d}')" for i, d in enumerate(dates))
+    return _parquet(tmp_path, rows)
+
+
+def test_mixed_day_first_dates_get_the_one_click_fix(tmp_path):
+    path = _dates(tmp_path, ["2026-10-14", "2026-10-02", "28/10/2026", "10/10/2026"])
+    [s] = [s for s in generate_insights(path)["suggestions"] if "dates" in s["text"]]
+    assert s == {
+        "text": "Standardise dates in b",
+        "instruction": "standardise dates in b",
+        # Non-breaking hyphens keep the format on one line
+        "detail": "2 written DD/MM/YYYY, 2 as YYYY‑MM‑DD",
+    }
+
+
+def test_month_first_dates_go_to_chef_with_the_order(tmp_path):
+    path = _dates(tmp_path, ["2026-10-14", "10/28/2026"])
+    [s] = [s for s in generate_insights(path)["suggestions"] if "dates" in s["text"]]
+    assert "month/day/year" in s["instruction"]
+    assert not s["instruction"].startswith("standardise")
+
+
+def test_one_date_format_is_not_flagged(tmp_path):
+    path = _dates(tmp_path, ["2026-10-14", "2026-10-02", "2026-09-30"])
+    assert not any("dates" in s["text"] for s in generate_insights(path)["suggestions"])

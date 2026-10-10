@@ -338,6 +338,10 @@ function WorkspaceContent() {
           setColumns(Object.keys(previewData[0]));
           setRows(previewData.slice(0, 500));
         }
+      } else {
+        // The file opened but its rows did not; an empty grid alone would
+        // read as an empty file
+        toast.error("Couldn't load the rows of this file. Reload the page to try again.");
       }
     } catch (e) {
       console.error("Failed to load file:", e);

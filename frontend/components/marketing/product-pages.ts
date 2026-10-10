@@ -48,7 +48,7 @@ export const PRODUCT_PAGES: ProductPage[] = [
     pitch: "Insights find the duplicates, gaps and odd formats for you, and every fix is one click from the column it belongs to.",
     features: [
       { name: "Column menu", detail: "Every column carries its own fixes: trim, fill, drop empty rows, dedupe, standardise dates, rename." },
-      { name: "Insights", detail: "On upload, SheetsLLM counts duplicates, empty cells and mixed formats, and offers the fix beside each." },
+      { name: "Insights", detail: "On upload, SheetsLLM counts duplicates, empty cells and mixed date formats, and offers the fix beside each." },
       { name: "Column health", detail: "A strip above the grid shows how complete every column is, so the gaps are visible before you scroll." },
       { name: "Undo in one click", detail: "Every fix is saved as a step with the rows before and after, so undoing it is one click." },
     ],
@@ -67,7 +67,7 @@ export const PRODUCT_PAGES: ProductPage[] = [
         body: "A fix shows exactly what it changed: rows before and after, and the cells it touched wash in violet for a moment so you can find them.",
         visual: "history",
         cells: [
-          { visual: "export", title: "Export named for the steps", body: "CSV, Excel, JSON or Parquet, with a file name that says how many steps it includes." },
+          { visual: "export", title: "Export named for the steps", body: "CSV, Excel, JSON, TSV or Parquet, with a file name that says how many steps it includes." },
           { visual: "receipt", title: "No AI, on the record", body: "One-click fixes say so in the history: no AI call, nothing sent anywhere." },
         ],
       },
@@ -131,7 +131,7 @@ export const PRODUCT_PAGES: ProductPage[] = [
         visual: "rerun",
         cells: [
           { visual: "recipes", title: "A shelf of recipes", body: "Every recipe shows its steps, the file it came from and the columns it needs." },
-          { visual: "missing", title: "Told, not broken", body: "When a column is missing, the run stops at that step and says which column." },
+          { visual: "missing", title: "Told, not broken", body: "When a column the recipe needs is missing, nothing runs and you are told which column." },
         ],
       },
       {
@@ -150,7 +150,7 @@ export const PRODUCT_PAGES: ProductPage[] = [
     href: "/product/privacy",
     name: "Privacy & history",
     menu: "Schema-only by default, with every step on the record",
-    label: "Privacy and history",
+    label: "Privacy & history",
     headline: "The AI sees the shape, never the values",
     lead: "Most AI spreadsheet tools send the whole file to a model. SheetsLLM sends column names, types and counts, keeps a receipt of every request, and never trains on your data.",
     pitch: "Strict privacy is on from the start, every AI step records what it sent, and the history keeps every step's instruction and SQL.",

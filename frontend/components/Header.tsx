@@ -140,7 +140,7 @@ function ProductMenu({ pathname }: { pathname: string }) {
               {[
                 ["/tools", "Free CSV tools"],
                 ["/pricing", "Pricing"],
-                ["/product/privacy", "Privacy"],
+                ["/product/privacy", "Privacy & history"],
                 ["/auth", "Sign in"],
               ].map(([href, label]) => (
                 <li key={href}>
@@ -183,8 +183,8 @@ export default function Header() {
   useEffect(() => {
     if ((menuOpen || mobileOpen) && privacyMode === null && user) {
       fetchWithAuth("/api/settings")
-        .then((r) => r.json())
-        .then((d) => setPrivacyMode(!!d.privacy_mode))
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => setPrivacyMode(typeof d?.privacy_mode === "boolean" ? d.privacy_mode : null))
         .catch(() => setPrivacyMode(null)); // unknown, not "off"
     }
   }, [menuOpen, mobileOpen, privacyMode, user]);
@@ -369,7 +369,7 @@ export default function Header() {
                 Sign in
               </Link>
               <Button variant="inverse" size="sm" className="ml-1 h-8 px-3.5" asChild>
-                <Link href="/auth?mode=signup">Get started</Link>
+                <Link href="/auth?mode=signup">Start free</Link>
               </Button>
             </>
           )}
@@ -444,7 +444,7 @@ export default function Header() {
                   <Link href="/auth">Sign in</Link>
                 </Button>
                 <Button variant="inverse" size="sm" className="flex-1" asChild>
-                  <Link href="/auth?mode=signup">Get started</Link>
+                  <Link href="/auth?mode=signup">Start free</Link>
                 </Button>
               </div>
             )}

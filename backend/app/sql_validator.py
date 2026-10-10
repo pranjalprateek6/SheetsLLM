@@ -114,7 +114,7 @@ def validate_sql(sql: str) -> str:
         if match:
             func = match.group(0).rstrip("( \t").upper()
             raise SQLValidationError(
-                f"Blocked SQL function: {func} — queries may only read the uploaded data",
+                f"Blocked SQL function: {func}. Queries may only read the uploaded data",
                 blocked_keyword=func,
             )
 

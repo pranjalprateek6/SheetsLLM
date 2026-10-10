@@ -150,8 +150,8 @@ async def upload(
             f"File has {col_count} columns (max {MAX_COLUMNS})",
         )
 
-    # Row cap is enforced inside convert_to_parquet (table is truncated),
-    # so row_count here always reflects the stored data.
+    # The row cap is enforced inside convert_to_parquet, which refuses an
+    # over-limit file (TooManyRowsError, an UnreadableFileError) above.
 
     # ── Upload to Storage ────────────────────────────────────────────
     r2_key = storage.r2_key_for_file(user_id, file_id)
