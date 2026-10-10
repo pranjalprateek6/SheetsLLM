@@ -84,7 +84,7 @@ const TableHead = React.forwardRef<
     // Column headings are labels for data, not prose: the workspace grid sets
     // them in mono at 10px so they recede behind the values they name.
     className={cn(
-      "h-9 px-3 text-left align-middle font-mono text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground [&:has([role=checkbox])]:pr-0",
+      "h-9 px-3 text-left align-middle text-xs font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0",
       className
     )}
     {...props}

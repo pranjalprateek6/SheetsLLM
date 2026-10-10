@@ -7,6 +7,7 @@ import io
 import logging
 import re
 import tempfile
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -36,29 +37,103 @@ def _sql_path(path: str | Path) -> str:
 # ── Connection ───────────────────────────────────────────────────────
 
 
-def get_connection() -> duckdb.DuckDBPyConnection:
-    """Create a fresh in-memory DuckDB connection."""
+def get_connection(
+    *, read: tuple[str | Path, ...] = (), write: tuple[str | Path, ...] = ()
+) -> duckdb.DuckDBPyConnection:
+    """Create a fresh in-memory DuckDB connection, locked to its files.
+
+    The connection runs SQL a model wrote and reads names a file supplied, so
+    it may touch only the files passed here: ``read`` to read, ``write`` to
+    COPY into. Every other file, directory listing, ATTACH, extension install
+    and network read is refused, and the lock itself cannot be undone from SQL.
+    """
     con = duckdb.connect(":memory:")
     con.execute(f"SET threads={DUCKDB_THREADS}")
     con.execute(f"SET max_memory='{DUCKDB_MEMORY_LIMIT}'")
+    # Title case under the names models reach for first (Postgres' initcap,
+    # Python's title). DuckDB has neither, so "north" -> "North" used to fail
+    # twice and end the turn with an error.
+    for name in _TITLE_CASE_NAMES:
+        con.execute(f"CREATE OR REPLACE TEMP MACRO {name}(s) AS {_TITLE_CASE_SQL}")
+    _lock_to_files(con, read, write)
+    # Inside _run_with_timeout, remember it so the limit can interrupt it
+    tracked = getattr(_opened, "cons", None)
+    if tracked is not None:
+        tracked.append(con)
     return con
+
+
+# The connections opened by the current _run_with_timeout worker thread
+_opened = threading.local()
+
+
+_TITLE_CASE_NAMES = ("initcap", "title")
+_TITLE_CASE_SQL = (
+    "array_to_string(list_transform(string_split(lower(s), ' '), "
+    "lambda w: upper(left(w, 1)) || substr(w, 2)), ' ')"
+)
+
+# Where DuckDB may spill when a query outgrows max_memory: its own directory,
+# so allowing it opens nothing else
+_SPILL_DIR = Path(tempfile.gettempdir()) / "sheetsllm-duckdb-spill"
+
+
+def _lock_to_files(con, read, write) -> None:
+    paths = [_sql_path(p) for p in read]
+    for p in write:
+        # COPY writes some formats (JSON) to a tmp_ sibling, then renames it
+        p = Path(p)
+        paths += [_sql_path(p), _sql_path(p.with_name(f"tmp_{p.name}"))]
+    _SPILL_DIR.mkdir(parents=True, exist_ok=True)
+    spill = _sql_path(_SPILL_DIR)
+    listed = ", ".join(f"'{p}'" for p in paths)
+    con.execute(f"SET temp_directory = '{spill}'")
+    con.execute(f"SET allowed_paths = [{listed}]")
+    con.execute(f"SET allowed_directories = ['{spill}/']")
+    con.execute("SET enable_external_access = false")
+    con.execute("SET lock_configuration = true")
+
+
+_TITLE_CASE_NAMES = ("initcap", "title")
+_TITLE_CASE_SQL = (
+    "array_to_string(list_transform(string_split(lower(s), ' '), "
+    "lambda w: upper(left(w, 1)) || substr(w, 2)), ' ')"
+)
 
 
 class QueryTimeoutError(Exception):
     """Raised when a DuckDB query exceeds the time limit."""
 
 
-def _run_with_timeout(func, *args, timeout: int = DUCKDB_QUERY_TIMEOUT):
-    """Run a synchronous function with a thread-pool timeout."""
-    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-        future = pool.submit(func, *args)
+def _run_with_timeout(func, *args, timeout: int = DUCKDB_QUERY_TIMEOUT, interrupt=()):
+    """Run a synchronous function, and stop its queries when time runs out.
+
+    Leaving a ``with ThreadPoolExecutor`` block waits for the worker, so the
+    old version raised only once the slow query had finished by itself: a
+    1s limit on a 17s cross join returned after 17s. Now every connection
+    the function opens, and any passed in ``interrupt``, is interrupted at
+    the limit, and nothing waits on it.
+    """
+    opened: list[duckdb.DuckDBPyConnection] = list(interrupt)
+
+    def run():
+        _opened.cons = opened
         try:
-            return future.result(timeout=timeout)
-        except concurrent.futures.TimeoutError:
-            future.cancel()
-            raise QueryTimeoutError(
-                f"Query exceeded {timeout}s time limit. Try a simpler instruction."
-            )
+            return func(*args)
+        finally:
+            _opened.cons = None
+
+    pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+    try:
+        return pool.submit(run).result(timeout=timeout)
+    except concurrent.futures.TimeoutError:
+        for con in opened:
+            con.interrupt()
+        raise QueryTimeoutError(
+            f"Query exceeded {timeout}s time limit. Try a simpler instruction."
+        )
+    finally:
+        pool.shutdown(wait=False)
 
 
 # ── Query Execution ──────────────────────────────────────────────────
@@ -74,7 +149,7 @@ def execute_sql_from_local(
     """Execute SQL against a local Parquet file with optional timeout."""
 
     def _inner():
-        con = get_connection()
+        con = get_connection(read=(local_path,))
         lp = _sql_path(local_path)
         con.execute(f"CREATE VIEW data AS SELECT * FROM read_parquet('{lp}')")
 
@@ -89,9 +164,11 @@ def execute_sql_from_local(
         total_rows = con.execute(
             f"SELECT COUNT(*) FROM (\n{sql}\n) AS _preview_count"
         ).fetchone()[0]
+        # date_as_object: a DATE stays a date ("2026-10-28"); through pandas'
+        # datetime64 it would reach the grid as "2026-10-28T00:00:00"
         result = con.execute(
             f"SELECT * FROM (\n{sql}\n) AS _preview LIMIT {int(preview_limit)}"
-        ).fetchdf()
+        ).fetchdf(date_as_object=True)
 
         total_columns = len(result.columns)
         columns = [str(c) for c in result.columns]
@@ -179,6 +256,41 @@ def build_replay_sql(
     return f"WITH {', '.join(ctes)} SELECT * FROM step_{last_step}"
 
 
+# ── Measuring a run ──────────────────────────────────────────────────
+
+
+def measure_run(
+    local_path: str | Path,
+    steps: list[dict],
+    start: int,
+    check_queries: list[str | None],
+    *,
+    timeout: int | None = None,
+) -> tuple[list[int], list[int | None]]:
+    """Rows before steps[start] and after each later step, and the count of
+    rows breaking each check (None for a check whose SQL is None).
+
+    The checks read the fully cleaned rows as a view named r.
+    """
+
+    def _inner():
+        con = get_connection(read=(local_path,))
+        lp = _sql_path(local_path)
+        con.execute(f"CREATE VIEW data AS SELECT * FROM read_parquet('{lp}')")
+        counts = [
+            int(con.execute(f"SELECT COUNT(*) FROM ({build_replay_sql(steps, up_to=k)})").fetchone()[0])
+            for k in range(start, len(steps) + 1)
+        ]
+        con.execute(f"CREATE VIEW r AS {build_replay_sql(steps)}")
+        failed = [
+            None if q is None else int(con.execute(q).fetchone()[0] or 0)
+            for q in check_queries
+        ]
+        return counts, failed
+
+    return _run_with_timeout(_inner, timeout=timeout if timeout is not None else DUCKDB_QUERY_TIMEOUT)
+
+
 # ── Chain checkpoints ─────────────────────────────────────────────────
 
 
@@ -189,7 +301,7 @@ def _materialize_segment(
     sql = build_replay_sql(steps)
 
     def _inner():
-        con = get_connection()
+        con = get_connection(read=(source_path,), write=(out_path,))
         sp = _sql_path(source_path)
         con.execute(f"CREATE VIEW data AS SELECT * FROM read_parquet('{sp}')")
         op = _sql_path(out_path)
@@ -258,7 +370,7 @@ def execute_full_result_local(
     """Replay all steps from a local Parquet file. Returns DuckDB result."""
     source, remaining = _resolve_checkpoint(local_path, steps)
     sql = build_replay_sql(remaining)
-    con = get_connection()
+    con = get_connection(read=(source,))
     lp = _sql_path(source)
     con.execute(f"CREATE VIEW data AS SELECT * FROM read_parquet('{lp}')")
     return con.execute(sql)
@@ -294,7 +406,7 @@ def export_full_result_local(
     sql = build_replay_sql(remaining)
 
     def _inner():
-        con = get_connection()
+        con = get_connection(read=(source,), write=(out_path,))
         lp = _sql_path(source)
         con.execute(f"CREATE VIEW data AS SELECT * FROM read_parquet('{lp}')")
         op = _sql_path(out_path)
@@ -368,7 +480,7 @@ def _enrich_columns(con: "duckdb.DuckDBPyConnection", source: str) -> list[dict]
 
 def get_schema_from_local(local_path: str | Path) -> dict[str, Any]:
     """Get enriched column metadata and sample rows from a local Parquet file."""
-    con = get_connection()
+    con = get_connection(read=(local_path,))
     lp = _sql_path(local_path)
     source = f"read_parquet('{lp}')"
 
@@ -402,7 +514,7 @@ def get_schema_after_steps(
     replay = build_replay_sql(remaining)
 
     def _inner():
-        con = get_connection()
+        con = get_connection(read=(source,))
         lp = _sql_path(source)
         con.execute(f"CREATE VIEW data AS SELECT * FROM read_parquet('{lp}')")
 
@@ -428,6 +540,17 @@ def get_schema_after_steps(
 
 class UnreadableFileError(Exception):
     """File could not be parsed even leniently. str() is safe to show users."""
+
+
+class TooManyRowsError(UnreadableFileError):
+    """The file is over the per-file row limit. Refused whole: keeping the
+    first MAX_ROWS rows would quietly drop the rest of someone's data."""
+
+    def __init__(self, rows: int):
+        super().__init__(
+            f"This file has {rows:,} rows, over the {MAX_ROWS:,} row limit per file. "
+            "Split it into smaller files and upload each one."
+        )
 
 
 def _read_csv_lenient(con, tmp_path: str, *, delim: str | None = None) -> None:
@@ -467,7 +590,6 @@ def convert_to_parquet(
     Convert CSV/XLSX/JSON/TSV to Parquet using DuckDB + PyArrow.
     Returns (parquet_bytes, row_count, column_count).
     """
-    con = get_connection()
     lower = filename.lower()
 
     # Write to a temp file for DuckDB to read
@@ -476,6 +598,7 @@ def convert_to_parquet(
     tmp.write(file_bytes)
     tmp.flush()
     tmp.close()
+    con = get_connection(read=(tmp.name,))
     tmp_path = _sql_path(tmp.name)  # forward slashes + quote-escaped for DuckDB
 
     try:
@@ -483,16 +606,12 @@ def convert_to_parquet(
             # Already parquet — enforce the row cap, else pass through
             arrow_table = pq.read_table(tmp.name)
             if arrow_table.num_rows > MAX_ROWS:
-                arrow_table = arrow_table.slice(0, MAX_ROWS)
-                buf = io.BytesIO()
-                pq.write_table(arrow_table, buf, compression="zstd")
-                logger.warning(
-                    "Parquet upload truncated to MAX_ROWS=%d", MAX_ROWS
-                )
-                return buf.getvalue(), arrow_table.num_rows, arrow_table.num_columns
-            return file_bytes, arrow_table.num_rows, arrow_table.num_columns
-
-        if lower.endswith(".xlsx") or lower.endswith(".xls"):
+                raise TooManyRowsError(arrow_table.num_rows)
+            names = [str(c) for c in arrow_table.column_names]
+            if sanitize_column_names(names) == names:
+                return file_bytes, arrow_table.num_rows, arrow_table.num_columns
+            # Otherwise its names get the same cleaning as any upload, below
+        elif lower.endswith(".xlsx") or lower.endswith(".xls"):
             import pandas as pd
 
             df = pd.read_excel(
@@ -510,7 +629,8 @@ def convert_to_parquet(
             # Default: CSV
             _read_csv_lenient(con, tmp_path)
 
-        arrow_table = con.execute("SELECT * FROM staging").fetch_arrow_table()
+        if not (lower.endswith(".parquet") or lower.endswith(".pq")):
+            arrow_table = con.execute("SELECT * FROM staging").fetch_arrow_table()
     finally:
         Path(tmp.name).unlink(missing_ok=True)
 
@@ -520,10 +640,9 @@ def convert_to_parquet(
     if clean_names != original_names:
         arrow_table = arrow_table.rename_columns(clean_names)
 
-    # Enforce the row cap for real — metadata and stored data must agree
+    # The row cap refuses the file rather than keeping only part of it
     if arrow_table.num_rows > MAX_ROWS:
-        arrow_table = arrow_table.slice(0, MAX_ROWS)
-        logger.warning("Upload truncated to MAX_ROWS=%d", MAX_ROWS)
+        raise TooManyRowsError(arrow_table.num_rows)
 
     row_count = arrow_table.num_rows
     col_count = arrow_table.num_columns
@@ -571,7 +690,7 @@ def suggest_column(
     if not local_path:
         return None
 
-    con = get_connection()
+    con = get_connection(read=(local_path,))
     lp = _sql_path(local_path)
     source = f"read_parquet('{lp}')"
 

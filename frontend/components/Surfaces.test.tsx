@@ -93,20 +93,22 @@ describe("RecipesPage", () => {
     expect(await screen.findByText("Trim Email")).toBeInTheDocument();
   });
 
-  it("applies to a picked file", async () => {
-    let applied: unknown = null;
+  it("opens a picked file with the recipe queued, where its report shows", async () => {
+    let applied = false;
     server.use(
       http.get("/api/recipes", () => HttpResponse.json(RECIPES)),
       http.get("/api/files", () => HttpResponse.json({ files: [{ id: "f9", name: "orders_nov.csv", row_count: 1040 }], total: 1 })),
-      http.post("/api/recipes/:id/apply", async ({ request }) => {
-        applied = await request.json();
+      http.post("/api/recipes/:id/apply", () => {
+        applied = true;
         return HttpResponse.json({ steps_added: 2 });
       }),
     );
     render(<RecipesPage />);
     await userEvent.click(await screen.findByRole("button", { name: /Apply to/ }));
     await userEvent.click(await screen.findByRole("button", { name: /orders_nov\.csv/ }));
-    await waitFor(() => expect(applied).toEqual({ file_id: "f9", from: "recipes_page" }));
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/workspace?file_id=f9&apply_recipe=r1"));
+    // The workspace runs it, not this page
+    expect(applied).toBe(false);
   });
 
   it("empty state points at a file", async () => {

@@ -139,7 +139,7 @@ function MetricsContent() {
         </p>
         <ul className="mt-3 grid gap-3 sm:grid-cols-2">
           {data.gates.map((g) => (
-            <li key={g.key} className="rounded-md border bg-card p-4">
+            <li key={g.key} className="rounded-xl border bg-card p-4 shadow-sm">
               <div className="flex items-start justify-between gap-3">
                 <p className="font-medium">{g.bet}</p>
                 <Badge variant="outline" className={cn("flex-shrink-0", STATUS[g.status].className)}>

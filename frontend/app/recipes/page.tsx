@@ -3,16 +3,16 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { BookMarked, ChevronDown, FileSpreadsheet, Play, Upload } from "lucide-react";
-import { toast } from "sonner";
 
 import AuthGuard from "@/components/AuthGuard";
 import EmptyState from "@/components/EmptyState";
+import RecipeChecks from "@/components/RecipeChecks";
 import type { Recipe } from "@/components/RecipesDrawer";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import { explainError } from "@/lib/errors";
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
+import type { RecipeCheck } from "@/lib/recipe-run";
 import { cn } from "@/lib/utils";
 
 type RecipeStep = { step_number: number; instruction: string };
@@ -37,6 +37,8 @@ function RecipesContent() {
   const [failed, setFailed] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
   const [steps, setSteps] = useState<Record<string, RecipeStep[]>>({});
+  const [stepsFailed, setStepsFailed] = useState<Record<string, boolean>>({});
+  const [checksOf, setChecksOf] = useState<Record<string, RecipeCheck[]>>({});
   const [applyFor, setApplyFor] = useState<Recipe | null>(null);
   const [files, setFiles] = useState<FileRow[] | null>(null);
   const [applying, setApplying] = useState<string | null>(null);
@@ -57,12 +59,16 @@ function RecipesContent() {
     }
     setOpen(r.id);
     if (steps[r.id]) return;
+    setStepsFailed((f) => ({ ...f, [r.id]: false }));
     try {
       const res = await fetchWithAuth(`/api/recipes/${r.id}`);
+      if (!res.ok) throw new Error(String(res.status));
       const d = await res.json();
       setSteps((s) => ({ ...s, [r.id]: d.recipe?.steps ?? [] }));
+      setChecksOf((c) => ({ ...c, [r.id]: Array.isArray(d.recipe?.checks) ? d.recipe.checks : [] }));
     } catch {
-      setSteps((s) => ({ ...s, [r.id]: [] }));
+      // An empty list would read as "this recipe has no steps"
+      setStepsFailed((f) => ({ ...f, [r.id]: true }));
     }
   };
 
@@ -78,28 +84,11 @@ function RecipesContent() {
     }
   };
 
-  const apply = async (recipe: Recipe, file: FileRow) => {
+  // The run happens in the file itself, so its report, and the question
+  // when a column was renamed, show where the rows are
+  const apply = (recipe: Recipe, file: FileRow) => {
     setApplying(file.id);
-    try {
-      const res = await fetchWithAuth(`/api/recipes/${recipe.id}/apply`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ file_id: file.id, from: "recipes_page" }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        toast.error(explainError(data).text);
-        return;
-      }
-      setApplyFor(null);
-      toast.success(`Ran "${recipe.name}" on ${file.name}.`, {
-        action: { label: "Open file", onClick: () => router.push(`/workspace?file_id=${file.id}`) },
-      });
-    } catch {
-      toast.error("Couldn't run the recipe. Check your connection.");
-    } finally {
-      setApplying(null);
-    }
+    router.push(`/workspace?file_id=${encodeURIComponent(file.id)}&apply_recipe=${encodeURIComponent(recipe.id)}`);
   };
 
   return (
@@ -128,7 +117,7 @@ function RecipesContent() {
       )}
 
       {recipes?.length === 0 && (
-        <div className="rounded-md border border-dashed">
+        <div className="rounded-xl border border-dashed bg-canvas">
           <EmptyState
             variant="recipes"
             title="No recipes yet"
@@ -145,7 +134,7 @@ function RecipesContent() {
       {recipes && recipes.length > 0 && (
         <ul className="space-y-3">
           {recipes.map((r) => (
-            <li key={r.id} className="rounded-md border bg-card">
+            <li key={r.id} className="rounded-xl border bg-card shadow-xs">
               <div className="flex flex-wrap items-center gap-3 p-4">
                 <BookMarked className="h-4 w-4 flex-shrink-0 text-primary" aria-hidden />
                 <div className="min-w-0 flex-1">
@@ -171,17 +160,25 @@ function RecipesContent() {
                 </div>
               </div>
               {open === r.id && (
-                <ol className="border-t px-4 py-3 text-sm">
-                  {!steps[r.id] && <li className="text-muted-foreground">Loading…</li>}
+                <div className="border-t">
+                <ol className="px-4 py-3 text-sm">
+                  {!steps[r.id] && !stepsFailed[r.id] && <li className="text-muted-foreground">Loading…</li>}
+                  {stepsFailed[r.id] && <li className="text-muted-foreground">Couldn&apos;t load the steps. Close and open the recipe to try again.</li>}
                   {steps[r.id]?.map((s) => (
                     <li key={s.step_number} className="flex gap-2 py-0.5">
-                      <span className="w-5 flex-shrink-0 text-right font-mono text-xs tabular-nums text-muted-foreground">
+                      <span className="w-5 flex-shrink-0 text-right text-[13px] tabular-nums text-muted-foreground">
                         {s.step_number}
                       </span>
                       <span>{s.instruction}</span>
                     </li>
                   ))}
                 </ol>
+                {steps[r.id] && (
+                  <div className="border-t px-4 py-3">
+                    <RecipeChecks recipeId={r.id} columns={r.required_columns ?? []} initial={checksOf[r.id] ?? []} />
+                  </div>
+                )}
+                </div>
               )}
             </li>
           ))}
@@ -192,11 +189,18 @@ function RecipesContent() {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Apply {applyFor ? `"${applyFor.name}"` : ""} to a file</DialogTitle>
-            <DialogDescription>The steps are added after the file&apos;s own. No AI call.</DialogDescription>
+            <DialogDescription>The file opens with the steps added after its own, and a report of what each step did. No AI call.</DialogDescription>
           </DialogHeader>
           <div className="max-h-80 space-y-1 overflow-y-auto">
             {files === null && <Skeleton className="h-10 w-full" />}
-            {files?.length === 0 && <p className="text-sm text-muted-foreground">No files yet.</p>}
+            {files?.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                No files yet.{" "}
+                <Link href={applyFor ? `/workspace?recipe_id=${applyFor.id}` : "/workspace"} className="font-medium text-foreground underline-offset-2 hover:underline">
+                  Upload one and run the recipe on it
+                </Link>
+              </p>
+            )}
             {files?.map((f) => (
               <button
                 key={f.id}

@@ -1,24 +1,15 @@
 import "@/styles/globals.css";
-import { Archivo, JetBrains_Mono } from "next/font/google";
+import { Inter } from "next/font/google";
+import { GeistMono } from "geist/font/mono";
 import { AuthProvider } from "@/contexts/AuthContext";
 import Header from "@/components/Header";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 
-// Archivo over Inter: higher x-height holds up at the 11-13px label sizes a
-// dense grid needs, and it has a voice at display sizes instead of being the
-// face every product defaults to.
-const archivo = Archivo({
-  subsets: ["latin"],
-  variable: "--font-sans",
-  display: "swap",
-});
-
-const jetbrainsMono = JetBrains_Mono({
-  subsets: ["latin"],
-  variable: "--font-mono",
-  display: "swap",
-});
+// Inter (variable, so the in-between 510 and 590 weights exist) for every
+// word of interface and prose; Geist Mono only for code: SQL and column types.
+// next/font self-hosts both, so there is no layout shift.
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 
 export const metadata = {
   metadataBase: new URL("https://sheets-llm.vercel.app"),
@@ -29,9 +20,9 @@ export const metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${archivo.variable} ${jetbrainsMono.variable}`} suppressHydrationWarning>
+    <html lang="en" className={`${inter.variable} ${GeistMono.variable}`} suppressHydrationWarning>
       <body className="min-h-dvh font-sans">
-        <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} disableTransitionOnChange>
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} disableTransitionOnChange>
           <AuthProvider>
             <a
               href="#main"
@@ -41,7 +32,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </a>
             <Header />
             <main id="main" tabIndex={-1}>{children}</main>
-            <Toaster position="bottom-right" />
+            {/* Bottom-left: the right edge of the workspace is Chef's composer,
+                and a toast there sat on the input people type into */}
+            <Toaster position="bottom-left" />
           </AuthProvider>
         </ThemeProvider>
       </body>

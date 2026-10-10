@@ -11,7 +11,7 @@ from app.billing import BillingError, handle_event
 def test_pro_tier_has_higher_limits_than_free():
     free = usage.TIER_LIMITS["free"]
     pro = usage.TIER_LIMITS["pro"]
-    assert pro["transforms"] > free["transforms"]
+    assert pro["chat_requests"] > free["chat_requests"]
     assert pro["uploads"] > free["uploads"]
 
 
@@ -39,10 +39,10 @@ def test_get_user_tier_fails_open_to_free(monkeypatch):
 
 def test_pro_user_gets_pro_enforcement(monkeypatch):
     """A pro user over the free cap but under the pro cap is not blocked."""
-    free_transforms = usage.TIER_LIMITS["free"]["transforms"]
+    free_uploads = usage.TIER_LIMITS["free"]["uploads"]
     monkeypatch.setattr(usage.db, "get_subscription", lambda uid: {"tier": "pro"})
-    monkeypatch.setattr(usage.db, "get_usage", lambda *a, **k: {"transforms": free_transforms})
-    usage.enforce("pro-user", "transforms")  # no raise
+    monkeypatch.setattr(usage.db, "get_usage", lambda *a, **k: {"uploads": free_uploads})
+    usage.enforce("pro-user", "uploads")  # no raise
 
 
 # ── configuration guards ──────────────────────────────────────────────

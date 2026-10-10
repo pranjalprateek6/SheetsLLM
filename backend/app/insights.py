@@ -6,7 +6,8 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from app.engine import get_connection
+from app.engine import _run_with_timeout, get_connection
+from app.ops import quote_ident  # column names come from the file
 
 logger = logging.getLogger("sheetsllm.insights")
 
@@ -16,7 +17,7 @@ def generate_insights(local_path: str | Path) -> dict[str, Any]:
     Run a set of DuckDB queries against a local Parquet file to produce
     auto-insights: null counts, duplicates, numeric stats, and suggestions.
     """
-    con = get_connection()
+    con = get_connection(read=(local_path,))
     lp = str(local_path).replace("\\", "/")
     con.execute(f"CREATE VIEW data AS SELECT * FROM read_parquet('{lp}')")
 
@@ -44,7 +45,7 @@ def generate_insights(local_path: str | Path) -> dict[str, Any]:
 
         # Null analysis per column
         for col_name in col_names:
-            qname = f'"{col_name}"'
+            qname = quote_ident(col_name)
             try:
                 null_result = con.execute(f"""
                     SELECT
@@ -80,7 +81,7 @@ def generate_insights(local_path: str | Path) -> dict[str, Any]:
             base_type = col_type.split("(")[0].upper()
             if base_type not in numeric_types:
                 continue
-            qname = f'"{col_name}"'
+            qname = quote_ident(col_name)
             try:
                 stats = con.execute(f"""
                     SELECT
@@ -108,16 +109,98 @@ def generate_insights(local_path: str | Path) -> dict[str, Any]:
             insights["suggestions"].append({
                 "text": f"Remove {n} duplicate row{'s' if n != 1 else ''}",
                 "instruction": "remove duplicate rows",
+                "detail": f"{n} row{'s repeat' if n != 1 else ' repeats'} another row exactly",
             })
 
         high_null_cols = [c for c in insights["null_columns"] if c["null_pct"] > 10]
         for col_info in high_null_cols[:3]:  # max 3 suggestions
             insights["suggestions"].append({
-                "text": f"Column '{col_info['column']}' has {col_info['null_pct']}% null values",
+                # Lead with what clicking does; the finding is the reason
+                "text": f"Drop rows where {col_info['column']} is empty",
                 "instruction": f"drop rows where {col_info['column']} is null",
+                "detail": f"{col_info['null_pct']}% of {col_info['column']} is empty",
             })
+
+        # Mixed date formats in a text column: "2026-10-14" beside "10/10/2026".
+        # Bounded: a cheap look at the first rows picks the date-like columns,
+        # and only those few are counted in full, under a time limit.
+        text_cols = [c for c, t in zip(col_names, col_types) if t.upper().startswith("VARCHAR")]
+        for col_name in _date_like(con, text_cols):
+            try:
+                found = _run_with_timeout(
+                    _mixed_dates, con, col_name, timeout=_DATE_PROBE_SECONDS, interrupt=(con,)
+                )
+            except Exception:
+                found = None
+            if found:
+                insights["suggestions"].append(found)
 
     except Exception as exc:
         logger.error("Insights generation failed: %s", exc)
 
     return insights
+
+
+_ISO = r"^\d{4}-\d{1,2}-\d{1,2}$"
+_SLASHED = r"^\d{1,2}/\d{1,2}/\d{4}$"
+
+
+_DATE_PROBE_ROWS = 1000
+_DATE_PROBE_COLUMNS = 10
+_DATE_PROBE_SECONDS = 5
+
+
+def _date_like(con, text_cols: list[str]) -> list[str]:
+    """Text columns whose first rows are mostly dates, at most a handful."""
+    if not text_cols:
+        return []
+    either = f"'{_ISO}|{_SLASHED}'"
+    parts = ", ".join(
+        f"COUNT(*) FILTER (WHERE regexp_matches(TRIM(CAST({quote_ident(c)} AS VARCHAR)), {either}))"
+        f" / GREATEST(COUNT({quote_ident(c)}), 1)"
+        for c in text_cols
+    )
+    shares = con.execute(
+        f"SELECT {parts} FROM (SELECT * FROM data LIMIT {_DATE_PROBE_ROWS})"
+    ).fetchone()
+    return [c for c, share in zip(text_cols, shares) if (share or 0) >= 0.5][:_DATE_PROBE_COLUMNS]
+
+
+def _mixed_dates(con, col_name: str) -> dict[str, str] | None:
+    """A suggestion when a text column holds dates written two ways.
+
+    Day-first slashed dates ("28/10/2026") are what the one-click fix assumes
+    when it has to guess, so it is offered only when a day over 12 proves
+    that order. Otherwise Chef gets the job, told which order the data shows.
+    """
+    q = quote_ident(col_name)
+    v = f"TRIM(CAST({q} AS VARCHAR))"
+    row = con.execute(f"""
+        SELECT
+            COUNT({q}) AS filled,
+            COUNT(*) FILTER (WHERE regexp_matches({v}, '{_ISO}')) AS iso,
+            COUNT(*) FILTER (WHERE regexp_matches({v}, '{_SLASHED}')) AS slashed,
+            COUNT(*) FILTER (WHERE regexp_matches({v}, '{_SLASHED}')
+                AND TRY_CAST(split_part({v}, '/', 1) AS INTEGER) > 12) AS day_first,
+            COUNT(*) FILTER (WHERE regexp_matches({v}, '{_SLASHED}')
+                AND TRY_CAST(split_part({v}, '/', 2) AS INTEGER) > 12) AS month_first
+        FROM data
+    """).fetchone()
+    filled, iso, slashed, day_first, month_first = (int(x or 0) for x in row)
+    # Mostly dates, and both ways of writing them present
+    if not filled or not iso or not slashed or (iso + slashed) < 0.9 * filled:
+        return None
+    if day_first and not month_first:
+        order, instruction = "DD/MM/YYYY", f"standardise dates in {col_name}"
+    elif month_first and not day_first:
+        order = "MM/DD/YYYY"
+        instruction = f"Convert {col_name} to YYYY-MM-DD. The slashed dates are month/day/year"
+    else:
+        order = "with slashes"
+        instruction = f"Convert {col_name} to YYYY-MM-DD"
+    # Non-breaking hyphens (U+2011) keep "YYYY-MM-DD" on one line in the chip
+    return {
+        "text": f"Standardise dates in {col_name}",
+        "instruction": instruction,
+        "detail": f"{slashed:,} written {order}, {iso:,} as YYYY‑MM‑DD",
+    }

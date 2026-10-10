@@ -130,10 +130,10 @@ export default function DedupeTool() {
                 disabled={running}
                 aria-pressed={keyCols.has(i)}
                 className={cn(
-                  "rounded-lg border px-2.5 py-1 font-mono text-xs transition-colors disabled:opacity-50",
+                  "rounded-full border px-3 py-1 text-[13px] transition-colors disabled:opacity-50",
                   keyCols.has(i)
-                    ? "border-primary bg-primary/10 text-primary"
-                    : "bg-background text-muted-foreground hover:border-primary/40"
+                    ? "border-primary/60 bg-primary/15 text-foreground"
+                    : "bg-background text-muted-foreground hover:border-foreground/25 hover:text-foreground"
                 )}
               >
                 {h || `(column ${i + 1})`}
@@ -141,7 +141,7 @@ export default function DedupeTool() {
             ))}
           </div>
 
-          <Button onClick={run} disabled={running} className="w-full sm:w-auto">
+          <Button variant="inverse" onClick={run} disabled={running} className="w-full sm:w-auto">
             <Download className="mr-2 h-4 w-4" />{" "}
             {running ? "Removing duplicates…" : "Remove duplicates & download"}
           </Button>

@@ -1,4 +1,4 @@
-"""In-memory caches — LLM response cache + local Parquet file cache."""
+"""In-memory caches: local Parquet files and replay checkpoints."""
 
 from __future__ import annotations
 
@@ -13,50 +13,13 @@ from app import storage
 
 logger = logging.getLogger("sheetsllm.cache")
 
-# ── LLM Response Cache ────────────────────────────────────────────────
-# Same user + same instruction + same schema → same SQL.  Keyed by SHA-256.
-# The user id is part of the key because generated SQL can carry literals
-# lifted from that user's sample rows; it must never be served to another.
-
-_sql_cache: dict[str, tuple[str, float]] = {}  # key → (sql, expires_at)
-_SQL_TTL = 86_400  # 24 hours
-_sql_lock = threading.Lock()
-
-
-def sql_cache_key(user_id: str, instruction: str, schema_hash: str) -> str:
-    """Deterministic cache key from user + instruction + schema fingerprint."""
-    raw = f"{user_id}:{instruction.strip().lower()}:{schema_hash}"
-    return hashlib.sha256(raw.encode()).hexdigest()
+# ── Schema fingerprint ───────────────────────────────────────────────
 
 
 def schema_fingerprint(schema: dict) -> str:
     """Fast fingerprint: sorted column names + types."""
     parts = sorted(f"{c['name']}:{c['dtype']}" for c in schema.get("columns", []))
     return hashlib.sha256("|".join(parts).encode()).hexdigest()[:16]
-
-
-def get_cached_sql(key: str) -> str | None:
-    with _sql_lock:
-        entry = _sql_cache.get(key)
-        if entry is None:
-            return None
-        sql, expires_at = entry
-        if time.monotonic() > expires_at:
-            del _sql_cache[key]
-            return None
-        return sql
-
-
-def set_cached_sql(key: str, sql: str) -> None:
-    with _sql_lock:
-        _sql_cache[key] = (sql, time.monotonic() + _SQL_TTL)
-
-
-def sql_cache_stats() -> dict:
-    with _sql_lock:
-        now = time.monotonic()
-        live = sum(1 for _, (_, exp) in _sql_cache.items() if exp > now)
-        return {"total_entries": len(_sql_cache), "live_entries": live}
 
 
 # ── Local Parquet File Cache ──────────────────────────────────────────

@@ -8,6 +8,7 @@ import { markOnboardingStep } from "@/components/GettingStarted";
 import UpgradeCta from "@/components/UpgradeCta";
 import { markRecipeSaved } from "@/components/ExportClosingStrip";
 import { explainError } from "@/lib/errors";
+import { applyRecipe as runRecipeOn, type MatchNeeded, type RecipeApplyResult, type RunSource } from "@/lib/recipe-run";
 import { useBillingConfigured } from "@/lib/billing";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -36,17 +37,7 @@ export type Recipe = {
   required_columns?: string[];
 };
 
-export type RecipeApplyResult = {
-  file_id: string;
-  steps_added: number;
-  total_steps: number;
-  preview: {
-    columns: string[];
-    rows: Record<string, unknown>[];
-    total_rows: number;
-    total_columns: number;
-  };
-};
+export type { RecipeApplyResult } from "@/lib/recipe-run";
 
 export default function RecipesDrawer({
   open,
@@ -54,6 +45,8 @@ export default function RecipesDrawer({
   fileId,
   fileName,
   onApplied,
+  onNeedsMatch,
+  onSaved,
   saveFrom = "drawer",
 }: {
   open: boolean;
@@ -61,6 +54,9 @@ export default function RecipesDrawer({
   fileId?: string;
   fileName?: string;
   onApplied: (result: RecipeApplyResult) => void;
+  /** A column the recipe needs was renamed: ask which one it is now */
+  onNeedsMatch?: (need: MatchNeeded, from: RunSource) => void;
+  onSaved?: (recipe: { id: string; name: string }) => void;
   /** Opened from the rail's "Save as a recipe": start on the save form. */
   saveFrom?: "drawer" | "rail";
 }) {
@@ -148,6 +144,7 @@ export default function RecipesDrawer({
         markOnboardingStep("recipe");
         if (fileId) markRecipeSaved(fileId, data.steps);
         fetchRecipes();
+        if (data.recipe_id) onSaved?.({ id: data.recipe_id, name: data.name });
       }
     } catch (e) {
       console.error("Failed to save recipe:", e);
@@ -163,22 +160,17 @@ export default function RecipesDrawer({
     setError(null);
     setNotice(null);
     try {
-      const res = await fetchWithAuth(`/api/recipes/${recipe.id}/apply`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ file_id: fileId, from: "drawer" }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(explainError(data).text);
+      const out = await runRecipeOn(recipe, fileId, { from: "drawer" });
+      if (out.kind === "error") {
+        setError(out.text);
+      } else if (out.kind === "match") {
+        onNeedsMatch?.(out.need, "drawer");
       } else {
-        setNotice(`Applied "${recipe.name}": ${data.steps_added} step${data.steps_added === 1 ? "" : "s"} added.`);
-        onApplied(data as RecipeApplyResult);
+        const n = out.result.steps_added;
+        setNotice(`Applied "${recipe.name}": ${n} step${n === 1 ? "" : "s"} added.`);
+        onApplied(out.result);
         fetchStepCount();
       }
-    } catch (e) {
-      console.error("Failed to apply recipe:", e);
-      setError("Failed to apply recipe.");
     } finally {
       setApplying(null);
     }

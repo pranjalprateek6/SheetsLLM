@@ -178,7 +178,7 @@ function AuthContent() {
           <span className="text-lg font-semibold tracking-tight">SheetsLLM</span>
         </Link>
 
-        <div className="rounded-lg border bg-card p-8">
+        <div className="rounded-xl border bg-card p-8 shadow-sm">
           {confirmationSent ? (
             <div className="text-center">
               <MailCheck className="mx-auto mb-3 h-8 w-8 text-success-text" />
@@ -231,7 +231,7 @@ function AuthContent() {
                       <span className="w-full border-t" />
                     </div>
                     <div className="relative flex justify-center">
-                      <span className="bg-card px-2 text-xs uppercase tracking-wide text-muted-foreground">
+                      <span className="bg-card px-2 text-xs text-muted-foreground">
                         or
                       </span>
                     </div>

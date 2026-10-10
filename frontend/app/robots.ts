@@ -6,7 +6,7 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: "*",
         allow: "/",
-        disallow: ["/api/", "/workspace", "/dashboard", "/account", "/auth"],
+        disallow: ["/api/", "/workspace", "/dashboard", "/account", "/auth", "/recipes", "/admin"],
       },
     ],
     sitemap: "https://sheets-llm.vercel.app/sitemap.xml",

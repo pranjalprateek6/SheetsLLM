@@ -206,3 +206,82 @@ def test_schema_after_steps_reflects_dropped_columns(local_parquet):
     steps = [{"sql_query": "SELECT name, age FROM data"}]
     schema = get_schema_after_steps(local_parquet, steps)
     assert [c["name"] for c in schema["columns"]] == ["name", "age"]
+
+
+def test_title_case_works_under_the_names_models_use():
+    # DuckDB has no initcap; the model reaches for it (then title) first
+    from app.engine import get_connection
+
+    con = get_connection()
+    rows = con.execute(
+        "SELECT initcap('north'), title('nEW yORK city'), initcap(NULL), initcap('')"
+    ).fetchall()
+    assert rows == [("North", "New York City", None, "")]
+
+
+def test_a_file_over_the_row_limit_is_refused_not_cut(monkeypatch):
+    import app.engine as engine
+
+    monkeypatch.setattr(engine, "MAX_ROWS", 3)
+    csv = b"a\n1\n2\n3\n4\n"
+    with pytest.raises(engine.TooManyRowsError, match="4 rows, over the 3 row limit"):
+        engine.convert_to_parquet(csv, "big.csv")
+    # At the limit is fine
+    _, rows, _ = engine.convert_to_parquet(b"a\n1\n2\n3\n", "ok.csv")
+    assert rows == 3
+
+
+def test_a_timeout_stops_the_query_instead_of_waiting_for_it():
+    import time
+
+    from app.engine import QueryTimeoutError, _run_with_timeout, get_connection
+
+    def heavy():
+        con = get_connection()
+        return con.execute(
+            "SELECT sum(a.range * b.range) FROM range(200000) a, range(20000) b"
+        ).fetchall()
+
+    started = time.time()
+    with pytest.raises(QueryTimeoutError):
+        _run_with_timeout(heavy, timeout=1)
+    # It used to raise only after the ~17s query had finished by itself
+    assert time.time() - started < 5
+
+
+def test_a_connection_reaches_only_the_files_it_was_given(tmp_path):
+    import duckdb
+
+    from app.engine import get_connection
+
+    mine, other = tmp_path / "mine.parquet", tmp_path / "other.parquet"
+    for p in (mine, other):
+        duckdb.connect().execute(f"COPY (SELECT 1 AS a) TO '{_sql_path(p)}' (FORMAT PARQUET)")
+    out = tmp_path / "out.json"
+    con = get_connection(read=(mine,), write=(out,))
+    assert con.execute(f"SELECT * FROM read_parquet('{_sql_path(mine)}')").fetchall() == [(1,)]
+    con.execute(f"COPY (SELECT 1 AS a) TO '{_sql_path(out)}' (FORMAT JSON, ARRAY true)")
+    assert out.exists()
+    for sql in (
+        f"SELECT * FROM read_parquet('{_sql_path(other)}')",
+        f"SELECT * FROM glob('{_sql_path(tmp_path)}/*')",
+        f"COPY (SELECT 1) TO '{_sql_path(tmp_path / 'x.csv')}'",
+        f"ATTACH '{_sql_path(tmp_path / 'x.db')}'",
+        "SET enable_external_access = true",
+    ):
+        with pytest.raises(duckdb.Error):
+            con.execute(sql)
+
+
+def test_a_date_column_previews_as_a_date(tmp_path):
+    import duckdb
+    from fastapi.encoders import jsonable_encoder
+
+    from app.engine import execute_sql_from_local
+
+    src = tmp_path / "d.parquet"
+    duckdb.connect().execute(
+        f"COPY (SELECT '2026-10-28' AS d) TO '{_sql_path(src)}' (FORMAT PARQUET)"
+    )
+    out = execute_sql_from_local(src, "SELECT CAST(d AS DATE) AS d FROM data")
+    assert jsonable_encoder(out["preview"]) == [{"d": "2026-10-28"}]

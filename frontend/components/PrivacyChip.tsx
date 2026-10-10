@@ -71,9 +71,11 @@ export default function PrivacyChip({
         : "Chef sees column names, types and a few sample rows. Click for names and types only."}
       className={cn(
         "inline-flex h-6 items-center gap-1 rounded-full border px-2 text-[11px] font-medium transition-colors disabled:opacity-60",
+        // Emphasis is the difference from the default: strict is the default
+        // and stays quiet; sending sample rows is the state worth noticing.
         strict
-          ? "border-success/30 bg-success/[0.07] text-success-text hover:bg-success/10"
-          : "border-border bg-muted text-muted-foreground hover:text-foreground",
+          ? "border-border bg-card text-muted-foreground hover:text-foreground"
+          : "border-warning/40 bg-warning/10 text-warning-text hover:bg-warning/15",
         className,
       )}
     >

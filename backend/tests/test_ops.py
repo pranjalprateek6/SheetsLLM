@@ -221,7 +221,8 @@ def api(monkeypatch, parquet):
     monkeypatch.setattr(usage, "record", lambda uid, **c: recorded["usage"].append(c))
     monkeypatch.setattr(events, "record", lambda uid, name, **p: recorded["events"].append((name, p)))
     llm = FakeLLM()
-    monkeypatch.setattr(transform_module, "get_llm", lambda: llm)
+    # The op route imports no LLM at all; any call would have to come through here
+    monkeypatch.setattr("app.llm.factory.get_llm", lambda: llm)
     client = TestClient(app, raise_server_exceptions=False)
     return client, store, recorded, llm
 

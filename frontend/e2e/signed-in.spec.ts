@@ -45,7 +45,7 @@ test("signed in: upload, a fix with no AI, the change bar, the export header", a
     await page.waitForURL(/file_id=/);
     fileId = new URL(page.url()).searchParams.get("file_id");
 
-    await expect(page.getByRole("button", { name: /^Remove 12 duplicate rows/ })).toContainText("no AI");
+    await expect(page.getByRole("button", { name: /^Remove 12 duplicate rows/ })).toContainText("One click");
     await page.getByRole("button", { name: /^Remove 12 duplicate rows/ }).click();
     await expect(page.getByText("Step 1 applied")).toBeVisible();
     await expect(page.getByText("1,012 → 1,000 rows (−12)")).toBeVisible();

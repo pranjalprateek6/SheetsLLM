@@ -62,13 +62,9 @@ def _no_usage(monkeypatch):
 
 @pytest.fixture(autouse=True)
 def _clean_caches():
-    with cache._sql_lock:
-        cache._sql_cache.clear()
     with jobs._lock:
         jobs._jobs.clear()
     yield
-    with cache._sql_lock:
-        cache._sql_cache.clear()
     with jobs._lock:
         jobs._jobs.clear()
 
@@ -102,7 +98,7 @@ def _file_rec(row_count: int = 3) -> dict:
 
 @pytest.fixture
 def transform_seams(monkeypatch, source_parquet):
-    """Wire /transform and /chat to a real local parquet; mock db writes."""
+    """Wire /transform/op and /chat to a real local parquet; mock db writes."""
     from app import db
 
     monkeypatch.setattr(db, "get_file", lambda fid, uid: _file_rec() if fid == "f1" else None)
@@ -124,20 +120,20 @@ def _use_llm(monkeypatch, module, llm: FakeLLM):
     monkeypatch.setattr(module, "get_llm", lambda: llm)
 
 
-# ── What reaches the LLM, and what the SQL cache shares ──────────────
+# ── What reaches the LLM ─────────────────────────────────────────────
 
 
-class TestPrivacyAndCache:
-    def _transform(self, client, monkeypatch, settings_row, llm):
+class TestPrivacy:
+    def _chat(self, client, monkeypatch, settings_row, llm):
         # The real lookup, so the default under test is the one routes get
         monkeypatch.setattr(db, "get_privacy_mode", _real_get_privacy_mode)
         monkeypatch.setattr(db, "get_user_settings", lambda uid: settings_row)
-        _use_llm(monkeypatch, transform_module, llm)
-        return client.post("/transform", json={"file_id": "f1", "instruction": "keep a > 1"})
+        _use_llm(monkeypatch, chat_module, llm)
+        return client.post("/chat", json={"file_id": "f1", "message": "keep a > 1"})
 
     def test_prompt_has_no_sample_rows_when_strict(self, client, transform_seams, monkeypatch):
         llm = FakeLLM("SELECT * FROM data WHERE a > 1")
-        resp = self._transform(client, monkeypatch, None, llm)
+        resp = self._chat(client, monkeypatch, None, llm)
         assert resp.status_code == 200, resp.text
         prompt = llm.calls[0][1]
         assert "a (INTEGER)" in prompt and "b (VARCHAR)" in prompt
@@ -148,101 +144,18 @@ class TestPrivacyAndCache:
 
     def test_prompt_has_samples_when_off(self, client, transform_seams, monkeypatch):
         llm = FakeLLM("SELECT * FROM data WHERE a > 1")
-        resp = self._transform(client, monkeypatch, {"privacy_mode": False}, llm)
+        resp = self._chat(client, monkeypatch, {"privacy_mode": False}, llm)
         assert resp.status_code == 200, resp.text
         assert "Sample rows:" in llm.calls[0][1]
 
-    def test_same_user_hits(self):
-        k1 = cache.sql_cache_key("u1", "keep a > 1", "abc")
-        k2 = cache.sql_cache_key("u1", "  Keep A > 1 ", "abc")
-        assert k1 == k2
 
-    def test_same_instruction_different_user_misses(self):
-        assert cache.sql_cache_key("u1", "keep a > 1", "abc") != cache.sql_cache_key(
-            "u2", "keep a > 1", "abc"
-        )
-
-    def test_two_users_each_cost_one_llm_call(self, transform_seams, monkeypatch):
-        llm = FakeLLM("SELECT * FROM data WHERE a > 1", "SELECT * FROM data WHERE a > 1")
-        _use_llm(monkeypatch, transform_module, llm)
-        schema = {"columns": [{"name": "a", "dtype": "BIGINT"}]}
-        for user in ("u1", "u2", "u1", "u2"):
-            transform_module._generate_or_cache_sql(user, "keep a > 1", schema)
-        assert len(llm.calls) == 2
+# ── /transform is retired ─────────────────────────────────────────────
 
 
-# ── /transform ────────────────────────────────────────────────────────
-
-
-class TestTransform:
-    def test_sync_transform_returns_preview(self, client, transform_seams, monkeypatch):
-        _use_llm(monkeypatch, transform_module, FakeLLM("SELECT * FROM data WHERE a > 1"))
-        resp = client.post("/transform", json={"file_id": "f1", "instruction": "keep a > 1"})
-        assert resp.status_code == 200
-        body = resp.json()
-        assert body["step_number"] == 1
-        assert body["preview"]["total_rows"] == 2
-        assert body["sql"] == "SELECT * FROM data WHERE a > 1"
-
-    def test_async_transform_creates_completing_job(self, client, transform_seams, monkeypatch):
-        from app import db
-
-        monkeypatch.setattr(db, "get_file", lambda fid, uid: _file_rec(row_count=200_000))
-        _use_llm(monkeypatch, transform_module, FakeLLM("SELECT * FROM data WHERE a > 1"))
-
-        resp = client.post("/transform", json={"file_id": "f1", "instruction": "big"})
-        assert resp.status_code == 200
-        job_id = resp.json()["job_id"]
-        assert resp.json()["status"] == "processing"
-
-        # TestClient runs BackgroundTasks before returning — poll is terminal
-        poll = client.get(f"/jobs/{job_id}")
-        assert poll.status_code == 200
-        assert poll.json()["status"] == "completed"
-        assert poll.json()["result"]["preview"]["total_rows"] == 2
-
-    def test_clarification_short_circuits(self, client, transform_seams, monkeypatch):
-        _use_llm(monkeypatch, transform_module, FakeLLM(
-            '{"needs_clarification": true, "question": "Which column?", "suggestions": ["a", "b"]}'
-        ))
-        resp = client.post("/transform", json={"file_id": "f1", "instruction": "sort it"})
-        assert resp.status_code == 200
-        body = resp.json()
-        assert body["needs_clarification"] is True
-        assert body["question"] == "Which column?"
-
-    def test_execution_retry_uses_fixed_sql(self, client, transform_seams, monkeypatch):
-        llm = FakeLLM(
-            "SELECT nope FROM data",              # first attempt: bad column
-            "SELECT * FROM data WHERE a > 2",     # retry: fixed
-        )
-        _use_llm(monkeypatch, transform_module, llm)
-        resp = client.post("/transform", json={"file_id": "f1", "instruction": "filter"})
-        assert resp.status_code == 200
-        assert resp.json()["sql"] == "SELECT * FROM data WHERE a > 2"
-        assert len(llm.calls) == 2
-
-    def test_unknown_file_404(self, client, transform_seams):
-        resp = client.post("/transform", json={"file_id": "ghost", "instruction": "x"})
-        assert resp.status_code == 404
-        assert resp.json()["code"] == "FILE_NOT_FOUND"
-
-    def test_missing_instruction_400(self, client, transform_seams):
-        resp = client.post("/transform", json={"file_id": "f1"})
-        assert resp.status_code == 400
-        assert resp.json()["code"] == "MISSING_INSTRUCTION"
-
-    def test_invalid_json_400(self, client, transform_seams):
-        resp = client.post("/transform", content=b"not json",
-                           headers={"Content-Type": "application/json"})
-        assert resp.status_code == 400
-        assert resp.json()["code"] == "INVALID_JSON"
-
-    def test_non_select_sql_rejected(self, client, transform_seams, monkeypatch):
-        _use_llm(monkeypatch, transform_module, FakeLLM("DROP TABLE data"))
-        resp = client.post("/transform", json={"file_id": "f1", "instruction": "drop it"})
-        assert resp.status_code == 400
-        assert resp.json()["code"] == "INVALID_SQL"
+def test_the_old_transform_endpoint_is_gone(client, transform_seams):
+    # AI steps come through /chat; /transform enforced a cap no plan names
+    resp = client.post("/transform", json={"file_id": "f1", "instruction": "keep a > 1"})
+    assert resp.status_code in (404, 405)
 
 
 # ── /chat ─────────────────────────────────────────────────────────────

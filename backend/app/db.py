@@ -563,6 +563,39 @@ def create_audit_entry(
     return resp.data[0]
 
 
+def last_recipe_run(user_id: str, recipe_id: str) -> dict | None:
+    """The newest recipe_apply audit entry for one recipe, with the row
+    counts it recorded (metadata.counts), or None."""
+    resp = (
+        get_client()
+        .table("audit_log")
+        .select("file_id,metadata,created_at")
+        .eq("user_id", user_id)
+        .eq("action", "recipe_apply")
+        .order("created_at", desc=True)
+        .limit(50)
+        .execute()
+    )
+    for row in resp.data or []:
+        meta = row.get("metadata") or {}
+        if meta.get("recipe_id") == recipe_id and isinstance(meta.get("counts"), list):
+            return row
+    return None
+
+
+class MigrationMissing(Exception):
+    """A column a feature needs is not in the database yet."""
+
+
+def save_recipe_checks(recipe_id: str, user_id: str, checks: list[dict]) -> dict | None:
+    try:
+        return update_recipe(recipe_id, user_id, checks=checks)
+    except Exception as exc:
+        if "checks" in str(exc):
+            raise MigrationMissing("Run migration 011 to save checks on a recipe") from exc
+        raise
+
+
 def count_audit_actions(user_id: str, action: str, since_iso: str) -> int:
     """Count a user's audit entries of one action type since a timestamp.
     Powers the dashboard's 'manual cleanups avoided' insight."""

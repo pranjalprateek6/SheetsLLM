@@ -32,7 +32,7 @@ logger = logging.getLogger("sheetsllm")
 # timeout instead of an answer.
 _ROUTE_TIMEOUTS = {
     "/upload": 120,
-    "/transform": 90,
+    "/transform/op": 90,  # one-click fixes replay every step on big files
     "/download": 60,
     "/chat": 90,
 }

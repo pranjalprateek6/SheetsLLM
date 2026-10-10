@@ -12,6 +12,7 @@ export const metadata: Metadata = {
 export default function Page() {
   return (
     <ToolShell
+      href="/tools/json-to-csv"
       title="JSON to CSV converter"
       intro="Turn a JSON array of objects into a spreadsheet-ready CSV. Nested objects become dot-path columns; arrays are preserved as JSON strings."
       steps={[

@@ -38,12 +38,14 @@ export default function ExportClosingStrip({
   steps,
   stem,
   onDone,
+  onSaved,
 }: {
   fileId: string;
   exportedName: string;
   steps: number;
   stem: string;
   onDone: () => void;
+  onSaved?: (recipe: { id: string; name: string }) => void;
 }) {
   const [name, setName] = useState(`${stem} cleanup`);
   const [saving, setSaving] = useState(false);
@@ -68,6 +70,7 @@ export default function ExportClosingStrip({
       markOnboardingStep("recipe");
       toast.success(`Saved "${data.name}". Next month, drop the new file on it.`);
       onDone();
+      if (data.recipe_id) onSaved?.({ id: data.recipe_id, name: data.name });
     } catch {
       toast.error("Couldn't save the recipe. Try again.");
     } finally {

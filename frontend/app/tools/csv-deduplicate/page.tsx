@@ -12,6 +12,7 @@ export const metadata: Metadata = {
 export default function Page() {
   return (
     <ToolShell
+      href="/tools/csv-deduplicate"
       title="CSV duplicate remover"
       intro="Delete duplicate rows from any CSV file. Match on the entire row or just the columns you choose, then download the cleaned file."
       steps={[

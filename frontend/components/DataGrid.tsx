@@ -361,7 +361,7 @@ export default function DataGrid({
                 return (
                   <th
                     key={h}
-                    className={`h-9 px-2 font-mono text-[11px] font-medium text-muted-foreground whitespace-nowrap relative select-none group border-r border-border/60 last:border-r-0 ${
+                    className={`h-9 px-2 text-xs font-medium text-muted-foreground whitespace-nowrap relative select-none group border-r border-border/60 last:border-r-0 ${
                       numeric ? "text-right" : "text-left"
                     } ${highlighted ? "bg-primary/[0.06]" : ""}`}
                     style={{ width: colWidths[h] || 140 }}
@@ -422,7 +422,7 @@ export default function DataGrid({
                           {onOp && (
                             <>
                               <DropdownMenuSeparator />
-                              <DropdownMenuLabel className="text-[10px] font-normal uppercase tracking-[0.08em] text-muted-foreground">
+                              <DropdownMenuLabel className="text-[11px] font-medium text-muted-foreground">
                                 Fix, no AI
                               </DropdownMenuLabel>
                               {(isTextType(meta?.dtype) || (!meta?.dtype && typeof rows[0]?.[h] === "string")) && (
@@ -568,7 +568,7 @@ export default function DataGrid({
                       className="border-b border-border/60 transition-colors"
                       style={{ height: virtualRow.size }}
                     >
-                      <td className="w-[46px] min-w-[46px] border-r bg-card text-center font-mono text-[10px] text-muted-foreground tabular-nums select-none sticky left-0 z-[5]">
+                      <td className="w-[46px] min-w-[46px] border-r bg-card text-center text-[11px] text-muted-foreground tabular-nums select-none sticky left-0 z-[5]">
                         {virtualRow.index + 1}
                       </td>
                       {head.map((h) => {
@@ -591,7 +591,7 @@ export default function DataGrid({
                                 NULL
                               </span>
                             ) : (
-                              <span className="inline-block max-w-full truncate align-middle font-mono text-xs tabular-nums">{String(val)}</span>
+                              <span className="inline-block max-w-full truncate align-middle text-[13px] tabular-nums">{String(val)}</span>
                             )}
                             {copiedCell === cellKey && (
                               <span className="absolute top-0.5 right-0.5 text-[10px] text-success-text flex items-center">

@@ -3,7 +3,7 @@ import dynamic from "next/dynamic";
 import { Suspense, useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import {
-  BarChart3, BookMarked, Check, ChevronDown, Columns3, FileSpreadsheet, History, Lightbulb, MessageSquare, Pencil, Redo2, Undo2, Upload,
+  BarChart3, BookMarked, CalendarClock, Check, ChevronDown, Columns3, FileSpreadsheet, History, Lightbulb, MessageSquare, Pencil, Redo2, Undo2, Upload,
 } from "lucide-react";
 import ColumnHealth, { type HealthColumn } from "@/components/ColumnHealth";
 import PipelineSpine from "@/components/PipelineSpine";
@@ -22,6 +22,9 @@ import { explainError } from "@/lib/errors";
 const RecipesDrawer = dynamic(() => import("@/components/RecipesDrawer"));
 import ChatPanel, { type LateStep } from "@/components/ChatPanel";
 import RecipeHint from "@/components/RecipeHint";
+import RunReport from "@/components/RunReport";
+import MatchColumnsDialog from "@/components/MatchColumnsDialog";
+import { applyRecipe, type MatchNeeded, type RunSource } from "@/lib/recipe-run";
 import { useOpenFileUrl } from "@/lib/use-open-file-url";
 import { announceOpenFile } from "@/lib/open-file";
 import { downloadExport, exportFileName, fileStem as stemOf } from "@/lib/export";
@@ -37,7 +40,7 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import AuthGuard from "@/components/AuthGuard";
 import { toast } from "sonner";
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
-import { SAMPLE_DATASETS } from "@/lib/samples";
+import { SAMPLE_DATASETS, type SampleDataset } from "@/lib/samples";
 import { TextShimmer } from "@/components/ui/text-shimmer";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -120,6 +123,10 @@ function WorkspaceContent() {
   const [schemaOpen, setSchemaOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [sampleSuggestions, setSampleSuggestions] = useState<string[] | null>(null);
+  // The sample the open file came from, and, once a recipe is saved from it,
+  // the offer to run that recipe on the sample's next month
+  const [openSample, setOpenSample] = useState<SampleDataset | null>(null);
+  const [nextMonth, setNextMonth] = useState<{ recipe: { id: string; name: string }; sample: SampleDataset } | null>(null);
   // The insights the upload response carried, handed to Chef so its first
   // suggestions need no second request.
   const [uploadInsights, setUploadInsights] = useState<unknown>(null);
@@ -130,6 +137,13 @@ function WorkspaceContent() {
   const [steps, setSteps] = useState<{ step_number: number; instruction: string }[]>([]);
   // What the last transform changed, surfaced in the change bar so the
   // grid never silently swaps under the user.
+  // The last recipe run's report, and a renamed column waiting to be matched
+  const [runResult, setRunResult] = useState<RecipeApplyResult | null>(null);
+  const [matchNeed, setMatchNeed] = useState<{ need: MatchNeeded; from: RunSource } | null>(null);
+  const [matchBusy, setMatchBusy] = useState(false);
+  // A recipe the Recipes page asked to run on the file being opened
+  const queuedRecipeId = useSearchParams().get("apply_recipe");
+  const queuedRunRef = useRef<string | null>(null);
   const [lastChange, setLastChange] = useState<{
     stepNumber?: number;
     label: string;
@@ -286,7 +300,7 @@ function WorkspaceContent() {
       : (intents ?? []).includes("other")
         ? // "All sorts" = no routing preference — answer with variety:
           // one starter idea from each domain plus a generic cleanup.
-          [...SAMPLE_DATASETS.map((s) => s.suggestions[0]), EXAMPLE_PROMPTS[0]]
+          [...SAMPLE_DATASETS.flatMap((s) => s.suggestions.slice(0, 1)), EXAMPLE_PROMPTS[0]]
         : EXAMPLE_PROMPTS;
 
   useEffect(() => {
@@ -302,6 +316,8 @@ function WorkspaceContent() {
 
   const loadFileById = async (id: string) => {
     setLoading(true);
+    setOpenSample(null);
+    setNextMonth(null);
     setFileLoadError(false);
     try {
       const res = await fetchWithAuth(`/api/files/${id}`);
@@ -334,10 +350,16 @@ function WorkspaceContent() {
       const previewRes = await fetchWithAuth(`/api/download?file_id=${id}&format=json&purpose=preview`);
       if (previewRes.ok) {
         const previewData = await previewRes.json();
-        if (Array.isArray(previewData) && previewData.length > 0) {
-          setColumns(Object.keys(previewData[0]));
+        const loaded = Array.isArray(previewData) && previewData.length > 0 ? Object.keys(previewData[0]) : [];
+        if (loaded.length) {
+          setColumns(loaded);
           setRows(previewData.slice(0, 500));
         }
+        runQueuedRecipe(id, { columns: loaded, rowCount: file.row_count || 0 });
+      } else {
+        // The file opened but its rows did not; an empty grid alone would
+        // read as an empty file
+        toast.error("Couldn't load the rows of this file. Reload the page to try again.");
       }
     } catch (e) {
       console.error("Failed to load file:", e);
@@ -349,6 +371,8 @@ function WorkspaceContent() {
 
   const onUpload = async (file: File, sheetName?: string, suggestions?: string[], pendingId?: string | null) => {
     setLoading(true);
+    setOpenSample(null);
+    setNextMonth(null);
     setSampleSuggestions(suggestions ?? null);
     setUploadInsights(null);
     setUploadError(null);
@@ -444,7 +468,7 @@ function WorkspaceContent() {
       if (!res.ok) return;
       const blob = await res.blob();
       const file = new File([blob], sample.uploadName, { type: "text/csv" });
-      await onUpload(file, undefined, sample.suggestions);
+      if (await onUpload(file, undefined, sample.suggestions)) setOpenSample(sample);
     } catch (e) {
       console.error("Failed to load sample dataset:", e);
     } finally {
@@ -702,6 +726,7 @@ function WorkspaceContent() {
     setColumnCount(result.preview.total_columns);
     setExportStrip(null);
     setHealthNonce((n) => n + 1);
+    setRunResult(result.report || result.checks?.length ? result : null);
     const id = appliedTo ?? fileId;
     if (id) refreshSteps(id);
   }, [fileId, refreshSteps]);
@@ -760,28 +785,78 @@ function WorkspaceContent() {
   }, [fileId, previewHandler]);
 
   // ── Re-run card: upload, then apply the recipe ──────────────────────
-  const runRecipe = async (recipe: Recipe, targetId: string) => {
-    try {
-      const r = await fetchWithAuth(`/api/recipes/${recipe.id}/apply`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ file_id: targetId, from: "rerun" }),
-      });
-      const data = await r.json();
-      if (!r.ok) {
-        toast.error(explainError(data).text);
-        return;
-      }
-      handleRecipeApplied(data as RecipeApplyResult, targetId);
-      toast.success(`Ran "${recipe.name}" on the new file.`);
-    } catch {
-      toast.error(`Couldn't run "${recipe.name}". The file is uploaded; apply it from Recipes.`);
+  const startRecipe = async (recipe: { id: string; name?: string }, targetId: string, from: RunSource) => {
+    const out = await applyRecipe(recipe, targetId, { from });
+    if (out.kind === "match") setMatchNeed({ need: out.need, from });
+    else if (out.kind === "error") toast.error(out.text);
+    else {
+      handleRecipeApplied(out.result, targetId);
+      toast.success(`Ran "${out.result.recipe_name ?? recipe.name ?? "the recipe"}" on this file.`);
     }
   };
+  const runRecipe = (recipe: Recipe, targetId: string) => startRecipe(recipe, targetId, "rerun");
+
+  // The matches are in: run again with them
+  const runWithMatch = async (columnMap: Record<string, string>, remember: boolean) => {
+    if (!matchNeed) return;
+    const { need, from } = matchNeed;
+    setMatchBusy(true);
+    try {
+      const out = await applyRecipe({ id: need.recipeId, name: need.recipeName }, need.fileId, { from, columnMap, remember });
+      if (out.kind === "ok") {
+        setMatchNeed(null);
+        handleRecipeApplied(out.result, need.fileId);
+        toast.success(
+          out.result.remembered
+            ? `Ran "${need.recipeName}". It will expect the new name${need.missing.length === 1 ? "" : "s"} from now on.`
+            : `Ran "${need.recipeName}" with the matched column${need.missing.length === 1 ? "" : "s"}.`,
+        );
+      } else if (out.kind === "match") {
+        setMatchNeed({ need: out.need, from });
+      } else {
+        toast.error(out.text);
+      }
+    } finally {
+      setMatchBusy(false);
+    }
+  };
+
+  // Opened from the Recipes page with a recipe to run: loadFileById calls
+  // this once the file's rows are in, so the run starts from a settled grid,
+  // then the request leaves the address so a reload won't run it again
+  const runQueuedRecipe = (id: string, grid: { columns: string[]; rowCount: number }) => {
+    if (!queuedRecipeId || queuedRunRef.current === queuedRecipeId || (urlFileId && urlFileId !== id)) return;
+    queuedRunRef.current = queuedRecipeId;
+    prevGridRef.current = grid;
+    showFileInUrl(id);
+    startRecipe({ id: queuedRecipeId }, id, "recipes_page");
+  };
+
+  // A report belongs to the file it ran on
+  useEffect(() => {
+    setRunResult(null);
+  }, [fileId]);
 
   const handleRerun = (file: File, recipe: Recipe) => {
     pendingRecipeRef.current = recipe;
     onUpload(file);
+  };
+
+  // A recipe saved from a sample: its next month is a click away
+  const offerNextMonth = (recipe: { id: string; name: string }) => {
+    if (openSample?.next) setNextMonth({ recipe, sample: openSample });
+  };
+  const runNextMonth = async () => {
+    if (!nextMonth?.sample.next || loading) return;
+    const { recipe, sample } = nextMonth;
+    try {
+      const res = await fetch(sample.next!.file);
+      if (!res.ok) throw new Error(String(res.status));
+      const file = new File([await res.blob()], sample.next!.uploadName, { type: "text/csv" });
+      handleRerun(file, recipe as Recipe);
+    } catch {
+      toast.error(`Couldn't load ${sample.next!.label}. Try again.`);
+    }
   };
 
   // Recipes for the upload screen's re-run card
@@ -822,6 +897,13 @@ function WorkspaceContent() {
 
   const latestStep = steps.reduce((n, s) => Math.max(n, s.step_number), 0);
 
+  // The upload's insights describe the file as uploaded. Once it has a step
+  // (a fix, a Chef change, a recipe run on it) they are out of date, so drop
+  // them and let Chef ask for the file as it is now.
+  useEffect(() => {
+    if (latestStep > 0) setUploadInsights(null);
+  }, [latestStep]);
+
   return (
     <ErrorBoundary>
       <div className="relative bg-background">
@@ -847,7 +929,7 @@ function WorkspaceContent() {
         {/* Bad ?file_id= — dead-end recovery */}
         {fileLoadError && !fileReady && (
           <div className="flex min-h-[calc(100vh-56px)] items-center justify-center px-4">
-            <div className="w-full max-w-md rounded-md border bg-card p-8 text-center shadow-sm">
+            <div className="w-full max-w-md rounded-xl border bg-card p-8 text-center shadow-sm">
               {/* eslint-disable-next-line @next/next/no-img-element -- static SVG */}
               <img src="/logo.svg" className="mx-auto mb-3 h-10 w-10 opacity-50" alt="" />
               <h2 className="text-lg font-semibold tracking-tight">This file couldn&apos;t be loaded</h2>
@@ -874,7 +956,7 @@ function WorkspaceContent() {
                 workspace uses gives this phase the left edge instead, and says
                 which of the two states you are looking at. */}
             <div className="flex h-9 items-center gap-3 border-b bg-card px-4 sm:px-6">
-              <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
+              <span className="text-xs font-medium text-muted-foreground">
                 Workspace
               </span>
               <span className="text-xs text-muted-foreground">No file open</span>
@@ -907,7 +989,7 @@ function WorkspaceContent() {
               <div className="grid gap-5 md:grid-cols-2">
                 <div className="space-y-5">
                 <RerunCard recipes={recipes} armedId={armedRecipeId} disabled={loading} onRun={handleRerun} />
-                <div className="rounded-md border bg-card p-6">
+                <div className="rounded-xl border bg-card p-6 shadow-sm">
                   <h2 className="mb-4 text-lg font-semibold tracking-tight">Upload a spreadsheet</h2>
                   <DropZone disabled={loading} onDropFile={onUpload} />
                   {uploadError && (
@@ -916,7 +998,7 @@ function WorkspaceContent() {
                     </div>
                   )}
                   <div className="mt-5 border-t pt-4">
-                    <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    <p className="mb-2 text-xs font-medium text-muted-foreground">
                       No file handy? Try a sample
                     </p>
                     {/* One-frame gate: render the list only after saved intents
@@ -951,7 +1033,7 @@ function WorkspaceContent() {
                 </div>
                 <div className="space-y-4">
                   <GettingStarted />
-                  <div className="rounded-md border bg-card p-5">
+                  <div className="rounded-xl border bg-card p-5 shadow-sm">
                     <div className="flex items-start gap-3">
                       <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-primary/10">
                         <Lightbulb className="h-4 w-4 text-primary" />
@@ -1119,7 +1201,7 @@ function WorkspaceContent() {
                   complete it is. Nulls read as the gap and drain as you clean. */}
               {healthColumns.length > 0 && (
                 <div className="flex h-9 flex-shrink-0 items-center gap-3 border-b bg-card px-3">
-                  <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
+                  <span className="text-xs font-medium text-muted-foreground">
                     Columns
                   </span>
                   <ColumnHealth
@@ -1133,10 +1215,10 @@ function WorkspaceContent() {
                   {/* The segments are proportional to column width, so on a
                       phone the narrow ones compress to 14px: too small to read
                       and too small to tap. The row states the count instead. */}
-                  <span className="flex-1 font-mono text-[10px] tabular-nums text-muted-foreground sm:hidden">
+                  <span className="flex-1 text-[11px] tabular-nums text-muted-foreground sm:hidden">
                     {healthColumns.length}
                   </span>
-                  <span className="shrink-0 font-mono text-[10px] tabular-nums text-muted-foreground">
+                  <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
                     {healthColumns.filter((c) => (c.null_pct ?? 0) > 0).length} with gaps
                   </span>
                 </div>
@@ -1149,6 +1231,7 @@ function WorkspaceContent() {
                 fileId={fileId}
                 enabled={fileReady && showTransform && steps.length === 0 && !lastChange && !recipesOpen}
                 onApplied={(r) => handleRecipeApplied(r)}
+                onNeedsMatch={(need, from) => setMatchNeed({ need, from })}
               />
 
               {exportStrip && fileId && (
@@ -1158,6 +1241,7 @@ function WorkspaceContent() {
                   steps={exportStrip.steps}
                   stem={stemOf(fileName)}
                   onDone={() => setExportStrip(null)}
+                  onSaved={offerNextMonth}
                 />
               )}
 
@@ -1231,6 +1315,42 @@ function WorkspaceContent() {
                 </div>
               )}
 
+              {/* Saved a recipe from a sample: next month's file is waiting */}
+              {nextMonth?.sample.next && (
+                <div className="flex flex-shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-primary/25 bg-primary/[0.06] px-4 py-2 text-xs">
+                  <CalendarClock className="h-3.5 w-3.5 flex-shrink-0 text-primary-accent" aria-hidden />
+                  <span className="font-medium">{nextMonth.sample.next.label} just came in.</span>
+                  <span className="text-muted-foreground">
+                    See month two: &ldquo;{nextMonth.recipe.name}&rdquo; cleans it in one click, with a report beside October.
+                  </span>
+                  <div className="ml-auto flex items-center gap-2">
+                    <Button size="sm" className="h-7" onClick={runNextMonth} disabled={loading}>
+                      Run it on {nextMonth.sample.next.label}
+                    </Button>
+                    <button
+                      type="button"
+                      onClick={() => setNextMonth(null)}
+                      className="text-muted-foreground hover:text-foreground"
+                      aria-label="Not now"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* A recipe run: each step beside the last run, and its checks */}
+              {runResult && !exportStrip && (
+                <RunReport
+                  key={`${runResult.recipe_id}-${runResult.total_steps}`}
+                  recipeName={runResult.recipe_name}
+                  report={runResult.report}
+                  checks={runResult.checks}
+                  matched={runResult.matched}
+                  onClose={() => setRunResult(null)}
+                />
+              )}
+
               {/* Data grid */}
               <div className="flex-1 overflow-hidden">
                 <DataGrid
@@ -1302,7 +1422,18 @@ function WorkspaceContent() {
           fileId={fileId}
           fileName={fileName}
           onApplied={(r) => handleRecipeApplied(r)}
+          onNeedsMatch={(need, from) => {
+            setRecipesOpen(false);
+            setMatchNeed({ need, from });
+          }}
+          onSaved={offerNextMonth}
           saveFrom={recipesFrom}
+        />
+        <MatchColumnsDialog
+          need={matchNeed?.need ?? null}
+          busy={matchBusy}
+          onRun={runWithMatch}
+          onCancel={() => setMatchNeed(null)}
         />
         <Dialog open={renameOpen} onOpenChange={setRenameOpen}>
           <DialogContent className="sm:max-w-sm">

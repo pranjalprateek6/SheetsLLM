@@ -5,7 +5,9 @@ GET    /recipes              list the user's recipes
 GET    /recipes/{id}         recipe detail (steps included)
 PATCH  /recipes/{id}         rename / edit description
 DELETE /recipes/{id}         delete a recipe
-POST   /recipes/{id}/apply   append the recipe's steps to another file
+POST   /recipes/{id}/apply   append the recipe's steps to another file, with
+                             a run report, its checks, and column matching
+PUT    /recipes/{id}/checks  replace the checks a recipe runs
 """
 
 from __future__ import annotations
@@ -19,7 +21,16 @@ from fastapi import APIRouter, Request, Response
 
 from app import db, events, usage
 from app.cache import get_local_parquet
-from app.engine import replay_transformations_local
+from app.engine import get_schema_after_steps, measure_run, replay_transformations_local
+from app.recipe_runs import (
+    check_label,
+    check_sql,
+    mapping_step,
+    remembered_columns,
+    step_report,
+    suggest_mapping,
+    validate_checks,
+)
 from app.recipes import (
     RecipeError,
     missing_columns,
@@ -216,12 +227,48 @@ def delete_recipe(request: Request, recipe_id: str):
     return {"deleted": True, "recipe_id": recipe_id}
 
 
+def _checks_of(recipe: dict) -> list[dict]:
+    """A recipe's checks; none before migration 011 adds the column."""
+    try:
+        return validate_checks(recipe.get("checks") or [])
+    except RecipeError:
+        logger.warning("Recipe %s has malformed checks; ignoring them", recipe.get("id"))
+        return []
+
+
+def _baseline(user_id: str, recipe: dict, n_steps: int) -> tuple[list[int] | None, dict | None]:
+    """Row counts to compare this run with: the recipe's last run, or the
+    file it was made from. Each is the rows before the first step, then after
+    each step, so it has n_steps + 1 values; anything else is not comparable."""
+    try:
+        last = db.last_recipe_run(user_id, recipe["id"])
+        if last:
+            counts = last["metadata"]["counts"]
+            if len(counts) == n_steps + 1 and all(isinstance(c, int) for c in counts):
+                name = db.file_names([last["file_id"]]).get(last["file_id"]) if last.get("file_id") else None
+                return counts, {"kind": "last_run", "file_name": name}
+        src = recipe.get("source_file_id")
+        if src:
+            steps = db.get_transformations(src)
+            counts = [db.get_upload_row_count(src)] + [s.get("row_count_after") for s in steps]
+            if len(counts) == n_steps + 1 and all(isinstance(c, int) for c in counts):
+                return counts, {"kind": "source", "file_name": db.file_names([src]).get(src)}
+    except Exception as exc:
+        logger.warning("No baseline for recipe %s: %s", recipe.get("id"), exc)
+    return None, None
+
+
 @router.post("/recipes/{recipe_id}/apply")
 async def apply_recipe(request: Request, recipe_id: str):
     """Append the recipe's steps to a target file and replay the full chain.
 
-    No LLM call is involved — that is the point of recipes — so this consumes
-    no transform quota; only rows_processed is recorded.
+    No LLM call is involved, which is the point of recipes, so this costs no
+    AI request; only rows_processed is recorded.
+
+    Body: file_id, and optionally column_map {recipe's column: this file's
+    column} with remember, when a column the recipe needs was renamed. The
+    response carries a report (each step's rows beside the last run's) and
+    the result of every check the recipe has.
     """
     user_id = getattr(request.state, "user_id", "anonymous")
     start_time = perf_counter()
@@ -234,6 +281,8 @@ async def apply_recipe(request: Request, recipe_id: str):
     file_id = body.get("file_id")
     if not file_id:
         return _json_response(400, "MISSING_FILE_ID", "file_id is required")
+    column_map = body.get("column_map") or None
+    remember = bool(body.get("remember")) and bool(column_map)
 
     recipe = db.get_recipe(recipe_id, user_id)
     if not recipe:
@@ -249,33 +298,69 @@ async def apply_recipe(request: Request, recipe_id: str):
     except RecipeError as exc:
         return _json_response(400, "RECIPE_INVALID", str(exc))
 
+    required = recipe.get("required_columns") or []
+    required_names = [c["name"] for c in required if isinstance(c, dict) and c.get("name")]
     existing = db.get_transformations(file_id)
-    new_steps = renumber_after(recipe_steps, len(existing))
-    combined = existing + new_steps
 
-    # Dry run + execute: replay includes an EXPLAIN before execution, which is
-    # the authoritative compatibility check for the target file's schema.
     try:
         local_path = await asyncio.to_thread(get_local_parquet, file_rec["r2_key"])
+        # The columns the recipe's first step will see
+        if existing:
+            schema = await asyncio.to_thread(get_schema_after_steps, local_path, existing)
+            file_columns = [c["name"] for c in schema.get("columns", [])]
+        else:
+            file_columns = [c["name"] for c in _base_columns(file_rec)]
+    except Exception as exc:
+        logger.error("Could not read file %s for recipe %s: %s", file_id, recipe_id, exc)
+        return _json_response(500, "FILE_UNREADABLE", "This file could not be read. Try again.")
+
+    prefix: list[dict] = []
+    if column_map:
+        try:
+            prefix = [mapping_step(column_map, file_columns, required_names)]
+        except RecipeError as exc:
+            return _json_response(400, "INVALID_MAPPING", str(exc))
+
+    new_steps = renumber_after(prefix + recipe_steps, len(existing))
+    combined = existing + new_steps
+
+    # Replay includes an EXPLAIN before execution: the authoritative check of
+    # whether the recipe fits this file
+    try:
         result = await asyncio.to_thread(replay_transformations_local, local_path, combined)
     except Exception as exc:
-        target_cols = [c.get("name") for c in _base_columns(file_rec)]
-        missing = missing_columns(recipe.get("required_columns") or [], target_cols)
-        hint = (
-            f" The recipe's source file had columns this file lacks: {missing}."
-            if missing else ""
-        )
+        mapped = set(column_map or {})
+        missing = [m for m in missing_columns(required, file_columns) if m not in mapped]
+        logger.info("Recipe %s did not fit file %s: %s", recipe_id, file_id, exc)
         events.record(user_id, "recipe_incompatible", recipe_id=recipe_id, missing=missing)
+        if missing:
+            message = f"This file is missing columns the recipe needs: {', '.join(missing)}."
+        else:
+            message = "The recipe's steps didn't run on this file."
         return _json_response(
-            400, "RECIPE_INCOMPATIBLE",
-            f"Recipe could not be applied to this file: {exc}.{hint}",
+            400, "RECIPE_INCOMPATIBLE", message,
             missing=missing,
+            suggested_map=suggest_mapping(missing, file_columns, required_names),
+            file_columns=file_columns,
+            recipe_name=recipe["name"],
         )
 
-    # Persist the appended steps (counts recorded on the final step)
+    # Rows before the recipe and after each of its steps, and the checks,
+    # measured on the same chain the preview came from
+    checks = _checks_of(recipe)
+    try:
+        counts, failed = await asyncio.to_thread(
+            measure_run, local_path, combined, len(existing),
+            [check_sql(c, result["columns"]) for c in checks],
+        )
+    except Exception as exc:
+        logger.warning("Could not measure recipe run %s on %s: %s", recipe_id, file_id, exc)
+        counts, failed = None, [None] * len(checks)
+
+    # Persist the appended steps, each with the rows it left
     try:
         last_number = len(existing) + len(new_steps)
-        for step in new_steps:
+        for i, step in enumerate(new_steps):
             is_last = step["step_number"] == last_number
             db.create_transformation(
                 file_id=file_id,
@@ -284,7 +369,7 @@ async def apply_recipe(request: Request, recipe_id: str):
                 sql_query=step["sql_query"],
                 explain=f"recipe: {recipe['name']}",
                 sent={"source": "recipe"},
-                row_count_after=result["total_rows"] if is_last else None,
+                row_count_after=counts[i + 1] if counts else (result["total_rows"] if is_last else None),
                 column_count_after=result["total_columns"] if is_last else None,
                 columns_after=result["columns"] if is_last else None,
             )
@@ -302,6 +387,48 @@ async def apply_recipe(request: Request, recipe_id: str):
             logger.error("Rollback of partial recipe steps failed for %s", file_id)
         return _json_response(500, "DB_FAILED", "Failed to save recipe steps")
 
+    # A remembered match becomes part of the recipe: next month's file, with
+    # the new names, then fits as it is
+    remembered = False
+    if remember:
+        try:
+            db.update_recipe(
+                recipe_id, user_id,
+                steps=renumber_after(prefix + recipe_steps, 0),
+                required_columns=remembered_columns(required, column_map),
+            )
+            remembered = True
+        except Exception as exc:
+            logger.warning("Could not remember the match on recipe %s: %s", recipe_id, exc)
+
+    # The report: this run beside the last one, step by step
+    report = None
+    stored_counts = None
+    if counts:
+        baseline, compared_with = _baseline(user_id, recipe, len(recipe_steps))
+        if baseline and prefix:
+            # A match renames, it removes no rows: give it last time's count too
+            baseline = [baseline[0]] + baseline
+        steps_report = step_report([s["instruction"] for s in new_steps], counts, baseline)
+        report = {
+            "steps": steps_report,
+            "flagged": sum(1 for s in steps_report if s["flag"]),
+            "compared_with": compared_with if baseline else None,
+        }
+        # Saved aligned with the recipe as it now stands, for the next run
+        stored_counts = counts if (remembered or not prefix) else [counts[0]] + counts[2:]
+
+    check_results = [
+        {
+            **c,
+            "label": check_label(c),
+            "failed": f,
+            "ok": f == 0,
+            "column_missing": c["column"] not in result["columns"],
+        }
+        for c, f in zip(checks, failed)
+    ]
+
     usage.record(user_id, rows_processed=result["total_rows"])
     # Where the apply came from: the hint over a fresh file, or the drawer
     source = body.get("from") if body.get("from") in ("hint", "drawer", "rerun", "recipes_page") else None
@@ -311,6 +438,14 @@ async def apply_recipe(request: Request, recipe_id: str):
     )
     if source == "hint":
         events.record(user_id, "recipe_hint_applied", recipe_id=recipe_id)
+    if column_map:
+        events.record(user_id, "recipe_columns_matched", recipe_id=recipe_id,
+                      columns=len(column_map), remembered=remembered)
+    if report and report["flagged"]:
+        events.record(user_id, "recipe_run_flagged", recipe_id=recipe_id, flagged=report["flagged"])
+    failing = [c for c in check_results if c["failed"]]
+    if failing:
+        events.record(user_id, "recipe_check_failed", recipe_id=recipe_id, checks=len(failing))
     try:
         db.create_audit_entry(
             user_id=user_id, file_id=file_id, action="recipe_apply",
@@ -318,6 +453,7 @@ async def apply_recipe(request: Request, recipe_id: str):
                 "recipe_id": recipe_id,
                 "recipe_name": recipe["name"],
                 "steps_added": len(new_steps),
+                "counts": stored_counts,
                 "elapsed_ms": round((perf_counter() - start_time) * 1000, 2),
             },
         )
@@ -327,12 +463,46 @@ async def apply_recipe(request: Request, recipe_id: str):
     return {
         "file_id": file_id,
         "recipe_id": recipe_id,
+        "recipe_name": recipe["name"],
         "steps_added": len(new_steps),
         "total_steps": len(combined),
+        "matched": column_map or None,
+        "remembered": remembered,
+        "report": report,
+        "checks": check_results,
         "preview": {
             "columns": result["columns"],
             "rows": result["preview"],
             "total_rows": result["total_rows"],
             "total_columns": result["total_columns"],
         },
+    }
+
+
+@router.put("/recipes/{recipe_id}/checks")
+async def put_recipe_checks(request: Request, recipe_id: str):
+    """Replace the checks a recipe runs after its steps."""
+    user_id = getattr(request.state, "user_id", "anonymous")
+    try:
+        body = await request.json()
+    except Exception:
+        return _json_response(400, "INVALID_JSON", "Request body must be JSON")
+    if not isinstance(body, dict):
+        return _json_response(400, "INVALID_JSON", "Request body must be a JSON object")
+    try:
+        checks = validate_checks(body.get("checks"))
+    except RecipeError as exc:
+        return _json_response(400, "INVALID_CHECKS", str(exc))
+    if not db.get_recipe(recipe_id, user_id):
+        return _json_response(404, "RECIPE_NOT_FOUND", "Recipe not found")
+    try:
+        updated = db.save_recipe_checks(recipe_id, user_id, checks)
+    except db.MigrationMissing as exc:
+        return _json_response(503, "MIGRATION_REQUIRED", str(exc))
+    if not updated:
+        return _json_response(404, "RECIPE_NOT_FOUND", "Recipe not found")
+    events.record(user_id, "recipe_checks_saved", recipe_id=recipe_id, checks=len(checks))
+    return {
+        "recipe_id": recipe_id,
+        "checks": [{**c, "label": check_label(c)} for c in checks],
     }

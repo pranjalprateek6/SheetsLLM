@@ -38,6 +38,7 @@ RULES:
 - Use ONLY the column names provided in the schema. NEVER invent columns.
 - Return ONLY a valid DuckDB SQL SELECT statement. No prose, no markdown, no explanation, no semicolons.
 - DuckDB syntax — use ILIKE for case-insensitive matching, || for string concat.
+- DuckDB has no initcap. For title case write: array_to_string(list_transform(string_split(lower(col), ' '), lambda w: upper(left(w, 1)) || substr(w, 2)), ' ')
 - For computed columns: SELECT *, (expression) AS new_column_name FROM data
 - For renaming: SELECT col1 AS new_name, col2 FROM data
   - When renaming, include ALL other columns explicitly so they are preserved.
@@ -162,6 +163,7 @@ When in doubt, prefer INSIGHT over SQL TRANSFORM. Only use SQL when the user cle
 
 RULES:
 - Use DuckDB syntax (ILIKE, ||, etc.)
+- DuckDB has no initcap. For title case write: array_to_string(list_transform(string_split(lower(col), ' '), lambda w: upper(left(w, 1)) || substr(w, 2)), ' ')
 - For computed columns: SELECT *, (expression) AS new_column_name FROM data
 - When renaming, include ALL other columns explicitly.
 - Always preserve all rows unless the user explicitly asks to filter.

@@ -17,6 +17,9 @@ const FORMATS: { value: string; label: string }[] = [
   { value: "parquet", label: "Parquet" },
 ];
 
+// The backend refuses Excel past this (download.py _XLSX_MAX_ROWS); say so here
+const XLSX_MAX_ROWS = 250_000;
+
 type HistoryStep = { step_number: number; row_count_after?: number | null; columns_after?: string[] | null };
 
 export type ExportSummary = {
@@ -134,11 +137,15 @@ export default function ExportMenu({
           </div>
         )}
         <DropdownMenuSeparator />
-        {FORMATS.map((f) => (
-          <DropdownMenuItem key={f.value} disabled={mismatch} onClick={() => onExport(f.value)}>
-            {f.label}
-          </DropdownMenuItem>
-        ))}
+        {FORMATS.map((f) => {
+          const tooBig = f.value === "xlsx" && rows > XLSX_MAX_ROWS;
+          return (
+            <DropdownMenuItem key={f.value} disabled={mismatch || tooBig} onClick={() => onExport(f.value)}>
+              {f.label}
+              {tooBig && <span className="ml-auto pl-3 text-[11px] text-muted-foreground">up to 250,000 rows</span>}
+            </DropdownMenuItem>
+          );
+        })}
       </DropdownMenuContent>
     </DropdownMenu>
   );

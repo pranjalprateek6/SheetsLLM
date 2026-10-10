@@ -38,7 +38,7 @@ export default function CommandBarMeter({ refreshKey, className }: { refreshKey?
       href="/pricing?reason=ai_requests"
       title="Your monthly AI requests. Recipes and one-click fixes don't use them."
       className={cn(
-        "inline-flex h-7 items-center gap-1.5 rounded-md border px-2 font-mono text-[11px] tabular-nums transition-colors hover:bg-accent",
+        "inline-flex h-7 items-center gap-1.5 rounded-md border px-2 text-xs font-medium tabular-nums transition-colors hover:bg-accent",
         capped ? "border-destructive/40 text-destructive-text" : "border-warning/40 text-warning-text",
         className,
       )}

@@ -74,6 +74,12 @@ export function matchVerb(raw: string, columns: ColumnInfo[]): VerbMatch | null 
     return col ? { op: "drop_column", column: col, label: `Drop column ${col}` } : null;
   }
 
+  // Standardise the dates in a column (the upload's mixed-format suggestion)
+  if (/^(?:please\s+)?standardi[sz]e\s+(?:the\s+)?dates?\s+(?:in|of)\s+/.test(t)) {
+    const col = findColumn(text, columns);
+    return col ? { op: "standardise_date", column: col, args: { format: "auto" }, label: `Standardise dates in ${col}` } : null;
+  }
+
   // Sort all rows by a column
   if (/^(?:please\s+)?(?:sort|order)\b/.test(t)) {
     const col = findColumn(text, columns);

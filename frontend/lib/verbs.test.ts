@@ -28,6 +28,8 @@ describe("matchVerb", () => {
     ["drop column Region", "drop_column", "Region", undefined],
     ["delete the Amount column", "drop_column", "Amount", undefined],
     ["drop rows where Region is null", "drop_empty_rows", "Region", undefined],
+    ["standardise dates in Order Date", "standardise_date", "Order Date", { format: "auto" }],
+    ["Standardize the dates in Date", "standardise_date", "Date", { format: "auto" }],
     ["remove rows with empty Email", "drop_empty_rows", "Email", undefined],
     ["sort by Order Date newest first", "sort", "Order Date", { direction: "desc" }],
     ["sort by Amount", "sort", "Amount", { direction: "asc" }],

@@ -8,6 +8,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
 import { Button } from "@/components/ui/button";
+import { SiteFooter } from "@/components/marketing/blocks";
 import { Badge } from "@/components/ui/badge";
 import UpgradeCta from "@/components/UpgradeCta";
 import { TextShimmer } from "@/components/ui/text-shimmer";
@@ -237,10 +238,10 @@ function PricingContent() {
   return (
     <div className="mx-auto max-w-4xl px-4 py-16 sm:px-6">
       <div className="mb-10 text-center">
-        <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
+        <h1 className="text-[40px] font-medium leading-none tracking-[-0.022em] sm:text-[56px]">
           Simple pricing
         </h1>
-        <p className="mx-auto mt-3 max-w-xl text-balance text-muted-foreground">
+        <p className="mx-auto mt-5 max-w-xl text-balance text-[17px] leading-relaxed text-muted-foreground">
           A saved recipe turns a 30-minute monthly cleanup into one click.
           Start free. Upgrade when the cleanups become a routine.
         </p>
@@ -294,7 +295,7 @@ function PricingContent() {
 
       <div className="grid gap-6 md:grid-cols-2">
         {/* Free */}
-        <div className="flex flex-col rounded-lg border bg-card p-7">
+        <div className="flex flex-col rounded-xl border bg-card p-7 shadow-sm">
           <h2 className="font-medium">Free</h2>
           <p className="mt-2 text-4xl font-semibold tracking-tight">
             ₹0<span className="text-base font-normal text-muted-foreground">/mo</span>
@@ -313,7 +314,7 @@ function PricingContent() {
           <div className="mt-7">
             {signedOut ? (
               <>
-                <Button variant="outline" className="w-full" asChild>
+                <Button variant="glass" className="w-full" asChild>
                   <Link href="/auth?mode=signup">
                     Start free <ArrowRight className="ml-1 h-4 w-4" />
                   </Link>
@@ -331,8 +332,8 @@ function PricingContent() {
         </div>
 
         {/* Pro */}
-        <div className="relative flex flex-col rounded-lg border border-primary bg-card p-7 ring-1 ring-primary/25">
-          <Badge className="absolute -top-3 left-6">Recommended</Badge>
+        <div className="relative flex flex-col rounded-xl border border-primary bg-card p-7 shadow-md ring-1 ring-primary/25">
+          <Badge className="absolute -top-2.5 left-6 border-primary/30 bg-card py-1 shadow-xs">Recommended</Badge>
           <h2 className="font-medium">Pro</h2>
           <p className="mt-2 text-4xl font-semibold tracking-tight">
             ₹499<span className="text-base font-normal text-muted-foreground">/mo</span>
@@ -359,7 +360,7 @@ function PricingContent() {
                 {busy ? "Working…" : "Cancel subscription"}
               </Button>
             ) : signedOut ? (
-              <Button className="w-full" asChild>
+              <Button variant="inverse" className="w-full" asChild>
                 <Link href="/auth?mode=signup">
                   Start with Pro <ArrowRight className="ml-1 h-4 w-4" />
                 </Link>
@@ -404,7 +405,7 @@ function PricingContent() {
           </h2>
           <div className="grid gap-4 sm:grid-cols-3">
             {UPGRADE_TIMELINE.map((step) => (
-              <div key={step.title} className="rounded-lg border bg-card p-5">
+              <div key={step.title} className="rounded-xl border bg-card p-5 shadow-sm">
                 <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
                   <step.icon className="h-4 w-4 text-primary" />
                 </div>
@@ -421,7 +422,7 @@ function PricingContent() {
         <h2 className="mb-6 text-center text-xl font-semibold tracking-tight">
           Compare plans
         </h2>
-        <div className="overflow-hidden rounded-lg border bg-card">
+        <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b bg-muted/40 text-left">
@@ -460,7 +461,7 @@ function PricingContent() {
         <h2 className="mb-6 text-center text-xl font-semibold tracking-tight">
           Frequently asked questions
         </h2>
-        <div className="divide-y rounded-lg border bg-card px-6">
+        <div className="divide-y rounded-xl border bg-card px-6 shadow-xs">
           {FAQ.filter((item) => billingConfigured || !item.q.startsWith("Can I cancel")).map((item) => (
             <details key={item.q} className="group py-4">
               <summary className="flex cursor-pointer list-none items-center justify-between text-sm font-medium [&::-webkit-details-marker]:hidden">
@@ -504,6 +505,7 @@ export default function PricingPage() {
       }
     >
       <PricingContent />
+      <SiteFooter />
     </Suspense>
   );
 }

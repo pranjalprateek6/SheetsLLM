@@ -5,7 +5,7 @@ import { expect, test } from "@playwright/test";
 test("the landing page leads with the promise", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1 })).toContainText(/Clean the same spreadsheet once/);
-  await expect(page.getByRole("link", { name: /Get started|Sign in/ }).first()).toBeVisible();
+  await expect(page.getByRole("link", { name: /Start free|Sign in/ }).first()).toBeVisible();
 });
 
 test("pricing shows both plans", async ({ page }) => {
@@ -15,9 +15,13 @@ test("pricing shows both plans", async ({ page }) => {
   await expect(page.getByText("₹499", { exact: false })).toBeVisible();
 });
 
-test("the tools index lists the four free tools", async ({ page }) => {
+test("the tools index lists all twelve free tools", async ({ page }) => {
   await page.goto("/tools");
-  for (const href of ["/tools/csv-cleaner", "/tools/csv-deduplicate", "/tools/csv-splitter", "/tools/json-to-csv"]) {
+  for (const href of [
+    "/tools/csv-cleaner", "/tools/csv-deduplicate", "/tools/csv-find-replace", "/tools/change-case",
+    "/tools/merge-csv", "/tools/csv-splitter", "/tools/csv-columns", "/tools/split-column",
+    "/tools/excel-to-csv", "/tools/json-to-csv", "/tools/csv-to-json", "/tools/csv-delimiter",
+  ]) {
     await expect(page.locator(`a[href="${href}"]`).first()).toBeVisible();
   }
 });

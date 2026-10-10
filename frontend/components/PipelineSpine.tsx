@@ -78,7 +78,7 @@ export default function PipelineSpine({
         <span
           aria-hidden
           className={cn(
-            "z-10 grid h-5 w-5 shrink-0 place-items-center rounded-full border font-mono text-[10px] tabular-nums transition-colors",
+            "z-10 grid h-5 w-5 shrink-0 place-items-center rounded-full border text-[10px] font-medium tabular-nums transition-colors",
             active
               ? "border-primary bg-primary text-primary-foreground"
               : "border-border bg-background group-hover:border-primary/50"
@@ -114,7 +114,7 @@ export default function PipelineSpine({
         <div className={cn("flex items-center border-b px-2 py-1.5", collapsed ? "justify-center" : "justify-between")}>
           {!collapsed && (
             // Once there is a step, this list is a recipe in the making: name it so
-            <span className="font-mono text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
+            <span className="text-xs font-medium text-muted-foreground">
               {steps.length === 0 ? "Steps" : `Recipe · ${steps.length} step${steps.length === 1 ? "" : "s"}`}
             </span>
           )}

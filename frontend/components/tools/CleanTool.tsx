@@ -175,7 +175,7 @@ export default function CleanTool() {
             ))}
           </div>
 
-          <Button onClick={run} disabled={running} className="w-full sm:w-auto">
+          <Button variant="inverse" onClick={run} disabled={running} className="w-full sm:w-auto">
             <Download className="mr-2 h-4 w-4" /> {running ? "Cleaning…" : "Clean & download"}
           </Button>
 

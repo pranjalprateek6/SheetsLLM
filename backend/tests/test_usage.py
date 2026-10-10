@@ -18,13 +18,13 @@ def test_month_key_first_of_month_utc():
 # ── check_limit (pure logic) ─────────────────────────────────────────
 
 def test_under_limit_passes():
-    check_limit({"transforms": 5}, "free", "transforms")  # no raise
+    check_limit({"uploads": 5}, "free", "uploads")  # no raise
 
 
 def test_at_limit_blocks():
-    limit = usage.TIER_LIMITS["free"]["transforms"]
+    limit = usage.TIER_LIMITS["free"]["uploads"]
     with pytest.raises(UsageLimitExceeded) as exc:
-        check_limit({"transforms": limit}, "free", "transforms")
+        check_limit({"uploads": limit}, "free", "uploads")
     assert exc.value.used == limit
     assert exc.value.limit == limit
     assert "limit reached" in str(exc.value)
@@ -37,22 +37,22 @@ def test_over_limit_blocks():
 
 
 def test_fresh_month_none_row_passes():
-    check_limit(None, "free", "transforms")  # no raise
+    check_limit(None, "free", "uploads")  # no raise
 
 
 def test_unknown_tier_falls_back_to_free():
-    limit = usage.TIER_LIMITS["free"]["transforms"]
+    limit = usage.TIER_LIMITS["free"]["uploads"]
     with pytest.raises(UsageLimitExceeded):
-        check_limit({"transforms": limit}, "nonexistent-tier", "transforms")
+        check_limit({"uploads": limit}, "nonexistent-tier", "uploads")
 
 
 def test_zero_limit_means_unlimited(monkeypatch):
-    monkeypatch.setitem(usage.TIER_LIMITS, "free", {"transforms": 0})
-    check_limit({"transforms": 10_000_000}, "free", "transforms")  # no raise
+    monkeypatch.setitem(usage.TIER_LIMITS, "free", {"uploads": 0})
+    check_limit({"uploads": 10_000_000}, "free", "uploads")  # no raise
 
 
 def test_unknown_action_passes():
-    check_limit({"transforms": 999999}, "free", "not-a-counter")  # no raise
+    check_limit({"uploads": 999999}, "free", "not-a-counter")  # no raise
 
 
 # ── enforce / record fail-open on metering errors ─────────────────────
@@ -61,16 +61,16 @@ def test_enforce_fails_open_when_db_unavailable(monkeypatch):
     def boom(*a, **k):
         raise RuntimeError("db down")
     monkeypatch.setattr(usage.db, "get_usage", boom)
-    usage.enforce("user-x", "transforms")  # no raise — data path unaffected
+    usage.enforce("user-x", "uploads")  # no raise — data path unaffected
 
 
 def test_enforce_raises_when_over_cap(monkeypatch):
-    limit = usage.TIER_LIMITS["free"]["transforms"]
+    limit = usage.TIER_LIMITS["free"]["uploads"]
     monkeypatch.setattr(
-        usage.db, "get_usage", lambda *a, **k: {"transforms": limit}
+        usage.db, "get_usage", lambda *a, **k: {"uploads": limit}
     )
     with pytest.raises(UsageLimitExceeded):
-        usage.enforce("user-x", "transforms")
+        usage.enforce("user-x", "uploads")
 
 
 def test_record_never_raises(monkeypatch):
@@ -88,7 +88,8 @@ def test_summary_shape(monkeypatch):
     s = usage.summary("user-x")
     assert s["tier"] == "free"
     assert s["used"]["transforms"] == 7
-    assert set(s["limits"]) == {"uploads", "transforms", "chat_requests"}
+    # transforms is counted, but it is not an allowance
+    assert set(s["limits"]) == {"uploads", "chat_requests"}
     assert s["month"].endswith("-01")
 
 

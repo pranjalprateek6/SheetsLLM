@@ -32,7 +32,7 @@ describe("ChatPanel suggestions", () => {
     server.use(
       insights([
         { text: "Remove 12 duplicate rows", instruction: "remove duplicate rows" },
-        { text: "Column 'Region' has 21.5% null values", instruction: "drop rows where Region is null" },
+        { text: "Drop rows where Region is empty", instruction: "drop rows where Region is null", detail: "21.5% of Region is empty" },
       ]),
       http.post("/api/chat", async ({ request }) => {
         sent = await request.json();
@@ -42,7 +42,8 @@ describe("ChatPanel suggestions", () => {
     render(<ChatPanel fileId="f1" open onPreview={noop} />);
 
     const chip = await screen.findByRole("button", { name: /^Remove 12 duplicate rows/ });
-    expect(screen.getByRole("button", { name: /^Column 'Region' has 21.5% null values/ })).toBeInTheDocument();
+    // Leads with what clicking does, then the finding behind it
+    expect(screen.getByRole("button", { name: /^Drop rows where Region is empty21\.5% of Region is empty/ })).toBeInTheDocument();
 
     await userEvent.click(chip);
     await waitFor(() => expect(sent).toEqual({ file_id: "f1", message: "remove duplicate rows" }));
@@ -66,6 +67,33 @@ describe("ChatPanel suggestions", () => {
     );
     expect(await screen.findByRole("button", { name: /^Remove 3 duplicate rows/ })).toBeInTheDocument();
     expect(fetched).toBe(false);
+  });
+
+  it("refreshes the suggestions when a step lands, so a fix already made is not offered again", async () => {
+    server.use(insights([{ text: "Sort by date", instruction: "sort by date" }]));
+    const { rerender } = render(
+      <ChatPanel
+        fileId="f1"
+        open
+        onPreview={noop}
+        latestStep={0}
+        initialInsights={{ suggestions: [{ text: "Remove 12 duplicate rows", instruction: "remove duplicate rows" }] }}
+      />,
+    );
+    expect(await screen.findByRole("button", { name: /^Remove 12 duplicate rows/ })).toBeInTheDocument();
+
+    // The dedupe ran: the file's insights no longer mention duplicates
+    rerender(
+      <ChatPanel
+        fileId="f1"
+        open
+        onPreview={noop}
+        latestStep={1}
+        initialInsights={{ suggestions: [{ text: "Remove 12 duplicate rows", instruction: "remove duplicate rows" }] }}
+      />,
+    );
+    expect(await screen.findByRole("button", { name: /^Sort by date/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Remove 12 duplicate rows/ })).not.toBeInTheDocument();
   });
 
   it("says so when there is nothing to suggest, and refetching replaces", async () => {
@@ -174,8 +202,8 @@ describe("ChatPanel without AI", () => {
     render(<ChatPanel fileId="f1" open onPreview={noop} columns={COLUMNS} onOp={onOp} />);
 
     const fix = await screen.findByRole("button", { name: /^Remove 12 duplicate rows/ });
-    expect(fix).toHaveTextContent("no AI");
-    expect(screen.getByRole("button", { name: /^Explain the outliers/ })).toHaveTextContent("asks Chef");
+    expect(fix).toHaveTextContent("One click");
+    expect(screen.getByRole("button", { name: /^Explain the outliers/ })).toHaveTextContent("Asks Chef");
 
     await userEvent.click(fix);
     expect(onOp).toHaveBeenCalledWith(expect.objectContaining({ op: "dedupe" }), "insight");

@@ -121,7 +121,37 @@ describe("RecipeHint", () => {
     render(<RecipeHint fileId="f1" enabled onApplied={onApplied} />);
     await userEvent.click(await screen.findByRole("button", { name: "Apply" }));
 
-    await waitFor(() => expect(toastError).toHaveBeenCalledWith("Recipe could not be applied to this file."));
+    await waitFor(() => expect(toastError).toHaveBeenCalledWith("This recipe doesn't fit this file."));
+    expect(onApplied).not.toHaveBeenCalled();
+  });
+
+  it("hands a renamed column to the match dialog instead of failing", async () => {
+    server.use(
+      recipes(RECIPES),
+      http.post("/api/recipes/:id/apply", () =>
+        HttpResponse.json(
+          {
+            code: "RECIPE_INCOMPATIBLE",
+            message: "This file is missing columns the recipe needs: Customer Email.",
+            missing: ["Customer Email"],
+            suggested_map: { "Customer Email": "Email" },
+            file_columns: ["Order ID", "Email"],
+            recipe_name: "Monthly cleanup",
+          },
+          { status: 400 },
+        ),
+      ),
+    );
+    const onApplied = vi.fn();
+    const onNeedsMatch = vi.fn();
+    render(<RecipeHint fileId="f1" enabled onApplied={onApplied} onNeedsMatch={onNeedsMatch} />);
+    await userEvent.click(await screen.findByRole("button", { name: "Apply" }));
+
+    await waitFor(() => expect(onNeedsMatch).toHaveBeenCalledTimes(1));
+    const [need, from] = onNeedsMatch.mock.calls[0];
+    expect(from).toBe("hint");
+    expect(need).toMatchObject({ fileId: "f1", missing: ["Customer Email"], suggested: { "Customer Email": "Email" } });
+    expect(toastError).not.toHaveBeenCalled();
     expect(onApplied).not.toHaveBeenCalled();
   });
 

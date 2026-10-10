@@ -184,6 +184,7 @@ export default function JsonToCsvTool() {
         </div>
       ) : (
         <Textarea
+          spellCheck={false}
           value={text}
           disabled={running}
           onChange={(e) => { setText(e.target.value); setDone(null); setError(null); }}
@@ -202,7 +203,7 @@ export default function JsonToCsvTool() {
         </div>
       )}
 
-      <Button onClick={run} disabled={running || !source.trim()} className="mt-4 w-full sm:w-auto">
+      <Button variant="inverse" onClick={run} disabled={running || !source.trim()} className="mt-4 w-full sm:w-auto">
         <Download className="mr-2 h-4 w-4" /> {running ? "Converting…" : "Convert & download CSV"}
       </Button>
 

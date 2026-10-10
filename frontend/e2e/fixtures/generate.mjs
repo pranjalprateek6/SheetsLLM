@@ -8,6 +8,10 @@
 // orders_nov.csv        the same shape plus 40 new rows (next month's export)
 // orders_nov_drift.csv  orders_nov with "Customer Email" renamed to "Email",
 //                       which a recipe built on October cannot bind to
+//
+// With --samples it also writes orders_oct.csv and orders_nov.csv to
+// public/samples, the "Monthly orders" sample in the workspace, so the sample
+// and the tests can never disagree. Those two copies are committed.
 import { writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -63,6 +67,11 @@ const nov = [...oct.filter((_, i) => i < 1000), ...build(40, 20261101, 0).map((r
 writeFileSync(join(here, "orders_oct.csv"), csv(HEADERS, oct));
 writeFileSync(join(here, "orders_nov.csv"), csv(HEADERS, nov));
 writeFileSync(join(here, "orders_nov_drift.csv"), csv(HEADERS.map((h) => (h === "Customer Email" ? "Email" : h)), nov));
+if (process.argv.includes("--samples")) {
+  const samples = join(here, "..", "..", "public", "samples");
+  writeFileSync(join(samples, "orders_oct.csv"), csv(HEADERS, oct));
+  writeFileSync(join(samples, "orders_nov.csv"), csv(HEADERS, nov));
+}
 
 const empty = oct.filter((r) => r[2] === "").length;
 console.log(`orders_oct.csv: ${oct.length} rows (12 duplicates, ${empty} empty Region)`);
