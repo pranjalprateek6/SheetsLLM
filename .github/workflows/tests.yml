@@ -115,6 +115,7 @@ jobs:
       # so repeated runs never lock it out of uploading.
       FREE_MAX_UPLOADS_PER_MONTH: "0"
       FREE_MAX_CHAT_PER_MONTH: "0"
+      FREE_MAX_RECIPES: "0"
       FREE_MAX_TRANSFORMS_PER_MONTH: "0"
       E2E_SIGNED_IN: "1"
     steps:
