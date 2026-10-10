@@ -56,12 +56,10 @@ export default function LandingPage() {
               </div>
             </div>
           </Container>
-          {/* The frame stands whole in a lit panel; only the pictures further
-              down fade into the page */}
-          <div className="mx-auto mt-12 w-full max-w-[1416px] px-1 sm:mt-10 sm:px-1.5">
-            <div className="rounded-2xl px-2 pb-10 pt-0 [background:linear-gradient(to_bottom,transparent_30%,hsl(var(--foreground)/0.05)),radial-gradient(60%_40%_at_50%_100%,hsl(var(--foreground)/0.10),transparent)] sm:px-12 sm:pb-12">
-              <Workstation />
-            </div>
+          {/* The frame stands whole on the black page: no panel, no light, no
+              fade. Only the pictures further down fade at their edges. */}
+          <div className="mx-auto mt-12 w-full max-w-[1344px] px-3 sm:mt-10 sm:px-8">
+            <Workstation />
           </div>
         </section>
 

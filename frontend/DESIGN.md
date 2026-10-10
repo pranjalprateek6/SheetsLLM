@@ -145,10 +145,10 @@ Duration, easing and distance tokens live at the bottom of `globals.css`.
   the hero and every section fragment loop their real flow like a muted video,
   with a ghost cursor that moves, presses and opens menus (`marketing/ghost.tsx`).
   Each loop plays only while on screen; reduced motion shows the last frame.
-- **Pictures and fades.** The hero's product frame stands whole in a lit panel
-  (a grey wash rising to its foot) and never fades. Every picture below it sits
-  on a spotlight stage whose edges fade into the page (`Stage` in
-  `marketing/blocks.tsx`). There is no animated backdrop: the page is black.
+- **Pictures and fades.** The hero's product frame stands whole on the black
+  page, with no panel, light or fade. Every picture below it fades into the page
+  at its edges (`Stage` in `marketing/blocks.tsx`), with no light behind it.
+  There is no backdrop of any kind: the page is black.
 - Dropdowns and modals animate through `data-state` keyframes, because Radix
   only keeps a closing surface mounted while a CSS *animation* runs.
 - Nothing loops except an explicit loading state (WCAG 2.2.2).
@@ -205,7 +205,7 @@ rather than filled.
   the account is an initial avatar.
 - **Landing.** A two-line 64px headline over a row of subline and calls to
   action; then the whole product in one frame (sidebar, the open file looping
-  its fixes, Chef), shown whole in a lit panel. Then a 48px statement, the
+  its fixes, Chef), shown whole on the black page. Then a 48px statement, the
   figure row (FIG 0.1 to 0.3: isometric line drawings that open, replay and
   follow the cursor), one section per product page (two-line head, copy and
   Learn more, a composite picture on a spotlight stage, and a Features row whose

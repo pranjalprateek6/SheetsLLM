@@ -47,14 +47,10 @@ export function SectionHead({
   );
 }
 
-/** A picture standing in a soft light, fading into the page at its edges. */
+/** A picture on the black page, fading into it at its edges. */
 export function Stage({ children, className, tight }: { children: React.ReactNode; className?: string; tight?: boolean }) {
   return (
     <div className={cn("group relative", className)}>
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 [background:radial-gradient(70%_80%_at_50%_0%,hsl(var(--foreground)/0.07),transparent_70%)]"
-      />
       <div
         className={cn(
           "relative flex justify-center px-4 sm:px-10",
