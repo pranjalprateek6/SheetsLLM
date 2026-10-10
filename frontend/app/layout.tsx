@@ -32,7 +32,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </a>
             <Header />
             <main id="main" tabIndex={-1}>{children}</main>
-            <Toaster position="bottom-right" />
+            {/* Bottom-left: the right edge of the workspace is Chef's composer,
+                and a toast there sat on the input people type into */}
+            <Toaster position="bottom-left" />
           </AuthProvider>
         </ThemeProvider>
       </body>

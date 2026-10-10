@@ -68,6 +68,33 @@ describe("ChatPanel suggestions", () => {
     expect(fetched).toBe(false);
   });
 
+  it("refreshes the suggestions when a step lands, so a fix already made is not offered again", async () => {
+    server.use(insights([{ text: "Sort by date", instruction: "sort by date" }]));
+    const { rerender } = render(
+      <ChatPanel
+        fileId="f1"
+        open
+        onPreview={noop}
+        latestStep={0}
+        initialInsights={{ suggestions: [{ text: "Remove 12 duplicate rows", instruction: "remove duplicate rows" }] }}
+      />,
+    );
+    expect(await screen.findByRole("button", { name: /^Remove 12 duplicate rows/ })).toBeInTheDocument();
+
+    // The dedupe ran: the file's insights no longer mention duplicates
+    rerender(
+      <ChatPanel
+        fileId="f1"
+        open
+        onPreview={noop}
+        latestStep={1}
+        initialInsights={{ suggestions: [{ text: "Remove 12 duplicate rows", instruction: "remove duplicate rows" }] }}
+      />,
+    );
+    expect(await screen.findByRole("button", { name: /^Sort by date/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Remove 12 duplicate rows/ })).not.toBeInTheDocument();
+  });
+
   it("says so when there is nothing to suggest, and refetching replaces", async () => {
     server.use(insights([]));
     render(<ChatPanel fileId="f1" open onPreview={noop} />);

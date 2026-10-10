@@ -195,6 +195,21 @@ export default function ChatPanel({
     fetchSuggestions();
   }, [fileId, open, starterSuggestions, initialInsights, fetchSuggestions]);
 
+  // The file changed under the suggestions (a fix, a Chef step, an undo or a
+  // recipe run): ask again, so a fix already made is never offered twice.
+  const seenStep = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    if (latestStep === undefined) return;
+    if (seenStep.current === undefined) {
+      seenStep.current = latestStep;
+      return;
+    }
+    if (latestStep !== seenStep.current) {
+      seenStep.current = latestStep;
+      if (open) fetchSuggestions();
+    }
+  }, [latestStep, open, fetchSuggestions]);
+
   // A stopped request may still save its step. Watch history for a step
   // past the one we started from, and hand it to the workspace.
   const watchForLateStep = useCallback((baseline: number) => {

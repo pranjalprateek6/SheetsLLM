@@ -822,6 +822,13 @@ function WorkspaceContent() {
 
   const latestStep = steps.reduce((n, s) => Math.max(n, s.step_number), 0);
 
+  // The upload's insights describe the file as uploaded. Once it has a step
+  // (a fix, a Chef change, a recipe run on it) they are out of date, so drop
+  // them and let Chef ask for the file as it is now.
+  useEffect(() => {
+    if (latestStep > 0) setUploadInsights(null);
+  }, [latestStep]);
+
   return (
     <ErrorBoundary>
       <div className="relative bg-background">
