@@ -271,3 +271,17 @@ def test_a_connection_reaches_only_the_files_it_was_given(tmp_path):
     ):
         with pytest.raises(duckdb.Error):
             con.execute(sql)
+
+
+def test_a_date_column_previews_as_a_date(tmp_path):
+    import duckdb
+    from fastapi.encoders import jsonable_encoder
+
+    from app.engine import execute_sql_from_local
+
+    src = tmp_path / "d.parquet"
+    duckdb.connect().execute(
+        f"COPY (SELECT '2026-10-28' AS d) TO '{_sql_path(src)}' (FORMAT PARQUET)"
+    )
+    out = execute_sql_from_local(src, "SELECT CAST(d AS DATE) AS d FROM data")
+    assert jsonable_encoder(out["preview"]) == [{"d": "2026-10-28"}]

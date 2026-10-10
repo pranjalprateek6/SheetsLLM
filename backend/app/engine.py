@@ -164,9 +164,11 @@ def execute_sql_from_local(
         total_rows = con.execute(
             f"SELECT COUNT(*) FROM (\n{sql}\n) AS _preview_count"
         ).fetchone()[0]
+        # date_as_object: a DATE stays a date ("2026-10-28"); through pandas'
+        # datetime64 it would reach the grid as "2026-10-28T00:00:00"
         result = con.execute(
             f"SELECT * FROM (\n{sql}\n) AS _preview LIMIT {int(preview_limit)}"
-        ).fetchdf()
+        ).fetchdf(date_as_object=True)
 
         total_columns = len(result.columns)
         columns = [str(c) for c in result.columns]
@@ -252,6 +254,41 @@ def build_replay_sql(
 
     last_step = len(target_steps)
     return f"WITH {', '.join(ctes)} SELECT * FROM step_{last_step}"
+
+
+# ── Measuring a run ──────────────────────────────────────────────────
+
+
+def measure_run(
+    local_path: str | Path,
+    steps: list[dict],
+    start: int,
+    check_queries: list[str | None],
+    *,
+    timeout: int | None = None,
+) -> tuple[list[int], list[int | None]]:
+    """Rows before steps[start] and after each later step, and the count of
+    rows breaking each check (None for a check whose SQL is None).
+
+    The checks read the fully cleaned rows as a view named r.
+    """
+
+    def _inner():
+        con = get_connection(read=(local_path,))
+        lp = _sql_path(local_path)
+        con.execute(f"CREATE VIEW data AS SELECT * FROM read_parquet('{lp}')")
+        counts = [
+            int(con.execute(f"SELECT COUNT(*) FROM ({build_replay_sql(steps, up_to=k)})").fetchone()[0])
+            for k in range(start, len(steps) + 1)
+        ]
+        con.execute(f"CREATE VIEW r AS {build_replay_sql(steps)}")
+        failed = [
+            None if q is None else int(con.execute(q).fetchone()[0] or 0)
+            for q in check_queries
+        ]
+        return counts, failed
+
+    return _run_with_timeout(_inner, timeout=timeout if timeout is not None else DUCKDB_QUERY_TIMEOUT)
 
 
 # ── Chain checkpoints ─────────────────────────────────────────────────
