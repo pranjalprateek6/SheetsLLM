@@ -46,6 +46,8 @@ EVENTS = frozenset({
     "waitlist_joined", "privacy_mode_changed",
     # recipe runs that match a renamed column, flag a step, or fail a check
     "recipe_columns_matched", "recipe_run_flagged", "recipe_check_failed", "recipe_checks_saved",
+    # a sort whose column mixes date formats, so it came out in text order
+    "sort_mixed_dates",
 })
 
 

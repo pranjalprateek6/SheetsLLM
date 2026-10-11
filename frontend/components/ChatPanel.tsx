@@ -410,7 +410,7 @@ export default function ChatPanel({
           <div className="mt-4">
             {loadingSuggestions ? (
               <div className="py-1">
-                <Thinking label="Reading your columns…" reduced={reduced} />
+                <Thinking label="Reading your columns…" reduced={reduced} stoppable={false} />
               </div>
             ) : suggestions.length > 0 ? (
               <>

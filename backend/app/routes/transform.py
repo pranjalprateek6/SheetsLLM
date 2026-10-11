@@ -17,6 +17,7 @@ from fastapi import APIRouter, Request, Response
 from app import db, events, usage
 from app.cache import get_local_parquet
 from app.engine import get_schema_after_steps, replay_transformations_local
+from app.insights import sort_warning
 from app.ops import OpError, build_op
 from app.security import RateLimitExceeded, check_rate_limit
 from app.sql_validator import SQLValidationError, validate_sql
@@ -160,9 +161,22 @@ async def transform_op(request: Request):
     if body.get("source") == "insight":
         events.record(user_id, "insight_fix_applied", op=op)
 
+    # A sort of a text column with dates written two ways runs, and comes out
+    # in text order; say so, and how to fix it
+    warning = None
+    if op == "sort" and body.get("column"):
+        try:
+            local_path = await asyncio.to_thread(get_local_parquet, r2_key)
+            warning = await asyncio.to_thread(sort_warning, local_path, steps, body["column"])
+        except Exception as exc:
+            logger.warning("Sort date check failed for %s: %s", file_id, exc)
+        if warning:
+            events.record(user_id, "sort_mixed_dates", column_fixable=warning["fix"] is not None)
+
     return {
         "type": "transform",
         "source": "op",
+        "warning": warning,
         "op": op,
         "file_id": file_id,
         "step_number": step_number,

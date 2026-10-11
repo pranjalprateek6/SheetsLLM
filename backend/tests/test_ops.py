@@ -289,3 +289,47 @@ def test_an_insight_fix_is_counted_as_one(api):
     client, _, recorded, _ = api
     client.post("/transform/op", json={"file_id": "f1", "op": "dedupe", "source": "insight"})
     assert ("insight_fix_applied", {"op": "dedupe"}) in recorded["events"]
+
+
+def _dates_parquet(tmp_path, dates):
+    path = tmp_path / "dates.parquet"
+    rows = ", ".join(f"({i}, '{d}')" for i, d in enumerate(dates))
+    duckdb.connect().execute(
+        f"COPY (SELECT * FROM (VALUES {rows}) t(id, d)) TO '{str(path).replace(chr(92), '/')}' (FORMAT PARQUET)"
+    )
+    return str(path)
+
+
+def test_sorting_mixed_dates_warns_with_a_one_click_fix(api, monkeypatch, tmp_path):
+    client, store, recorded, _ = api
+    path = _dates_parquet(tmp_path, ["2026-10-14", "28/10/2026", "2026-10-02", "10/10/2026"])
+    monkeypatch.setattr(transform_module, "get_local_parquet", lambda key: path)
+    resp = client.post("/transform/op", json={"file_id": "f1", "op": "sort", "column": "d", "args": {"direction": "desc"}})
+    assert resp.status_code == 200, resp.text
+    w = resp.json()["warning"]
+    assert w["code"] == "MIXED_DATES" and w["column"] == "d"
+    assert "sorted as text" in w["message"] and "—" not in w["message"]
+    assert w["fix"] == {"op": "standardise_date", "column": "d", "args": {"format": "auto"}}
+    # The sort still ran and was saved
+    assert store[0]["instruction"] == "Sort all rows by d, descending"
+    assert ("sort_mixed_dates", {"column_fixable": True}) in recorded["events"]
+
+
+def test_ambiguous_day_month_order_warns_without_a_guess(api, monkeypatch, tmp_path):
+    client, *_ = api
+    path = _dates_parquet(tmp_path, ["2026-10-14", "10/11/2026"])  # 10 Nov or 11 Oct?
+    monkeypatch.setattr(transform_module, "get_local_parquet", lambda key: path)
+    w = client.post("/transform/op", json={"file_id": "f1", "op": "sort", "column": "d"}).json()["warning"]
+    assert w["fix"] is None and w["instruction"].startswith("Convert d to YYYY-MM-DD")
+
+
+def test_one_date_format_sorts_without_a_warning(api, monkeypatch, tmp_path):
+    client, *_ = api
+    path = _dates_parquet(tmp_path, ["2026-10-14", "2026-10-02"])
+    monkeypatch.setattr(transform_module, "get_local_parquet", lambda key: path)
+    assert client.post("/transform/op", json={"file_id": "f1", "op": "sort", "column": "d"}).json()["warning"] is None
+
+
+def test_sorting_a_number_column_never_checks_dates(api):
+    client, *_ = api
+    assert client.post("/transform/op", json={"file_id": "f1", "op": "sort", "column": "Amount"}).json()["warning"] is None
