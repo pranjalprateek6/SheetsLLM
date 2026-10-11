@@ -14,13 +14,22 @@ describe("explainError", () => {
     [{ code: "INVALID_SQL", message: "Blocked SQL keyword: DROP" },
       "I couldn't write a safe query for that. Try naming the column.", ["edit_retry"]],
     [{ code: "EXECUTION_FAILED", message: "Binder Error" }, "That query didn't run. Details below.", ["edit_retry", "details"]],
-    [{ code: "LLM_FAILED" }, "Chef didn't answer. Try again.", ["retry"]],
+    [{ code: "LLM_FAILED" }, "Chef didn't answer. Try again in a moment.", ["retry"]],
+    // An older backend sent the provider's quota error as LLM_FAILED
+    [{ code: "LLM_FAILED", message: "LLM error: Gemini request failed: 429 RESOURCE_EXHAUSTED. {'error': ...}" },
+      "Chef is out of AI capacity for today. Your recipes and one-click fixes still work.", ["open_recipes"]],
     [{ code: "RECIPE_INCOMPATIBLE", missing: ["Customer Email"] },
       "This file is missing columns the recipe needs: Customer Email.", ["details"]],
   ])("%j", (payload, text, actions) => {
     const e = explainError(payload);
     expect(e.text).toBe(text);
     expect(e.actions).toEqual(actions);
+  });
+
+  it("never shows the AI provider's own error text", () => {
+    const e = explainError({ code: "LLM_FAILED", message: "LLM error: Gemini request failed: 500 INTERNAL https://ai.google.dev/..." });
+    expect(e.details).toBeUndefined();
+    expect(e.text).not.toContain("Gemini");
   });
 
   it("keeps the engine's text for Details, never as the message", () => {

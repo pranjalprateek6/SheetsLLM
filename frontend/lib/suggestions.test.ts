@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { toSuggestions } from "./suggestions";
+import { ideasFor, toSuggestions } from "./suggestions";
+import { matchVerb } from "./verbs";
 
 describe("toSuggestions", () => {
   it("reads the nested shape GET /insights returns", () => {
@@ -35,5 +36,28 @@ describe("toSuggestions", () => {
     expect(toSuggestions(null)).toEqual([]);
     expect(toSuggestions({ code: "INSIGHTS_FAILED" })).toEqual([]);
     expect(toSuggestions({ insights: null })).toEqual([]);
+  });
+});
+
+describe("ideasFor", () => {
+  it("offers a sort by date, a count by category and a summary", () => {
+    const ideas = ideasFor([
+      { name: "Order ID", dtype: "VARCHAR" },
+      { name: "Customer Email", dtype: "VARCHAR" },
+      { name: "Region", dtype: "VARCHAR" },
+      { name: "Order Date", dtype: "DATE" },
+      { name: "MRP", dtype: "BIGINT" },
+    ]);
+    expect(ideas.map((i) => i.text)).toEqual([
+      "Sort by Order Date, newest first",
+      "Count the rows for each Region",
+      "Summarise this file",
+    ]);
+    // The sort is a one-click fix, not an AI request
+    expect(matchVerb(ideas[0].instruction, [{ name: "Order Date", dtype: "DATE" }])).toMatchObject({ op: "sort", args: { direction: "desc" } });
+  });
+
+  it("still offers a summary for a file with nothing to sort or count", () => {
+    expect(ideasFor([{ name: "Amount", dtype: "DOUBLE" }]).map((i) => i.text)).toEqual(["Summarise this file"]);
   });
 });

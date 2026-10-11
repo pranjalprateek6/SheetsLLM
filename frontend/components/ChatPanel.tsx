@@ -13,7 +13,7 @@ import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { toSuggestions, type Suggestion } from "@/lib/suggestions";
+import { ideasFor, toSuggestions, type Suggestion } from "@/lib/suggestions";
 import { explainError } from "@/lib/errors";
 import { matchVerb, type ColumnInfo } from "@/lib/verbs";
 import type { OpRequest } from "@/lib/ops";
@@ -428,40 +428,29 @@ export default function ChatPanel({
             ) : suggestions.length > 0 ? (
               <>
                 <p className="mb-2 text-[12px] font-medium text-muted-foreground">Try one of these</p>
-                <ul className="divide-y overflow-hidden rounded-lg border bg-background">
-                  {suggestions.map((s, i) => {
-                    const fix = columns && onOp ? matchVerb(s.instruction, columns) : null;
-                    return (
-                      <li key={i}>
-                        <button
-                          onClick={() => (fix && onOp ? onOp(fix, "insight") : sendMessage(s.instruction))}
-                          className="group flex w-full items-start justify-between gap-3 px-3 py-2.5 text-left transition-colors hover:bg-accent"
-                        >
-                          <span className="min-w-0">
-                            <span className="block text-[13px] font-medium text-foreground/90 group-hover:text-foreground">{s.text}</span>
-                            {s.detail && <span className="mt-0.5 block text-[12px] text-muted-foreground">{s.detail}</span>}
-                          </span>
-                          <span
-                            className={cn(
-                              "mt-px flex-shrink-0 rounded-full border px-1.5 py-px text-[10px] font-medium",
-                              fix ? "border-border text-muted-foreground" : "border-primary/30 text-primary-accent",
-                            )}
-                          >
-                            {fix ? "One click" : "Asks Chef"}
-                          </span>
-                        </button>
-                      </li>
-                    );
-                  })}
-                </ul>
+                <SuggestionRows items={suggestions} columns={columns} onOp={onOp} onAsk={sendMessage} />
+              </>
+            ) : suggestionsChecked ? (
+              // Nothing to fix: say so, and offer next steps from the columns
+              <>
+                <p className="text-[13px] text-foreground/90">Nothing to fix right now.</p>
+                <p className="mb-3 mt-0.5 text-[12px] text-muted-foreground">
+                  No duplicate rows, empty cells or mixed date formats.{" "}
+                  <button type="button" onClick={fetchSuggestions} className="font-medium text-foreground/80 underline-offset-2 hover:underline">
+                    Check again
+                  </button>
+                </p>
+                {columns && columns.length > 0 && (
+                  <>
+                    <p className="mb-2 text-[12px] font-medium text-muted-foreground">Or try</p>
+                    <SuggestionRows items={ideasFor(columns)} columns={columns} onOp={onOp} onAsk={sendMessage} />
+                  </>
+                )}
               </>
             ) : (
-              <div className="flex items-center justify-between gap-3">
-                {suggestionsChecked && <p className="text-[12px] text-muted-foreground">Nothing to suggest yet.</p>}
-                <Button variant="outline" size="sm" className="ml-auto" onClick={fetchSuggestions}>
-                  Suggest next steps
-                </Button>
-              </div>
+              <Button variant="outline" size="sm" onClick={fetchSuggestions}>
+                Suggest next steps
+              </Button>
             )}
           </div>
         </div>
@@ -684,7 +673,9 @@ export default function ChatPanel({
             <PrivacyChip onChange={setStrict} />
             <div className="flex items-center gap-2">
               {!sending && input.trim() && (
-                <span className="hidden text-[11px] text-muted-foreground sm:inline">Enter to send · Shift+Enter for a new line</span>
+                <span className="hidden whitespace-nowrap text-[11px] text-muted-foreground sm:inline" title="Shift+Enter for a new line">
+                  Enter to send
+                </span>
               )}
               {sending ? (
                 <button
@@ -711,5 +702,48 @@ export default function ChatPanel({
         </div>
       </div>
     </div>
+  );
+}
+
+/** Suggested next steps as rows: what clicking does, why, and whether it is
+ *  a one-click fix or a question for Chef. */
+function SuggestionRows({
+  items,
+  columns,
+  onOp,
+  onAsk,
+}: {
+  items: Suggestion[];
+  columns?: ColumnInfo[];
+  onOp?: (req: OpRequest, source: "insight" | "intercept") => unknown;
+  onAsk: (text: string) => void;
+}) {
+  return (
+    <ul className="divide-y overflow-hidden rounded-lg border bg-background">
+      {items.map((s, i) => {
+        const fix = columns && onOp ? matchVerb(s.instruction, columns) : null;
+        return (
+          <li key={i}>
+            <button
+              onClick={() => (fix && onOp ? onOp(fix, "insight") : onAsk(s.instruction))}
+              className="group flex w-full items-start justify-between gap-3 px-3 py-2.5 text-left transition-colors hover:bg-accent"
+            >
+              <span className="min-w-0">
+                <span className="block text-[13px] font-medium text-foreground/90 group-hover:text-foreground">{s.text}</span>
+                {s.detail && <span className="mt-0.5 block text-[12px] text-muted-foreground">{s.detail}</span>}
+              </span>
+              <span
+                className={cn(
+                  "mt-px flex-shrink-0 whitespace-nowrap rounded-full border px-1.5 py-px text-[10px] font-medium",
+                  fix ? "border-border text-muted-foreground" : "border-primary/30 text-primary-accent",
+                )}
+              >
+                {fix ? "One click" : "Asks Chef"}
+              </span>
+            </button>
+          </li>
+        );
+      })}
+    </ul>
   );
 }

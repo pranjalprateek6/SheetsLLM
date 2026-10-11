@@ -80,7 +80,16 @@ export function explainError(payload: ErrorPayload | null | undefined): Explaine
     case "EXECUTION_FAILED":
       return { code, text: "That query didn't run. Details below.", actions: ["edit_retry", "details"], details: p.message };
     case "LLM_FAILED":
-      return { code, text: "Chef didn't answer. Try again.", actions: ["retry"], details: p.message };
+      // An older backend reports the provider's quota error this way; say
+      // what it means. The provider's own text never reaches the user.
+      if (/429|resource_exhausted|quota/i.test(p.message ?? "")) {
+        return {
+          code: "LLM_QUOTA",
+          text: "Chef is out of AI capacity for today. Your recipes and one-click fixes still work.",
+          actions: ["open_recipes"],
+        };
+      }
+      return { code, text: "Chef didn't answer. Try again in a moment.", actions: ["retry"] };
     case "REQUEST_TIMEOUT":
       return { code, text: "That took too long and was stopped. Try again, or ask something more specific.", actions: ["edit_retry"] };
     case "RECIPE_INCOMPATIBLE": {
