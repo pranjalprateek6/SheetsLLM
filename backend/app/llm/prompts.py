@@ -105,6 +105,7 @@ Columns:
 {schema_text}
 
 (No sample data available — rely on column names, types, and the instruction.)
+(You have not seen any values. When you describe the data, do not give example values or guess what a column contains; say what can be told from the names and types, and that the values were not shared.)
 Instruction: {instruction}"""
 
     sample_text = ""

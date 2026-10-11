@@ -18,7 +18,7 @@ import { explainError } from "@/lib/errors";
 import { matchVerb, type ColumnInfo } from "@/lib/verbs";
 import type { OpRequest } from "@/lib/ops";
 import ChatText from "@/components/ChatText";
-import { ChefMark, CopyButton, SqlBlock, Thinking } from "@/components/chat-parts";
+import { CopyButton, SqlBlock, Thinking } from "@/components/chat-parts";
 import ErrorBubble from "@/components/ErrorBubble";
 import PrivacyChip from "@/components/PrivacyChip";
 import SentDisclosure, { type SentReceipt } from "@/components/SentDisclosure";
@@ -91,7 +91,6 @@ export default function ChatPanel({
   // True once a fetch has answered, so an empty answer says so instead of
   // silently showing the button again.
   const [suggestionsChecked, setSuggestionsChecked] = useState(false);
-  const [stage, setStage] = useState(0);
   const [confirmClear, setConfirmClear] = useState(false);
   // Scrolled up away from the newest message: offer a way back
   const [awayFromEnd, setAwayFromEnd] = useState(false);
@@ -126,18 +125,6 @@ export default function ChatPanel({
   }, []);
   useEffect(() => clearLateChecks, [fileId, clearLateChecks]);
 
-  // Staged progress while Chef works — honest labels for the real pipeline
-  // (generate -> validate -> execute), rotated on a timer. A late fourth
-  // stage reassures on the occasional 30s+ answer instead of looking hung.
-  const STAGES = ["Writing SQL…", "Validating…", "Running on your data…", "Taking longer than usual, still working…"];
-  useEffect(() => {
-    if (!sending) { setStage(0); return; }
-    // Guard against the interval walking the late stage back down to 2.
-    const t = setInterval(() => setStage((v) => (v >= 3 ? v : Math.min(v + 1, 2))), 2600);
-    const late = setTimeout(() => setStage(3), 15000);
-    return () => { clearInterval(t); clearTimeout(late); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sending]);
 
   useEffect(() => {
     if (!fileId || !open) return;
@@ -461,7 +448,7 @@ export default function ChatPanel({
           separate from the log so history is not re-read on mount. */}
       <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
         {sending
-          ? STAGES[stage]
+          ? "Chef is working on it"
           : messages.length && messages[messages.length - 1].role === "assistant"
             ? `Chef replied: ${messages[messages.length - 1].content}`
             : ""}
@@ -478,7 +465,6 @@ export default function ChatPanel({
         >
           {messages.map((msg, i) => {
             const isUser = msg.role === "user";
-            const startsTurn = !isUser && messages[i - 1]?.role !== "assistant";
             if (isUser) {
               return (
                 <div key={i} className="flex justify-end">
@@ -493,7 +479,6 @@ export default function ChatPanel({
             const stepNumber = typeof msg.metadata?.step_number === "number" ? (msg.metadata.step_number as number) : null;
             return (
               <div key={i} className="group">
-                {startsTurn && <ChefMark />}
                 {isError && msg.metadata?.code ? (
                   <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-[13px] text-destructive-text">
                     <ErrorBubble
@@ -578,12 +563,7 @@ export default function ChatPanel({
             );
           })}
 
-          {sending && (
-            <div>
-              {messages[messages.length - 1]?.role !== "assistant" && <ChefMark />}
-              <Thinking label={STAGES[stage]} reduced={reduced} />
-            </div>
-          )}
+          {sending && <Thinking reduced={reduced} />}
         </div>
         {awayFromEnd && (
           <button

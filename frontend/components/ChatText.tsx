@@ -1,7 +1,7 @@
 import { Fragment, type ReactNode } from "react";
 
 /* Chef answers in light markdown: paragraphs, numbered and bulleted lists,
-   **bold** and `code`. This renders exactly that subset as React elements
+   headings, divider lines, **bold** and `code`. This renders exactly that subset as React elements
    (never as HTML), so a model reply cannot inject markup. Anything else
    shows as the plain text it is. */
 
@@ -27,7 +27,7 @@ function inline(text: string, key: string): ReactNode[] {
   return out;
 }
 
-type Block = { kind: "p"; lines: string[] } | { kind: "ol" | "ul"; items: string[] };
+type Block = { kind: "p"; lines: string[] } | { kind: "ol" | "ul"; items: string[] } | { kind: "h"; text: string } | { kind: "hr" };
 
 function blocks(src: string): Block[] {
   const out: Block[] = [];
@@ -35,8 +35,13 @@ function blocks(src: string): Block[] {
     const line = raw.trimEnd();
     const ol = /^\s*\d+[.)]\s+(.*)$/.exec(line);
     const ul = /^\s*[-*•]\s+(.*)$/.exec(line);
+    const heading = /^\s*#{1,6}\s+(.*?)\s*#*\s*$/.exec(line);
     const prev = out[out.length - 1];
-    if (ol || ul) {
+    if (/^\s*([-*_])(\s*\1){2,}\s*$/.test(line)) {
+      out.push({ kind: "hr" });
+    } else if (heading) {
+      out.push({ kind: "h", text: heading[1] });
+    } else if (ol || ul) {
       const kind = ol ? "ol" : "ul";
       const item = (ol ?? ul)![1];
       if (prev && prev.kind === kind) prev.items.push(item);
@@ -56,7 +61,12 @@ export default function ChatText({ text }: { text: string }) {
   return (
     <div className="space-y-2">
       {blocks(text).map((b, i) =>
-        b.kind === "p" ? (
+        b.kind === "hr" ? (
+          <hr key={i} className="border-border" />
+        ) : b.kind === "h" ? (
+          // A heading inside a chat reply: a small bold line, not page-sized type
+          <p key={i} className="pt-1 font-semibold">{inline(b.text, `${i}`)}</p>
+        ) : b.kind === "p" ? (
           <p key={i}>
             {b.lines.map((l, j) => (
               <Fragment key={j}>

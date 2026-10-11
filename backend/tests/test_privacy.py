@@ -135,3 +135,13 @@ def test_environment_can_restore_the_old_default(monkeypatch):
     monkeypatch.setattr(db, "PRIVACY_DEFAULT_STRICT", False)
     monkeypatch.setattr(db, "get_user_settings", lambda uid: None)
     assert db.get_privacy_mode("u1") is False
+
+
+def test_strict_prompt_tells_the_model_not_to_invent_values():
+    # Asked to summarise in strict mode, the model listed made-up statuses
+    from app.llm.prompts import build_user_message
+
+    schema = {"columns": [{"name": "Status", "dtype": "VARCHAR", "sample_values": ["Paid"]}], "samples": [["Paid"]]}
+    msg = build_user_message("Summarise this file", schema, privacy_mode=True)
+    assert "Paid" not in msg
+    assert "do not give example values" in msg

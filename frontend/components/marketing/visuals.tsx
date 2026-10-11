@@ -9,7 +9,7 @@ import {
 import { cn } from "@/lib/utils";
 import { FixSlice, HistorySlice, PrivacySlice, RerunSlice } from "@/components/marketing/Slices";
 import { useScene, type Frame as SceneFrame } from "@/components/marketing/ghost";
-import { ChefMark, Thinking } from "@/components/chat-parts";
+import { Thinking } from "@/components/chat-parts";
 import type { VisualKey } from "@/components/marketing/product-pages";
 
 /* Small, honest fragments of the real interface for the product pages'
@@ -79,7 +79,6 @@ function ChefChat() {
           </div>
           {s.stage !== "ask" && (
             <div>
-              <ChefMark />
               {s.stage === "done" ? (
                 <div className="overflow-hidden rounded-xl border bg-background/60">
                   <div className="flex items-start gap-2.5 px-3 py-2.5">
@@ -102,7 +101,7 @@ function ChefChat() {
                   </div>
                 </div>
               ) : (
-                <Thinking label={s.stage === "think" ? "Writing SQL…" : "Validating…"} reduced={reduced} />
+                <Thinking reduced={reduced} />
               )}
             </div>
           )}
