@@ -96,15 +96,19 @@ describe("ChatPanel suggestions", () => {
     expect(screen.queryByRole("button", { name: /^Remove 12 duplicate rows/ })).not.toBeInTheDocument();
   });
 
-  it("says so when there is nothing to suggest, and refetching replaces", async () => {
+  it("says the file is clean, offers next steps from its columns, and checking again replaces", async () => {
     server.use(insights([]));
-    render(<ChatPanel fileId="f1" open onPreview={noop} />);
-    expect(await screen.findByText("Nothing to suggest yet.")).toBeInTheDocument();
+    const columns = [{ name: "Region", dtype: "VARCHAR" }, { name: "Order Date", dtype: "DATE" }];
+    render(<ChatPanel fileId="f1" open onPreview={noop} columns={columns} onOp={vi.fn(async () => true)} />);
+    expect(await screen.findByText("Nothing to fix right now.")).toBeInTheDocument();
+    // Not a dead end: ideas from the columns, the sort being a one-click fix
+    expect(screen.getByRole("button", { name: /^Sort by Order Date, newest first.*One click/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Summarise this file.*Asks Chef/ })).toBeInTheDocument();
 
-    server.use(insights([{ text: "Sort by date", instruction: "sort by date" }]));
-    await userEvent.click(screen.getByRole("button", { name: "Suggest next steps" }));
-    expect(await screen.findByRole("button", { name: /^Sort by date/ })).toBeInTheDocument();
-    expect(screen.queryByText("Nothing to suggest yet.")).not.toBeInTheDocument();
+    server.use(insights([{ text: "Remove 3 duplicate rows", instruction: "remove duplicate rows" }]));
+    await userEvent.click(screen.getByRole("button", { name: "Check again" }));
+    expect(await screen.findByRole("button", { name: /^Remove 3 duplicate rows/ })).toBeInTheDocument();
+    expect(screen.queryByText("Nothing to fix right now.")).not.toBeInTheDocument();
   });
 });
 
@@ -294,7 +298,7 @@ describe("ChatPanel privacy and receipts", () => {
     const chip = await screen.findByRole("button", { name: "Schema only" });
     expect(screen.getByText("Chef sees column names and types, never your values.")).toBeInTheDocument();
     await userEvent.click(chip);
-    expect(await screen.findByRole("button", { name: "Schema + sample rows" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Schema + samples" })).toBeInTheDocument();
     expect(patched).toEqual({ privacy_mode: false });
   });
 

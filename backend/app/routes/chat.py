@@ -187,8 +187,10 @@ async def chat(request: Request):
             text = "Chef is out of AI capacity for today. Your recipes and one-click fixes still work."
             _save_error(file_id, text, "LLM_QUOTA")
             return _json_response(503, "LLM_QUOTA", text)
-        _save_error(file_id, "Chef didn't answer. Try again.", "LLM_FAILED")
-        return _json_response(502, "LLM_FAILED", f"LLM error: {exc}")
+        # The provider's error text (URLs, quota details) is logged above,
+        # never sent to the browser
+        _save_error(file_id, "Chef didn't answer. Try again in a moment.", "LLM_FAILED")
+        return _json_response(502, "LLM_FAILED", "Chef didn't answer. Try again in a moment.")
 
     # The LLM call is the metered cost, regardless of response type
     usage.record(user_id, chat_requests=1)

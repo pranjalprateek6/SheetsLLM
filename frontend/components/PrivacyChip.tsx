@@ -70,7 +70,7 @@ export default function PrivacyChip({
         ? "Chef sees column names and types only. Click to also send a few sample rows."
         : "Chef sees column names, types and a few sample rows. Click for names and types only."}
       className={cn(
-        "inline-flex h-6 items-center gap-1 rounded-full border px-2 text-[11px] font-medium transition-colors disabled:opacity-60",
+        "inline-flex h-6 flex-shrink-0 items-center gap-1 whitespace-nowrap rounded-full border px-2 text-[11px] font-medium transition-colors disabled:opacity-60",
         // Emphasis is the difference from the default: strict is the default
         // and stays quiet; sending sample rows is the state worth noticing.
         strict
@@ -80,7 +80,7 @@ export default function PrivacyChip({
       )}
     >
       {strict ? <Lock className="h-3 w-3" aria-hidden /> : <LockOpen className="h-3 w-3" aria-hidden />}
-      {strict ? "Schema only" : "Schema + sample rows"}
+      {strict ? "Schema only" : "Schema + samples"}
     </button>
   );
 }

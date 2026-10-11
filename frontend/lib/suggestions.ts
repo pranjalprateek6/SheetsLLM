@@ -38,3 +38,36 @@ export function toSuggestions(source: unknown): Suggestion[] {
   }
   return out;
 }
+
+/**
+ * Next steps when the file has nothing to fix, from its columns alone (no AI
+ * call to come up with them): sort by a date, count by a category, or ask
+ * Chef for a summary. At most three.
+ */
+export function ideasFor(columns: { name: string; dtype?: string }[]): Suggestion[] {
+  const out: Suggestion[] = [];
+  const date = columns.find((c) => /DATE|TIME/i.test(c.dtype ?? "") || /date|time|_at$|_on$/i.test(c.name));
+  if (date) {
+    out.push({
+      text: `Sort by ${date.name}, newest first`,
+      instruction: `sort by ${date.name} descending`,
+      detail: "The latest rows at the top",
+    });
+  }
+  const category = columns.find(
+    (c) => /VARCHAR|TEXT|STRING/i.test(c.dtype ?? "VARCHAR") && c !== date && !/id$|^id\b|email|name|phone|note|comment/i.test(c.name),
+  );
+  if (category) {
+    out.push({
+      text: `Count the rows for each ${category.name}`,
+      instruction: `How many rows are there for each ${category.name}?`,
+      detail: "An answer, the file stays as it is",
+    });
+  }
+  out.push({
+    text: "Summarise this file",
+    instruction: "Summarise this file: what each column holds, and anything that looks off",
+    detail: "What each column holds, and anything that looks off",
+  });
+  return out.slice(0, 3);
+}
