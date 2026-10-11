@@ -74,8 +74,9 @@ export async function applyRecipe(
   fileId: string,
   opts: { from?: RunSource; columnMap?: Record<string, string>; remember?: boolean } = {},
 ): Promise<RunOutcome> {
+  let res: Response;
   try {
-    const res = await fetchWithAuth(`/api/recipes/${recipe.id}/apply`, {
+    res = await fetchWithAuth(`/api/recipes/${recipe.id}/apply`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -84,26 +85,40 @@ export async function applyRecipe(
         ...(opts.columnMap ? { column_map: opts.columnMap, remember: !!opts.remember } : {}),
       }),
     });
-    const data = await res.json();
-    if (res.ok) return { kind: "ok", result: data as RecipeApplyResult };
-    // A renamed column is a question, not a failure
-    if (data?.code === "RECIPE_INCOMPATIBLE" && Array.isArray(data.missing) && data.missing.length && Array.isArray(data.file_columns)) {
-      return {
-        kind: "match",
-        need: {
-          recipeId: recipe.id,
-          recipeName: data.recipe_name ?? recipe.name ?? "This recipe",
-          fileId,
-          missing: data.missing,
-          suggested: data.suggested_map ?? {},
-          fileColumns: data.file_columns,
-        },
-      };
-    }
-    return { kind: "error", text: explainError(data).text };
   } catch {
     return { kind: "error", text: "Couldn't run the recipe. Check your connection and try again." };
   }
+  // The request arrived; a reply that is not JSON is a server-side failure
+  // (a crash or a proxy timeout page), not the user's connection
+  let data: {
+    code?: string;
+    message?: string;
+    missing?: string[];
+    suggested_map?: Record<string, string>;
+    file_columns?: string[];
+    recipe_name?: string;
+  };
+  try {
+    data = await res.json();
+  } catch {
+    return { kind: "error", text: "The recipe didn't run this time. Nothing was changed. Try again." };
+  }
+  if (res.ok) return { kind: "ok", result: data as unknown as RecipeApplyResult };
+  // A renamed column is a question, not a failure
+  if (data?.code === "RECIPE_INCOMPATIBLE" && Array.isArray(data.missing) && data.missing.length && Array.isArray(data.file_columns)) {
+    return {
+      kind: "match",
+      need: {
+        recipeId: recipe.id,
+        recipeName: data.recipe_name ?? recipe.name ?? "This recipe",
+        fileId,
+        missing: data.missing,
+        suggested: data.suggested_map ?? {},
+        fileColumns: data.file_columns,
+      },
+    };
+  }
+  return { kind: "error", text: explainError(data).text };
 }
 
 /** "−21.3%" or "+4%" or "no change", for a step's effect on the rows. */

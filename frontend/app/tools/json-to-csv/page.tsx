@@ -16,7 +16,7 @@ export default function Page() {
       title="JSON to CSV converter"
       intro="Turn a JSON array of objects into a spreadsheet-ready CSV. Nested objects become dot-path columns; arrays are preserved as JSON strings."
       steps={[
-        "Paste your JSON or upload a .json file: an array of objects, or an object that contains one.",
+        "Paste your JSON or upload a .json or .jsonl file: an array of objects, an object that contains one, or one object per line.",
         "The converter flattens nested objects into columns like customer.name and unions the keys across all records.",
         "Download the CSV and open it in Excel, Google Sheets, or anything else.",
       ]}
