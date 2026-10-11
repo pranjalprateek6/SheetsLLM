@@ -48,7 +48,7 @@ function useRotatingVerb(enabled: boolean, everyMs = 2400) {
  * soft shimmer, and the time so far. With no label it walks through
  * CHEF_VERBS; a label (say "Reading your columns…") is shown as it is.
  */
-export function Thinking({ label, reduced }: { label?: string; reduced?: boolean }) {
+export function Thinking({ label, reduced, stoppable = true }: { label?: string; reduced?: boolean; stoppable?: boolean }) {
   const [frame, setFrame] = useState(0);
   const [seconds, setSeconds] = useState(0);
   const verb = useRotatingVerb(!label && !reduced);
@@ -71,8 +71,9 @@ export function Thinking({ label, reduced }: { label?: string; reduced?: boolean
         {label ?? (reduced ? "Working…" : verb)}
       </TextShimmer>
       <span className="tabular-nums text-muted-foreground">
-        {seconds > 0 && `${seconds}s · `}
-        <span>esc to stop</span>
+        {seconds > 0 && `${seconds}s`}
+        {/* Only Chef's answers can be stopped, so only they say so */}
+        {stoppable && <span>{seconds > 0 ? " · " : ""}esc to stop</span>}
       </span>
     </div>
   );

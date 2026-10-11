@@ -35,6 +35,14 @@ describe("Thinking", () => {
     expect(shown()).toBeNull();
   });
 
+  it("offers Esc only for work that can be stopped", () => {
+    const { unmount } = render(<Thinking />);
+    expect(screen.getByText(/esc to stop/)).toBeInTheDocument();
+    unmount();
+    render(<Thinking label="Reading your columns…" stoppable={false} />);
+    expect(screen.queryByText(/esc to stop/)).not.toBeInTheDocument();
+  });
+
   it("holds one plain word when motion is reduced", () => {
     render(<Thinking reduced />);
     act(() => { vi.advanceTimersByTime(5000); });

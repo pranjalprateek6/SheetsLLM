@@ -19,12 +19,25 @@ export type OpRequest = {
   args?: Record<string, unknown>;
 };
 
+/** Said after a step that ran but may not have done what was meant: a sort
+ *  of a text column with dates written two ways comes out in text order. */
+export type OpWarning = {
+  code: "MIXED_DATES";
+  column: string;
+  message: string;
+  /** The one-click fix, when the data shows the day/month order; else null */
+  fix: OpRequest | null;
+  /** What to ask Chef when there is no one-click fix */
+  instruction: string;
+};
+
 export type OpResult = {
   file_id: string;
   step_number: number;
   instruction: string;
   sql: string;
   preview: { columns: string[]; rows: Record<string, unknown>[]; total_rows: number; total_columns: number };
+  warning?: OpWarning | null;
 };
 
 /** Formats the backend accepts for standardise_date, with an example each. */

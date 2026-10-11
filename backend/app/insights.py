@@ -166,7 +166,7 @@ def _date_like(con, text_cols: list[str]) -> list[str]:
     return [c for c, share in zip(text_cols, shares) if (share or 0) >= 0.5][:_DATE_PROBE_COLUMNS]
 
 
-def _mixed_dates(con, col_name: str) -> dict[str, str] | None:
+def _mixed_dates(con, col_name: str, table: str = "data") -> dict[str, str] | None:
     """A suggestion when a text column holds dates written two ways.
 
     Day-first slashed dates ("28/10/2026") are what the one-click fix assumes
@@ -184,7 +184,7 @@ def _mixed_dates(con, col_name: str) -> dict[str, str] | None:
                 AND TRY_CAST(split_part({v}, '/', 1) AS INTEGER) > 12) AS day_first,
             COUNT(*) FILTER (WHERE regexp_matches({v}, '{_SLASHED}')
                 AND TRY_CAST(split_part({v}, '/', 2) AS INTEGER) > 12) AS month_first
-        FROM data
+        FROM {table}
     """).fetchone()
     filled, iso, slashed, day_first, month_first = (int(x or 0) for x in row)
     # Mostly dates, and both ways of writing them present
@@ -203,4 +203,34 @@ def _mixed_dates(con, col_name: str) -> dict[str, str] | None:
         "text": f"Standardise dates in {col_name}",
         "instruction": instruction,
         "detail": f"{slashed:,} written {order}, {iso:,} as YYYY‑MM‑DD",
+    }
+
+
+def sort_warning(local_path, steps: list[dict], column: str) -> dict | None:
+    """Why a sort by ``column`` came out in the wrong order, if it did.
+
+    A text column holding dates written two ways ("2026-10-14" beside
+    "28/10/2026") sorts as text, so the order is wrong without anything
+    failing. Checked on the column as the steps so far left it. The fix is
+    one click when a day over 12 proves day-first dates, as on upload;
+    otherwise only the instruction for Chef is given.
+    """
+    from app.engine import _sql_path, build_replay_sql
+
+    con = get_connection(read=(local_path,))
+    con.execute(f"CREATE VIEW data AS SELECT * FROM read_parquet('{_sql_path(local_path)}')")
+    con.execute(f"CREATE VIEW cur AS {build_replay_sql(steps)}")
+    dtype = {r[0]: str(r[1]) for r in con.execute("DESCRIBE SELECT * FROM cur").fetchall()}.get(column, "")
+    if not dtype.upper().startswith("VARCHAR"):
+        return None
+    found = _mixed_dates(con, column, table="cur")
+    if not found:
+        return None
+    one_click = found["instruction"].lower().startswith("standardise dates in")
+    return {
+        "code": "MIXED_DATES",
+        "column": column,
+        "message": f"{column} has dates written two ways ({found['detail']}), so it sorted as text and the order is off.",
+        "fix": {"op": "standardise_date", "column": column, "args": {"format": "auto"}} if one_click else None,
+        "instruction": found["instruction"],
     }

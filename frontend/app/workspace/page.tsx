@@ -3,7 +3,7 @@ import dynamic from "next/dynamic";
 import { Suspense, useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import {
-  BarChart3, BookMarked, CalendarClock, Check, ChevronDown, Columns3, FileSpreadsheet, History, Lightbulb, MessageSquare, Pencil, Redo2, Undo2, Upload,
+  AlertTriangle, BarChart3, BookMarked, CalendarClock, Check, ChevronDown, Columns3, FileSpreadsheet, History, Lightbulb, MessageSquare, Pencil, Redo2, Undo2, Upload,
 } from "lucide-react";
 import ColumnHealth, { type HealthColumn } from "@/components/ColumnHealth";
 import PipelineSpine from "@/components/PipelineSpine";
@@ -17,7 +17,7 @@ import ExportMenu from "@/components/ExportMenu";
 import ExportClosingStrip, { shouldOfferRecipe } from "@/components/ExportClosingStrip";
 import RerunCard from "@/components/RerunCard";
 import CommandBarMeter from "@/components/CommandBarMeter";
-import { applyOp, OpFailure, type OpRequest } from "@/lib/ops";
+import { applyOp, OpFailure, type OpRequest, type OpWarning } from "@/lib/ops";
 import { explainError } from "@/lib/errors";
 const RecipesDrawer = dynamic(() => import("@/components/RecipesDrawer"));
 import ChatPanel, { type LateStep } from "@/components/ChatPanel";
@@ -157,6 +157,8 @@ function WorkspaceContent() {
     redo?: { instruction: string; sql: string };
   } | null>(null);
   const [chatPrefill, setChatPrefill] = useState<{ text: string; nonce: number } | null>(null);
+  // A sort that came out in text order, with how to fix it
+  const [sortWarning, setSortWarning] = useState<{ warning: OpWarning; sort: OpRequest } | null>(null);
   // Step to confirm-revert to from the pipeline strip (0 = original file)
   const [confirmRevert, setConfirmRevert] = useState<number | null>(null);
   // What the revert dialog shows. Holds the last target through the closing
@@ -493,6 +495,7 @@ function WorkspaceContent() {
 
   const handleUndo = useCallback(async () => {
     if (!fileId) return;
+    setSortWarning(null);
     setLoading(true);
     try {
       // Keep the step being undone, so Redo can put it back with no AI call
@@ -734,6 +737,7 @@ function WorkspaceContent() {
   // ── One-click fixes: a step with no AI call ─────────────────────────
   const handleOp = useCallback(async (req: OpRequest, source?: string): Promise<boolean> => {
     if (!fileId) return false;
+    setSortWarning(null);
     setLoading(true);
     try {
       const r = await applyOp(fileId, req, source);
@@ -745,6 +749,7 @@ function WorkspaceContent() {
         stepNumber: r.step_number,
         instruction: r.instruction,
       });
+      if (r.warning) warnAfterSort(r.warning, req);
       return true;
     } catch (e) {
       toast.error(e instanceof OpFailure ? explainError({ code: e.code, message: e.message }).text : "That fix didn't apply. Try again.");
@@ -753,6 +758,44 @@ function WorkspaceContent() {
       setLoading(false);
     }
   }, [fileId, previewHandler]);
+
+  // A sort that ran in text order because the dates are written two ways.
+  // When the data shows the day/month order, one click takes the sort back,
+  // standardises the dates and sorts again, so the recipe keeps no step that
+  // sorted the wrong way. Otherwise Chef is asked, with the order spelled out.
+  const fixDatesThenSort = async (fix: OpRequest, sort: OpRequest) => {
+    if (!fileId) return;
+    setSortWarning(null);
+    setLoading(true);
+    try {
+      const undo = await fetchWithAuth("/api/undo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ file_id: fileId }),
+      });
+      if (!undo.ok) throw new Error("undo");
+      await applyOp(fileId, fix, "sort_warning");
+      const r = await applyOp(fileId, sort, "sort_warning");
+      previewHandler({
+        columns: r.preview.columns,
+        rows: r.preview.rows,
+        totalRows: r.preview.total_rows,
+        totalColumns: r.preview.total_columns,
+        stepNumber: r.step_number,
+        instruction: r.instruction,
+      });
+      refreshSteps(fileId);
+      toast.success(`Standardised the dates in ${fix.column} and sorted again.`);
+    } catch {
+      refreshSteps(fileId);
+      toast.error("Couldn't fix the dates. Use the column menu: Standardise dates, then sort again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+  // Shown as a strip under the change bar, beside the grid it is about, and
+  // kept until acted on, dismissed, or replaced by the next change
+  const warnAfterSort = (w: OpWarning, sort: OpRequest) => setSortWarning({ warning: w, sort });
 
   // ── Redo: put an undone step back from its SQL, no AI call ──────────
   const handleRedo = useCallback(async (step: { instruction: string; sql: string }) => {
@@ -832,9 +875,10 @@ function WorkspaceContent() {
     startRecipe({ id: queuedRecipeId }, id, "recipes_page");
   };
 
-  // A report belongs to the file it ran on
+  // A report, and a warning, belong to the file they came from
   useEffect(() => {
     setRunResult(null);
+    setSortWarning(null);
   }, [fileId]);
 
   const handleRerun = (file: File, recipe: Recipe) => {
@@ -1308,6 +1352,45 @@ function WorkspaceContent() {
                       onClick={() => setLastChange(null)}
                       className="text-muted-foreground hover:text-foreground"
                       aria-label="Dismiss change summary"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* A sort that came out in text order because the dates mix formats */}
+              {sortWarning && (
+                <div
+                  role="status"
+                  className="flex flex-shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-warning/30 bg-warning/10 px-4 py-2 text-xs"
+                >
+                  <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0 text-warning-text" aria-hidden />
+                  <span className="min-w-0 flex-1">{sortWarning.warning.message}</span>
+                  <div className="flex items-center gap-2">
+                    {sortWarning.warning.fix ? (
+                      <Button size="sm" className="h-7" disabled={loading} onClick={() => fixDatesThenSort(sortWarning.warning.fix!, sortWarning.sort)}>
+                        Fix the dates and sort again
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7"
+                        onClick={() => {
+                          setChatOpen(true);
+                          setChatPrefill({ text: sortWarning.warning.instruction, nonce: Date.now() });
+                          setSortWarning(null);
+                        }}
+                      >
+                        Ask Chef to fix them
+                      </Button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setSortWarning(null)}
+                      className="text-muted-foreground hover:text-foreground"
+                      aria-label="Dismiss the date warning"
                     >
                       ✕
                     </button>
