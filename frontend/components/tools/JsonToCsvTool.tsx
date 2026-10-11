@@ -37,8 +37,24 @@ function flatten(obj: Record<string, unknown>, prefix = ""): Record<string, stri
   return out;
 }
 
+/** JSON, or JSON Lines (one object per line), which the file picker accepts
+ *  as .jsonl and which JSON.parse alone rejects. */
+export function parseJsonOrLines(text: string): unknown {
+  try {
+    return JSON.parse(text);
+  } catch (whole) {
+    const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    if (lines.length < 2) throw whole;
+    try {
+      return lines.map((l) => JSON.parse(l));
+    } catch {
+      throw whole;
+    }
+  }
+}
+
 async function jsonToTable(text: string, onProgress: (from: number, to: number) => Progress) {
-  let data: unknown = JSON.parse(text);
+  let data: unknown = parseJsonOrLines(text);
   if (data !== null && typeof data === "object" && !Array.isArray(data)) {
     // Accept {items: [...]} style wrappers: use the first array value found.
     const arr = Object.values(data as Record<string, unknown>).find(Array.isArray);
