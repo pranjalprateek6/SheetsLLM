@@ -7,6 +7,7 @@ import logging
 from typing import Any
 from uuid import UUID
 
+import httpx
 from supabase import Client, create_client
 
 from app.config import PRIVACY_DEFAULT_STRICT, SUPABASE_SERVICE_KEY, SUPABASE_URL
@@ -25,7 +26,38 @@ def get_client() -> Client:
                 "SUPABASE_URL and SUPABASE_SERVICE_KEY must be set"
             )
         _client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+        _retry_closed_connections(_client.postgrest.session)
+        _retry_closed_connections(_client.storage.session)
     return _client
+
+
+class _RetryClosedConnection(httpx.BaseTransport):
+    """Sends a request again, once, when the server had closed the pooled
+    connection it went out on.
+
+    After a quiet spell Supabase drops idle keep-alive connections; the next
+    request on one fails with "Server disconnected" before any response, so
+    it never reached the server and is safe to repeat. Seen in production as
+    a recipe run that failed the first time and worked on retry.
+    """
+
+    def __init__(self, inner: httpx.BaseTransport):
+        self._inner = inner
+
+    def handle_request(self, request: httpx.Request) -> httpx.Response:
+        try:
+            return self._inner.handle_request(request)
+        except httpx.RemoteProtocolError as exc:
+            logger.info("Supabase closed a pooled connection (%s); retrying once", exc)
+            return self._inner.handle_request(request)
+
+    def close(self) -> None:
+        self._inner.close()
+
+
+def _retry_closed_connections(session: httpx.Client) -> None:
+    if not isinstance(session._transport, _RetryClosedConnection):
+        session._transport = _RetryClosedConnection(session._transport)
 
 
 # ── Files ────────────────────────────────────────────────────────────

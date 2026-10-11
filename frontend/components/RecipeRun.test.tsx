@@ -2,7 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
+import { http, HttpResponse } from "msw";
+
 import MatchColumnsDialog from "@/components/MatchColumnsDialog";
+import { server } from "@/test/handlers";
+import { applyRecipe } from "@/lib/recipe-run";
 import RunReport from "@/components/RunReport";
 import type { CheckResult, RunReport as Report } from "@/lib/recipe-run";
 
@@ -66,5 +70,20 @@ describe("MatchColumnsDialog", () => {
     await userEvent.click(screen.getByRole("checkbox"));
     await userEvent.click(screen.getByRole("button", { name: "Run the recipe" }));
     expect(onRun).toHaveBeenCalledWith({ "Customer Email": "Region" }, false);
+  });
+});
+
+describe("applyRecipe", () => {
+  it("says a server-side failure plainly, not as a connection problem", async () => {
+    // A crash or a proxy timeout answers with an HTML page, not JSON
+    server.use(http.post("/api/recipes/:id/apply", () => new HttpResponse("<html>Internal Server Error</html>", { status: 500 })));
+    const out = await applyRecipe({ id: "r1" }, "f1");
+    expect(out).toEqual({ kind: "error", text: "The recipe didn't run this time. Nothing was changed. Try again." });
+  });
+
+  it("blames the connection only when the request never arrived", async () => {
+    server.use(http.post("/api/recipes/:id/apply", () => HttpResponse.error()));
+    const out = await applyRecipe({ id: "r1" }, "f1");
+    expect(out).toEqual({ kind: "error", text: "Couldn't run the recipe. Check your connection and try again." });
   });
 });
