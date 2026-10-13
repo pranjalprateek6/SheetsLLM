@@ -1,0 +1,18 @@
+[
+  {"rule": "the table is called data", "prompt": "both", "phrase": "Table name is always: data"},
+  {"rule": "never invent a column", "prompt": "both", "phrase": "NEVER invent columns"},
+  {"rule": "SQL comes back bare, no prose or semicolons", "prompt": "both", "phrase": "No prose, no markdown"},
+  {"rule": "DuckDB has no initcap; title case is spelled out", "prompt": "both", "phrase": "DuckDB has no initcap"},
+  {"rule": "a computed column keeps every other column", "prompt": "both", "phrase": "SELECT *, (expression) AS new_column_name FROM data"},
+  {"rule": "a rename keeps every other column", "prompt": "both", "phrase": "include ALL other columns"},
+  {"rule": "rows are kept unless the user asks to filter", "prompt": "both", "phrase": "Always preserve all rows unless the user explicitly asks to filter"},
+  {"rule": "an ambiguous request asks a question in JSON", "prompt": "both", "phrase": "\"needs_clarification\": true"},
+  {"rule": "a question about values is answered with a query, not a step", "prompt": "chat", "phrase": "Respond with: {\"query\":"},
+  {"rule": "a query aggregates to a few rows", "prompt": "chat", "phrase": "never more than 50"},
+  {"rule": "a query leaves empty values out of groups and rankings", "prompt": "chat", "phrase": "Leave out empty values"},
+  {"rule": "an insight never guesses a value", "prompt": "chat", "phrase": "Never guess a value, a total or a top item in an insight"},
+  {"rule": "when in doubt it is a question, not a change", "prompt": "chat", "phrase": "prefer the question"},
+  {"rule": "a lookup is a LEFT JOIN with one match per key", "prompt": "lookups", "phrase": "LEFT JOIN"},
+  {"rule": "a lookup keeps every row of data", "prompt": "lookups", "phrase": "keep every row of data"},
+  {"rule": "strict mode says the values were never seen", "prompt": "strict", "phrase": "You have not seen any values"}
+]

@@ -1,0 +1,122 @@
+[
+  {
+    "id": "dedupe",
+    "instruction": "remove duplicate rows",
+    "kind": "transform",
+    "reply": "SELECT DISTINCT * FROM data",
+    "expect": {"rows": 10}
+  },
+  {
+    "id": "drop-empty-region",
+    "instruction": "remove rows where Region is empty",
+    "kind": "transform",
+    "reply": "SELECT * FROM data WHERE \"Region\" IS NOT NULL AND TRIM(\"Region\") <> ''",
+    "expect": {"rows": 10}
+  },
+  {
+    "id": "margin-column",
+    "instruction": "add a Margin column equal to MRP minus Landing Cost",
+    "kind": "transform",
+    "reply": "SELECT *, \"MRP\" - \"Landing Cost\" AS \"Margin\" FROM data",
+    "expect": {"rows": 12, "columns_added": ["Margin"]}
+  },
+  {
+    "id": "keep-paid",
+    "instruction": "keep rows where Status is Paid",
+    "kind": "transform",
+    "reply": "SELECT * FROM data WHERE \"Status\" = 'Paid'",
+    "expect": {"rows": 8}
+  },
+  {
+    "id": "sort-desc",
+    "instruction": "sort by MRP, highest first",
+    "kind": "transform",
+    "reply": "SELECT * FROM data ORDER BY \"MRP\" DESC",
+    "expect": {"rows": 12, "first": {"MRP": 400}}
+  },
+  {
+    "id": "rename",
+    "instruction": "rename MRP to Price",
+    "kind": "transform",
+    "reply": "SELECT \"Order ID\", \"Customer Email\", \"Region\", \"Order Date\", \"MRP\" AS \"Price\", \"Landing Cost\", \"Status\" FROM data",
+    "expect": {"rows": 12, "columns_added": ["Price"], "columns_removed": ["MRP"]}
+  },
+  {
+    "id": "fill-empty",
+    "instruction": "fill the empty Region cells with Unknown",
+    "kind": "transform",
+    "reply": "SELECT * REPLACE (COALESCE(NULLIF(TRIM(\"Region\"), ''), 'Unknown') AS \"Region\") FROM data",
+    "expect": {"rows": 12, "no_empty_in": "Region", "value_count": {"column": "Region", "value": "Unknown", "count": 2}}
+  },
+  {
+    "id": "title-case",
+    "instruction": "title-case the Region column",
+    "kind": "transform",
+    "reply": "SELECT * REPLACE (array_to_string(list_transform(string_split(lower(\"Region\"), ' '), lambda w: upper(left(w, 1)) || substr(w, 2)), ' ') AS \"Region\") FROM data",
+    "expect": {"rows": 12, "value_count": {"column": "Region", "value": "South", "count": 2}}
+  },
+  {
+    "id": "set-where",
+    "instruction": "set Status to Closed where Status is Refunded",
+    "kind": "transform",
+    "reply": "SELECT * REPLACE (CASE WHEN \"Status\" = 'Refunded' THEN 'Closed' ELSE \"Status\" END AS \"Status\") FROM data",
+    "expect": {"rows": 12, "value_count": {"column": "Status", "value": "Closed", "count": 1}}
+  },
+  {
+    "id": "standardise-dates",
+    "instruction": "standardise Order Date so every date reads YYYY-MM-DD",
+    "kind": "transform",
+    "reply": "SELECT * REPLACE (COALESCE(TRY_STRPTIME(\"Order Date\", '%Y-%m-%d'), TRY_STRPTIME(\"Order Date\", '%d/%m/%Y'))::DATE AS \"Order Date\") FROM data",
+    "expect": {"rows": 12, "no_empty_in": "Order Date"}
+  },
+  {
+    "id": "join-managers",
+    "instruction": "add Manager from managers, matched on Region",
+    "kind": "transform",
+    "lookups": true,
+    "reply": "SELECT d.*, m.\"Manager\" FROM data d LEFT JOIN managers m ON lower(trim(d.\"Region\")) = lower(trim(m.\"Region\"))",
+    "expect": {"rows": 12, "columns_added": ["Manager"], "value_count": {"column": "Manager", "value": "Ann", "count": 3}}
+  },
+  {
+    "id": "top-region",
+    "instruction": "which region sold the most?",
+    "kind": "question",
+    "reply": "{\"query\": \"SELECT \\\"Region\\\" AS region, SUM(\\\"MRP\\\") AS total_mrp FROM data WHERE \\\"Region\\\" IS NOT NULL AND TRIM(\\\"Region\\\") <> '' GROUP BY 1 ORDER BY 2 DESC\"}",
+    "expect": {"answer_rows": 4, "first": {"region": "West"}}
+  },
+  {
+    "id": "no-email-count",
+    "instruction": "how many rows have no email?",
+    "kind": "question",
+    "reply": "{\"query\": \"SELECT COUNT(*) AS rows_without_email FROM data WHERE \\\"Customer Email\\\" IS NULL OR TRIM(\\\"Customer Email\\\") = ''\"}",
+    "expect": {"answer_rows": 1, "first": {"rows_without_email": 1}}
+  },
+  {
+    "id": "by-status",
+    "instruction": "total MRP by status",
+    "kind": "question",
+    "reply": "{\"query\": \"SELECT \\\"Status\\\" AS status, SUM(\\\"MRP\\\") AS total_mrp FROM data GROUP BY 1 ORDER BY 2 DESC\"}",
+    "expect": {"answer_rows": 3, "first": {"status": "Paid", "total_mrp": 1780}}
+  },
+  {
+    "id": "below-cost",
+    "instruction": "how many orders were sold below their landing cost?",
+    "kind": "question",
+    "reply": "{\"query\": \"SELECT COUNT(*) AS orders_below_cost FROM data WHERE \\\"MRP\\\" < \\\"Landing Cost\\\"\"}",
+    "expect": {"answer_rows": 1, "first": {"orders_below_cost": 1}}
+  },
+  {
+    "id": "columns-insight",
+    "instruction": "what columns do I have?",
+    "kind": "insight",
+    "reply": "{\"insight\": \"Seven columns: Order ID, Customer Email, Region, Order Date, MRP, Landing Cost and Status. Region has empty cells and Order Date is text, so the dates may be written more than one way.\"}",
+    "expect": {"mentions": ["Region", "Order Date"]}
+  },
+  {
+    "id": "ambiguous",
+    "instruction": "remove the bad ones",
+    "kind": "clarify",
+    "reply": "{\"needs_clarification\": true, \"question\": \"Which rows count as bad: duplicates, empty regions, or orders sold below cost?\", \"suggestions\": [\"Remove duplicate rows\", \"Remove rows where Region is empty\"]}",
+    "expect": {}
+  }
+]

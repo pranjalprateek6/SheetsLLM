@@ -42,3 +42,6 @@ frontend/scripts/magic-link.mjs
 review/
 .playwright-mcp/
 frontend/.playwright-mcp/
+
+# Chef eval scorecards are per-run output
+backend/evals/last_run.json
