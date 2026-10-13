@@ -29,6 +29,51 @@ function findColumn(text: string, columns: ColumnInfo[]): string | null {
  * else ("trim the fat" names no column, so it stays with Chef). Deliberately
  * narrow: a wrong match costs a step, a missed one costs only an AI request.
  */
+const COMPARE_WORDS: Record<string, string> = {
+  eq: "is", ne: "is not", gt: ">", gte: ">=", lt: "<", lte: "<=",
+  contains: "contains", not_contains: "doesn't contain", starts_with: "starts with", ends_with: "ends with",
+  empty: "is empty", not_empty: "is not empty",
+};
+
+// "<column> <compare> <value>", with the column named first. The compare words
+// are ordered longest first so "is not empty" wins over "is not" and "is".
+const CONDITIONS: [RegExp, string, boolean][] = [
+  [/^(?:is\s+not\s+empty|isn't\s+empty|is\s+filled|has\s+a\s+value|not\s+empty|not\s+blank)$/i, "not_empty", false],
+  [/^(?:is\s+empty|is\s+blank|is\s+null|is\s+missing|empty|blank)$/i, "empty", false],
+  [/^(?:does\s*n[o']t\s+contain|not\s+containing|doesn't\s+include|without)\s+(.+)$/i, "not_contains", true],
+  [/^(?:contains?|containing|includes?|including|has|with)\s+(.+)$/i, "contains", true],
+  [/^(?:start(?:s|ing)?\s+with|begin(?:s|ning)?\s+with)\s+(.+)$/i, "starts_with", true],
+  [/^(?:end(?:s|ing)?\s+with)\s+(.+)$/i, "ends_with", true],
+  [/^(?:>=|is\s+at\s+least|at\s+least|greater\s+than\s+or\s+equal\s+to|or\s+more)\s*(.+)$/i, "gte", true],
+  [/^(?:<=|is\s+at\s+most|at\s+most|less\s+than\s+or\s+equal\s+to)\s*(.+)$/i, "lte", true],
+  [/^(?:>|(?:is\s+)?(?:more|greater|bigger|higher|larger)\s+than|(?:is\s+)?(?:above|over|after))\s*(.+)$/i, "gt", true],
+  [/^(?:<|(?:is\s+)?(?:less|smaller|lower)\s+than|(?:is\s+)?(?:below|under|before))\s*(.+)$/i, "lt", true],
+  [/^(?:!=|<>|is\s+not|isn't|does\s+not\s+equal|not)\s+(.+)$/i, "ne", true],
+  [/^(?:=|==|is|equals?|equal\s+to)\s+(.+)$/i, "eq", true],
+];
+
+function parseCondition(rest: string, columns: ColumnInfo[]): { column: string; compare: string; value?: string } | null {
+  const sorted = [...columns].sort((a, b) => b.name.length - a.name.length);
+  for (const c of sorted) {
+    const re = new RegExp(`^["'\`]?${esc(c.name)}["'\`]?\\s+(.+)$`, "i");
+    const m = rest.match(re);
+    if (!m) continue;
+    const tail = m[1].trim();
+    for (const [pattern, compare, needsValue] of CONDITIONS) {
+      const hit = tail.match(pattern);
+      if (!hit) continue;
+      if (!needsValue) return { column: c.name, compare };
+      const value = hit[1].trim().replace(/^["'\`](.*)["'\`]$/, "$1").trim();
+      if (!value || value.length > 500) return null;
+      // A range or a second condition is Chef's job
+      if (/^(?:between|in|one\s+of|either)\b/i.test(value) || /\s(?:and|or)\s/i.test(value)) return null;
+      return { column: c.name, compare, value };
+    }
+    return null;
+  }
+  return null;
+}
+
 export function matchVerb(raw: string, columns: ColumnInfo[]): VerbMatch | null {
   const text = raw.trim();
   if (!text || text.length > 120) return null;
@@ -66,6 +111,22 @@ export function matchVerb(raw: string, columns: ColumnInfo[]): VerbMatch | null 
   if (empty) {
     const col = findColumn(text, columns);
     return col ? { op: "drop_empty_rows", column: col, label: `Drop rows where ${col} is empty` } : null;
+  }
+
+  // Keep or remove rows by a plain condition: "keep rows where Amount > 0",
+  // "remove rows where Status is cancelled", "filter Email contains @acme.com"
+  const filter = text.match(
+    /^(?:please\s+)?(?:(keep|show|only|filter(?:\s+to)?|select)|(remove|drop|delete|exclude))\s+(?:only\s+|the\s+)?(?:rows?\s+)?(?:where|with|whose|if|that\s+have|in\s+which)?\s*(.+)$/i,
+  );
+  if (filter && /\b(where|with|whose|if|that have|in which)\b|^(?:please\s+)?filter\b/i.test(text)) {
+    const keep = !filter[2];
+    const rest = filter[3].trim();
+    const parsed = parseCondition(rest, columns);
+    if (parsed) {
+      const { column, compare, value } = parsed;
+      const label = `${keep ? "Keep" : "Remove"} rows where ${column} ${COMPARE_WORDS[compare]}${value !== undefined ? ` ${value}` : ""}`;
+      return { op: "filter_rows", column, args: { compare, ...(value !== undefined ? { value } : {}), keep }, label };
+    }
   }
 
   // Drop a column

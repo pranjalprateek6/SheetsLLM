@@ -33,7 +33,7 @@ describe("DataGrid column menu", () => {
     grid();
     const menu = await openMenu("Email");
     for (const item of ["Sort preview ↑", "Sort preview ↓", "Trim whitespace", "Fill empty cells…",
-      "Drop rows where empty", "Remove duplicate rows (this column)", "Sort all rows ascending",
+      "Drop rows where empty", "Keep rows where…", "Remove duplicate rows (this column)", "Sort all rows ascending",
       "Sort all rows descending", "Rename…", "Drop column"]) {
       expect(within(menu).getByRole("menuitem", { name: item })).toBeInTheDocument();
     }
@@ -87,6 +87,22 @@ describe("DataGrid column menu", () => {
     await userEvent.type(await screen.findByLabelText("Fill empty cells with"), "x{Escape}");
     expect(screen.queryByLabelText("Fill empty cells with")).not.toBeInTheDocument();
     expect(onOp).not.toHaveBeenCalled();
+  });
+
+  it("Keep rows where… takes a compare and a value, and needs no value for empty", async () => {
+    const onOp = grid();
+    let menu = await openMenu("Amount");
+    await userEvent.click(within(menu).getByRole("menuitem", { name: "Keep rows where…" }));
+    await userEvent.selectOptions(await screen.findByLabelText("How to compare"), "gt");
+    await userEvent.type(screen.getByLabelText("Value"), "0{Enter}");
+    expect(onOp).toHaveBeenCalledWith({ op: "filter_rows", column: "Amount", args: { compare: "gt", value: "0", keep: true } });
+
+    menu = await openMenu("Email");
+    await userEvent.click(within(menu).getByRole("menuitem", { name: "Keep rows where…" }));
+    await userEvent.selectOptions(await screen.findByLabelText("How to compare"), "not_empty");
+    expect(screen.queryByLabelText("Value")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Apply" }));
+    expect(onOp).toHaveBeenCalledWith({ op: "filter_rows", column: "Email", args: { compare: "not_empty", keep: true } });
   });
 
   it("Standardise dates posts the chosen format", async () => {
