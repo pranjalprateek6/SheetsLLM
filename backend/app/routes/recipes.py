@@ -243,7 +243,13 @@ def delete_recipe(request: Request, recipe_id: str):
 def _link_required_lookups(user_id: str, file_id: str, required: list[dict]) -> list[dict]:
     """Give the target file every lookup the recipe needs, under the same
     alias, when the lookup file still exists. Returns the ones that do not."""
-    have = {l["alias"]: l for l in db.list_lookups(file_id)}
+    if not required:
+        return []
+    try:
+        have = {l["alias"]: l for l in db.list_lookups(file_id)}
+    except Exception as exc:  # the table is missing (migration 015 not applied): nothing to link
+        logger.warning("lookups unavailable for %s: %s", file_id, exc)
+        return list(required)
     missing = []
     for need in required:
         alias, lookup_id = need.get("alias"), need.get("lookup_file_id")
