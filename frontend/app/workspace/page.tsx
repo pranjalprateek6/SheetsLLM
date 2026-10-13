@@ -8,7 +8,6 @@ import {
 import ColumnHealth, { type HealthColumn } from "@/components/ColumnHealth";
 import PipelineSpine from "@/components/PipelineSpine";
 import DropZone from "@/components/DropZone";
-import UploadMore from "@/components/UploadMore";
 import DataGrid from "@/components/DataGrid";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import SheetSelector from "@/components/SheetSelector";
@@ -16,7 +15,8 @@ const HistoryDrawer = dynamic(() => import("@/components/HistoryDrawer"));
 import { type Recipe, type RecipeApplyResult } from "@/components/RecipesDrawer";
 import ExportMenu from "@/components/ExportMenu";
 import ExportClosingStrip, { shouldOfferRecipe } from "@/components/ExportClosingStrip";
-import RerunCard from "@/components/RerunCard";
+import FileIntake from "@/components/FileIntake";
+import { cn } from "@/lib/utils";
 import CommandBarMeter from "@/components/CommandBarMeter";
 import { applyOp, OpFailure, type OpRequest, type OpWarning } from "@/lib/ops";
 import { explainError } from "@/lib/errors";
@@ -106,10 +106,14 @@ function WorkspaceContent() {
   const [exportOpen, setExportOpen] = useState(false);
   // After an export with steps: offer to keep them as a recipe
   const [exportStrip, setExportStrip] = useState<{ name: string; steps: number } | null>(null);
-  // Saved recipes, for the upload screen's re-run card
+  // Saved recipes, for the start screen's rail
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const armedRecipeId = useSearchParams().get("recipe_id");
-  // A recipe to run as soon as the next upload lands (the re-run card)
+  // The recipe the next file runs: armed from the Recipes page's link, or
+  // picked in the rail; the one intake says so and the file runs it
+  const [armedId, setArmedId] = useState<string | null>(armedRecipeId);
+  const armedRecipe = recipes.find((r) => r.id === armedId) ?? null;
+  // A recipe to run as soon as the next upload lands
   const pendingRecipeRef = useRef<Recipe | null>(null);
   // Bumped after every step change; the health strip refetches null counts
   const [healthNonce, setHealthNonce] = useState(0);
@@ -1122,9 +1126,17 @@ function WorkspaceContent() {
               )}
 
               <div className="mt-8 grid gap-10 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:gap-14">
-                <section aria-label="Open a file">
-                  <DropZone disabled={loading} onDropFile={onUpload} />
-                  <UploadMore disabled={loading} onPaste={(f) => onUpload(f)} onLink={onUploadFromUrl} />
+                <div>
+                  <FileIntake
+                    disabled={loading}
+                    armed={armedRecipe}
+                    onDisarm={() => setArmedId(null)}
+                    onDropFile={(f) => (armedRecipe ? handleRerun(f, armedRecipe) : onUpload(f))}
+                    onLink={(u) => {
+                      if (armedRecipe) pendingRecipeRef.current = armedRecipe;
+                      return onUploadFromUrl(u);
+                    }}
+                  />
                   {uploadError && (
                     <div className="mt-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-[13px] text-destructive-text">
                       {uploadError}
@@ -1171,10 +1183,47 @@ function WorkspaceContent() {
                       })}
                     </ul>
                   </div>
-                </section>
+                </div>
 
                 <aside className="space-y-6" aria-label="Where to start">
-                  <RerunCard recipes={recipes} armedId={armedRecipeId} disabled={loading} onRun={handleRerun} />
+                  {recipes.length > 0 && (
+                    <section className="rounded-xl border bg-card p-4 shadow-xs">
+                      <h2 className="flex items-center gap-2 text-[13px] font-medium">
+                        <BookMarked className="h-4 w-4 text-primary-accent" aria-hidden /> Your recipes
+                      </h2>
+                      <p className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground">
+                        Pick one and the next file runs it, with no AI call. Or open a file first and choose then.
+                      </p>
+                      <ul className="mt-2 divide-y">
+                        {recipes.slice(0, 5).map((r) => {
+                          const chosen = r.id === armedId;
+                          return (
+                            <li key={r.id} className="flex items-center justify-between gap-3 py-2">
+                              <span className="min-w-0">
+                                <span className="block truncate text-[13px] font-medium">{r.name}</span>
+                                <span className="block text-[12px] tabular-nums text-muted-foreground">
+                                  {r.steps} step{r.steps === 1 ? "" : "s"}
+                                  {r.source_file_name ? ` · from ${r.source_file_name}` : ""}
+                                </span>
+                              </span>
+                              <button
+                                type="button"
+                                aria-pressed={chosen}
+                                disabled={loading}
+                                onClick={() => setArmedId(chosen ? null : r.id)}
+                                className={cn(
+                                  "flex-shrink-0 rounded-full border px-2.5 py-1 text-[12px] font-medium transition-colors duration-150 disabled:opacity-50",
+                                  chosen ? "border-primary bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:border-input hover:text-foreground",
+                                )}
+                              >
+                                {chosen ? "Runs on the next file" : "Use on the next file"}
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </section>
+                  )}
                   <GettingStarted />
                   <section>
                     <h2 className="flex items-center gap-2 text-[13px] font-medium">

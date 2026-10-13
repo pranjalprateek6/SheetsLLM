@@ -7,7 +7,16 @@ import { UploadIcon, type UploadIconHandle } from "@/components/icons/upload";
    hairline on the panel surface, the icon small, the formats and the limits
    said once. Violet only when a file is over it or it has focus. */
 
-export default function DropZone({ disabled, onDropFile }: { disabled?: boolean; onDropFile: (f: File) => void }) {
+export default function DropZone({
+  disabled,
+  onDropFile,
+  armed,
+}: {
+  disabled?: boolean;
+  onDropFile: (f: File) => void;
+  /** The name of the recipe the dropped file will run, when one is armed */
+  armed?: string;
+}) {
   const [dragging, setDragging] = useState(false);
   const iconRef = useRef<UploadIconHandle>(null);
 
@@ -41,8 +50,17 @@ export default function DropZone({ disabled, onDropFile }: { disabled?: boolean;
         <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-muted text-muted-foreground transition-colors group-hover:bg-primary/10 group-hover:text-primary-accent">
           <UploadIcon ref={iconRef} size={20} />
         </div>
-        <p className="text-[14px] font-medium">Click to upload or drag and drop</p>
-        <p className="mt-1 text-[13px] text-muted-foreground">CSV, Excel, JSON, TSV or Parquet. Up to 400 MB and 1,000,000 rows.</p>
+        {armed ? (
+          <>
+            <p className="text-[14px] font-medium">Drop this month&apos;s file to run {armed}</p>
+            <p className="mt-1 text-[13px] text-muted-foreground">Or click to choose it. CSV, Excel, JSON, TSV or Parquet.</p>
+          </>
+        ) : (
+          <>
+            <p className="text-[14px] font-medium">Click to upload or drag and drop</p>
+            <p className="mt-1 text-[13px] text-muted-foreground">CSV, Excel, JSON, TSV or Parquet. Up to 400 MB and 1,000,000 rows.</p>
+          </>
+        )}
       </div>
     </label>
   );

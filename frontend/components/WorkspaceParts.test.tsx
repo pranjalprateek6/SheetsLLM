@@ -10,7 +10,6 @@ import ExportClosingStrip, { markRecipeSaved, shouldOfferRecipe } from "./Export
 import ExportMenu, { summarise } from "./ExportMenu";
 import HistoryDrawer from "./HistoryDrawer";
 import PipelineSpine from "./PipelineSpine";
-import RerunCard from "./RerunCard";
 
 vi.mock("@/lib/supabase", () => ({
   supabase: { auth: { getSession: async () => ({ data: { session: null } }), signOut: async () => {} } },
@@ -185,35 +184,6 @@ describe("PipelineSpine", () => {
     rerender(<PipelineSpine steps={[step(1)]} onRevertTo={vi.fn()} onAddStep={vi.fn()} onSaveRecipe={onSave} />);
     await userEvent.click(screen.getByRole("button", { name: /Save as a recipe/ }));
     expect(onSave).toHaveBeenCalled();
-  });
-});
-
-// ── 2.3 re-run card ──────────────────────────────────────────────────
-
-describe("RerunCard", () => {
-  const recipes = [
-    { id: "r1", name: "Monthly orders", steps: 6, source_file_name: "orders_oct.csv" },
-    { id: "r2", name: "HR cleanup", steps: 2 },
-  ];
-
-  it("renders from the list shape and runs the picked recipe on the dropped file", async () => {
-    const onRun = vi.fn();
-    render(<RerunCard recipes={recipes} onRun={onRun} />);
-    expect(screen.getByText("6 steps · from orders_oct.csv")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("radio", { name: "HR cleanup" }));
-    const file = new File(["a,b\n1,2"], "nov.csv", { type: "text/csv" });
-    await userEvent.upload(screen.getByLabelText("Upload a file and run HR cleanup"), file);
-    expect(onRun).toHaveBeenCalledWith(file, recipes[1]);
-  });
-
-  it("starts on the recipe a link armed", () => {
-    render(<RerunCard recipes={recipes} armedId="r2" onRun={vi.fn()} />);
-    expect(screen.getByRole("radio", { name: "HR cleanup" })).toHaveAttribute("aria-checked", "true");
-  });
-
-  it("renders nothing with no recipes", () => {
-    const { container } = render(<RerunCard recipes={[]} onRun={vi.fn()} />);
-    expect(container).toBeEmptyDOMElement();
   });
 });
 
