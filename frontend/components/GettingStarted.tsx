@@ -1,35 +1,83 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Check, X } from "lucide-react";
+import { ArrowRight, Check, X } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-/* Inline activation checklist (replaces the old modal tour).
-   3-5 milestone items with pre-filled progress — the account step starts
-   checked so the list never reads as a blank slate. Progress flags are
-   set from the surfaces where each milestone actually happens. */
+/* The activation checklist, inline on the start screen. Five milestones
+   that end where the product clicks: a recipe run on month two's file.
+   The next undone one says how to do it and, where a click can do it,
+   offers the click. Progress flags are set from the surfaces where each
+   milestone actually happens; dismissed collapses to a pill rather than
+   vanishing, since a list that sticks around keeps pulling people back. */
 
 export const ONBOARDING_FLAGS = {
   upload: "sllm_done_upload",
   transform: "sllm_done_transform",
   recipe: "sllm_done_recipe",
+  rerun: "sllm_done_rerun",
 } as const;
+
+export type OnboardingStep = keyof typeof ONBOARDING_FLAGS;
 
 export const ONBOARDING_DISMISSED_KEY = "sllm_onboarding_dismissed";
 
-export function markOnboardingStep(step: keyof typeof ONBOARDING_FLAGS) {
+export function markOnboardingStep(step: OnboardingStep) {
   try {
     localStorage.setItem(ONBOARDING_FLAGS[step], "true");
   } catch {}
 }
 
-const ITEMS = [
-  { key: "account", label: "Create your account", done: () => true },
-  { key: "upload", label: "Upload a file, or try a sample", done: () => localStorage.getItem(ONBOARDING_FLAGS.upload) === "true" },
-  { key: "transform", label: "Clean something: your first step", done: () => localStorage.getItem(ONBOARDING_FLAGS.transform) === "true" },
-  { key: "recipe", label: "Save it as a recipe", done: () => localStorage.getItem(ONBOARDING_FLAGS.recipe) === "true" },
+const flag = (step: OnboardingStep) => {
+  try {
+    return localStorage.getItem(ONBOARDING_FLAGS[step]) === "true";
+  } catch {
+    return false;
+  }
+};
+
+type Item = {
+  key: "account" | OnboardingStep;
+  label: string;
+  /** How to do it, shown on the next undone item */
+  hint: string;
+  /** A click that does it, when one can */
+  action?: string;
+  done: () => boolean;
+};
+
+export const ITEMS: Item[] = [
+  { key: "account", label: "Create your account", hint: "", done: () => true },
+  {
+    key: "upload",
+    label: "Open a file, or try a sample",
+    hint: "Monthly orders has duplicates, empty regions and two date formats to fix.",
+    action: "Open Monthly orders",
+    done: () => flag("upload"),
+  },
+  {
+    key: "transform",
+    label: "Clean something: your first step",
+    hint: "The chips above Chef are one click each, and every column header has a menu of fixes.",
+    done: () => flag("transform"),
+  },
+  {
+    key: "recipe",
+    label: "Save the steps as a recipe",
+    hint: "In the steps rail, or right after an export. Name it for the file it cleans.",
+    done: () => flag("recipe"),
+  },
+  {
+    key: "rerun",
+    label: "Run it on next month's file",
+    hint: "The same steps on a new file, in one click, with no AI call. This is the whole point.",
+    action: "Run it on November's orders",
+    done: () => flag("rerun"),
+  },
 ];
 
-export default function GettingStarted() {
+export default function GettingStarted({ onAct }: { onAct?: (step: OnboardingStep) => void }) {
   const [state, setState] = useState<"hidden" | "open" | "collapsed">("hidden");
   const [doneMap, setDoneMap] = useState<Record<string, boolean>>({});
 
@@ -37,10 +85,8 @@ export default function GettingStarted() {
     try {
       const map: Record<string, boolean> = {};
       for (const item of ITEMS) map[item.key] = item.done();
-      if (Object.values(map).every(Boolean)) return; // all done — nothing to show
+      if (Object.values(map).every(Boolean)) return; // all done: nothing to show
       setDoneMap(map);
-      // Dismissed collapses to a pill instead of vanishing — checklists
-      // that stick around keep pulling users back to the milestones.
       setState(localStorage.getItem(ONBOARDING_DISMISSED_KEY) === "true" ? "collapsed" : "open");
     } catch {}
   }, []);
@@ -49,6 +95,7 @@ export default function GettingStarted() {
 
   const doneCount = Object.values(doneMap).filter(Boolean).length;
   const pct = Math.round((doneCount / ITEMS.length) * 100);
+  const next = ITEMS.find((item) => !doneMap[item.key]);
 
   const dismiss = () => {
     try { localStorage.setItem(ONBOARDING_DISMISSED_KEY, "true"); } catch {}
@@ -95,17 +142,30 @@ export default function GettingStarted() {
       <ul className="space-y-2.5">
         {ITEMS.map((item) => {
           const done = !!doneMap[item.key];
+          const isNext = next?.key === item.key;
           return (
-            <li key={item.key} className="flex items-center gap-2.5 text-sm">
-              <span
-                className={cn(
-                  "flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border transition-colors",
-                  done ? "border-success bg-success text-success-foreground" : "border-border bg-background"
-                )}
-              >
-                {done && <Check className="h-3 w-3" />}
-              </span>
-              <span className={cn(done && "text-muted-foreground line-through")}>{item.label}</span>
+            <li key={item.key} className="text-[13px]">
+              <div className="flex items-center gap-2.5">
+                <span
+                  className={cn(
+                    "flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border transition-colors",
+                    done ? "border-success bg-success text-success-foreground" : isNext ? "border-primary" : "border-border bg-background",
+                  )}
+                >
+                  {done && <Check className="h-3 w-3" />}
+                </span>
+                <span className={cn(done && "text-muted-foreground line-through", isNext && "font-medium")}>{item.label}</span>
+              </div>
+              {isNext && item.hint && (
+                <div className="ml-[30px] mt-1.5">
+                  <p className="text-[12px] leading-relaxed text-muted-foreground">{item.hint}</p>
+                  {item.action && onAct && item.key !== "account" && (
+                    <Button size="sm" variant="outline" className="mt-2 h-7" onClick={() => onAct(item.key as OnboardingStep)}>
+                      {item.action} <ArrowRight className="ml-1 h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                </div>
+              )}
             </li>
           );
         })}
