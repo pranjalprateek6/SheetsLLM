@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import logging
+import re
 from pathlib import Path
 from typing import Any
 
 from app.engine import _run_with_timeout, get_connection
-from app.ops import quote_ident  # column names come from the file
+from app.ops import quote_ident, quote_literal  # column names come from the file
 
 logger = logging.getLogger("sheetsllm.insights")
 
@@ -125,6 +126,16 @@ def generate_insights(local_path: str | Path) -> dict[str, Any]:
         # Bounded: a cheap look at the first rows picks the date-like columns,
         # and only those few are counted in full, under a time limit.
         text_cols = [c for c, t in zip(col_names, col_types) if t.upper().startswith("VARCHAR")]
+        # Numbers written as text with currency signs, separators or brackets
+        for col_name in _number_like(con, text_cols):
+            try:
+                found = _run_with_timeout(
+                    _symbol_numbers, con, col_name, timeout=_DATE_PROBE_SECONDS, interrupt=(con,)
+                )
+            except Exception:
+                found = None
+            if found:
+                insights["suggestions"].append(found)
         for col_name in _date_like(con, text_cols):
             try:
                 found = _run_with_timeout(
@@ -164,6 +175,60 @@ def _date_like(con, text_cols: list[str]) -> list[str]:
         f"SELECT {parts} FROM (SELECT * FROM data LIMIT {_DATE_PROBE_ROWS})"
     ).fetchone()
     return [c for c, share in zip(text_cols, shares) if (share or 0) >= 0.5][:_DATE_PROBE_COLUMNS]
+
+
+# A number as people write it in a spreadsheet: an optional sign or
+# bracket, a currency mark, digits with thousands separators, a decimal
+# part, an optional percent. "$1,234.50", "(12)", "12%", "€ 1 234,50".
+_WRITTEN_NUMBER = r"^[-(]?\s*[$€£₹¥]?\s*-?\d[\d,. ]*\s*%?\s*\)?$"
+# A plain number, which "Change type to number" already reads
+_PLAIN_NUMBER = r"^-?\d+(\.\d+)?$"
+# Money columns carry a few "N/A" and "TBD": seven in ten written as numbers is enough
+_NUMBER_SHARE = 0.7
+# Columns whose digits are labels, not amounts: never offer to clean them
+_NOT_AMOUNTS = re.compile(r"\b(id|code|zip|postal|pin|phone|mobile|tel|sku|ref)\b|_id$|^id", re.IGNORECASE)
+
+
+def _number_like(con, text_cols: list[str]) -> list[str]:
+    """Text columns whose first rows are mostly written numbers, at most a
+    handful, leaving out columns named like identifiers."""
+    cols = [c for c in text_cols if not _NOT_AMOUNTS.search(c)]
+    if not cols:
+        return []
+    parts = ", ".join(
+        f"COUNT(*) FILTER (WHERE regexp_matches(TRIM(CAST({quote_ident(c)} AS VARCHAR)), {quote_literal(_WRITTEN_NUMBER)}))"
+        f" / GREATEST(COUNT(*) FILTER (WHERE TRIM(CAST({quote_ident(c)} AS VARCHAR)) <> ''), 1)"
+        for c in cols
+    )
+    shares = con.execute(
+        f"SELECT {parts} FROM (SELECT * FROM data LIMIT {_DATE_PROBE_ROWS})"
+    ).fetchone()
+    return [c for c, share in zip(cols, shares) if (share or 0) >= _NUMBER_SHARE][:_DATE_PROBE_COLUMNS]
+
+
+def _symbol_numbers(con, col_name: str, table: str = "data") -> dict[str, str] | None:
+    """A suggestion when a text column holds numbers written with currency
+    signs, separators or brackets, which sort and sum as text until cleaned.
+    A column of plain digits is left alone: it may be a code with leading
+    zeros, and "Change type to number" covers it anyway."""
+    q = quote_ident(col_name)
+    v = f"TRIM(CAST({q} AS VARCHAR))"
+    row = con.execute(f"""
+        SELECT
+            COUNT(*) FILTER (WHERE {v} <> '') AS filled,
+            COUNT(*) FILTER (WHERE regexp_matches({v}, {quote_literal(_WRITTEN_NUMBER)})) AS written,
+            COUNT(*) FILTER (WHERE regexp_matches({v}, {quote_literal(_WRITTEN_NUMBER)})
+                AND NOT regexp_matches({v}, {quote_literal(_PLAIN_NUMBER)})) AS dressed
+        FROM {table}
+    """).fetchone()
+    filled, written, dressed = (int(x or 0) for x in row)
+    if not filled or written < _NUMBER_SHARE * filled or not dressed:
+        return None
+    return {
+        "text": f"Clean numbers in {col_name}",
+        "instruction": f"clean numbers in {col_name}",
+        "detail": f"{dressed:,} written with a currency sign, separators or brackets",
+    }
 
 
 def _mixed_dates(con, col_name: str, table: str = "data") -> dict[str, str] | None:

@@ -33,7 +33,7 @@ describe("DataGrid column menu", () => {
     grid();
     const menu = await openMenu("Email");
     for (const item of ["Sort preview ↑", "Sort preview ↓", "Trim whitespace", "Fill empty cells…",
-      "Drop rows where empty", "Remove duplicate rows (this column)", "Sort all rows ascending",
+      "Drop rows where empty", "Remove duplicate rows (this column)", "Clean numbers", "Sort all rows ascending",
       "Sort all rows descending", "Rename…", "Drop column"]) {
       expect(within(menu).getByRole("menuitem", { name: item })).toBeInTheDocument();
     }
@@ -44,6 +44,7 @@ describe("DataGrid column menu", () => {
     grid();
     let menu = await openMenu("Amount");
     expect(within(menu).queryByRole("menuitem", { name: "Trim whitespace" })).not.toBeInTheDocument();
+    expect(within(menu).queryByRole("menuitem", { name: "Clean numbers" })).not.toBeInTheDocument();
     expect(within(menu).queryByRole("menuitem", { name: "Standardise dates…" })).not.toBeInTheDocument();
     await userEvent.keyboard("{Escape}");
     menu = await openMenu("Order Date");
@@ -52,6 +53,7 @@ describe("DataGrid column menu", () => {
 
   it.each([
     ["Trim whitespace", { op: "trim", column: "Email" }],
+    ["Clean numbers", { op: "clean_number", column: "Email" }],
     ["Drop rows where empty", { op: "drop_empty_rows", column: "Email" }],
     ["Remove duplicate rows (this column)", { op: "dedupe", column: "Email" }],
     ["Sort all rows descending", { op: "sort", column: "Email", args: { direction: "desc" } }],
