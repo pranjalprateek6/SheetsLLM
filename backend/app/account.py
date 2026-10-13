@@ -7,7 +7,7 @@ Order matters, and each stage can be run again if the one after it fails:
    and the caller is told to try again.
 2. Data. Every file (its stored Parquet, steps, chat, cache), then the rows
    in every table keyed by user id: recipes, audit log, events, usage,
-   settings, subscription state, jobs.
+   settings, subscription state.
 3. The sign-in itself, last, so a half-finished deletion can still be
    retried by the user.
 """
@@ -23,7 +23,7 @@ from app.cache import invalidate_file
 logger = logging.getLogger("sheetsllm.account")
 
 # Tables with a user_id column, beyond files (whose children cascade)
-USER_TABLES = ("recipes", "audit_log", "events", "usage", "user_settings", "subscriptions", "jobs")
+USER_TABLES = ("recipes", "audit_log", "events", "usage", "user_settings", "subscriptions")
 
 # Subscription states that can still charge the card
 _CHARGING = _ACTIVE_STATUSES | {"pending", "halted"}
