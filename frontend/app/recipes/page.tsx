@@ -6,6 +6,7 @@ import { BookMarked, ChevronDown, FileSpreadsheet, Play, Upload } from "lucide-r
 
 import AuthGuard from "@/components/AuthGuard";
 import EmptyState from "@/components/EmptyState";
+import DueRecipes from "@/components/DueRecipes";
 import RecipeChecks from "@/components/RecipeChecks";
 import RecipeStepsEditor, { type RecipeStep } from "@/components/RecipeStepsEditor";
 import type { Recipe } from "@/components/RecipesDrawer";
@@ -101,6 +102,8 @@ function RecipesContent() {
           </p>
         </div>
       </div>
+
+      <DueRecipes className="mb-5" />
 
       {failed && (
         <div className="rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm">

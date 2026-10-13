@@ -145,5 +145,5 @@ async def verify_token(request: Request) -> dict:
 # own HMAC signature header, not a JWT. /docs and /openapi.json only exist
 # outside production (gated in main.py).
 PUBLIC_PATHS = frozenset(
-    {"/health", "/docs", "/openapi.json", "/billing/webhook"}
+    {"/health", "/docs", "/openapi.json", "/billing/webhook", "/reminders/run"}
 )

@@ -556,6 +556,25 @@ def list_recipes(user_id: str) -> list[dict]:
     return resp.data
 
 
+def list_all_recipes() -> list[dict]:
+    """Every recipe of every user, for the daily reminders pass."""
+    resp = (
+        get_client()
+        .table("recipes")
+        .select("id,user_id,name,created_at")
+        .order("created_at", desc=True)
+        .limit(5000)
+        .execute()
+    )
+    return resp.data or []
+
+
+def user_email(user_id: str) -> str | None:
+    """The sign-in address of a user, from Supabase Auth."""
+    user = get_client().auth.admin.get_user_by_id(user_id).user
+    return getattr(user, "email", None) if user else None
+
+
 def get_recipe(recipe_id: str, user_id: str) -> dict | None:
     if not is_uuid(recipe_id):
         return None

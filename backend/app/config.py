@@ -87,6 +87,17 @@ ALLOW_ANONYMOUS: bool = (
     os.getenv("ALLOW_ANONYMOUS", "false").strip().lower() in ("1", "true", "yes")
 )
 
+# ── Reminders between months ─────────────────────────────────────────
+# A recipe that has not run for this many days is due
+REMINDER_DAYS: int = int(os.getenv("REMINDER_DAYS", "28"))
+# The daily pass is called by the database's scheduler with this header
+CRON_SECRET: str = os.getenv("CRON_SECRET", "")
+# Email goes through Resend when both are set; otherwise reminders stay in-app
+RESEND_API_KEY: str = os.getenv("RESEND_API_KEY", "")
+REMINDER_FROM: str = os.getenv("REMINDER_FROM", "")
+# Where the links in an email point
+PUBLIC_APP_URL: str = os.getenv("PUBLIC_APP_URL", "https://sheets-llm.vercel.app").rstrip("/")
+
 # ── CORS ─────────────────────────────────────────────────────────────
 ALLOWED_ORIGINS: list[str] = [
     o.strip()
