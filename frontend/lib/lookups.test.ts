@@ -56,6 +56,6 @@ describe("the orders sample", () => {
     expect(orders.lookup?.suggestion).toContain("managers");
     const { readFileSync } = await import("node:fs");
     const csv = readFileSync(`public${orders.lookup!.file}`, "utf-8");
-    expect(csv.split("\n")[0]).toBe("Region,Manager,Monthly Target");
+    expect(csv.split("\n")[0].trimEnd()).toBe("Region,Manager,Monthly Target");
   });
 });
