@@ -404,7 +404,12 @@ export default function ChatPanel({
       {fileId && messages.length === 0 && (
         <div className="flex-shrink-0 px-4 pb-6 pt-5">
           <p className="text-[15px] font-medium tracking-[-0.01em]">{fileName || "Your file"} is ready</p>
-          <p className="mt-1 text-[13px] text-muted-foreground">Ask a question about it, or describe a change.</p>
+          <p className="mt-1 text-[13px] text-muted-foreground">
+            Ask a question about it, or describe a change.{" "}
+            <a href="/help#chef" target="_blank" rel="noreferrer" className="underline underline-offset-2 hover:text-foreground">
+              What Chef can do
+            </a>
+          </p>
           {strict !== null && (
             <p className="mt-0.5 text-[12px] text-muted-foreground">
               {strict
