@@ -396,6 +396,32 @@ class TestUpload:
         assert resp.status_code == 410
         assert resp.json()["code"] == "PENDING_UPLOAD_EXPIRED"
 
+    def test_a_link_is_fetched_and_ingested_like_a_drop(self, client, upload_seams, monkeypatch):
+        seen = {}
+
+        def _fetch(url, **kw):
+            seen["url"] = url
+            return b"item,cost\nx,1\ny,2\n", "orders.csv"
+
+        monkeypatch.setattr(upload_module, "fetch_bytes", _fetch)
+        resp = client.post("/upload/url", json={"url": "docs.google.com/spreadsheets/d/1AbC/edit#gid=3"})
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert seen["url"] == "https://docs.google.com/spreadsheets/d/1AbC/export?format=csv&gid=3"
+        assert body["name"] == "orders.csv"
+        assert body["preview"]["columns"] == ["item", "cost"] and body["preview"]["total_rows"] == 2
+
+    def test_a_bad_link_answers_with_its_reason(self, client, upload_seams, monkeypatch):
+        from app.fetch_url import FetchError
+
+        def _fetch(url, **kw):
+            raise FetchError("PRIVATE_HOST", "That link points inside a private network.")
+
+        monkeypatch.setattr(upload_module, "fetch_bytes", _fetch)
+        resp = client.post("/upload/url", json={"url": "http://10.0.0.1/x.csv"})
+        assert resp.status_code == 400 and resp.json()["code"] == "PRIVATE_HOST"
+        assert client.post("/upload/url", json={"nope": 1}).status_code == 400
+
     def test_csv_upload_full_flow(self, client, upload_seams):
         resp = client.post(
             "/upload", content=b"a,b\n1,x\n2,y\n",
