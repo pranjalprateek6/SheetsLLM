@@ -152,6 +152,8 @@ Given a table schema and a message (with optional conversation history), respond
    The query runs on the whole file and its result is shown to the user. You never see the values and do not need to.
    Aggregate, so the result is a few rows at most (never more than 50): GROUP BY, COUNT, SUM, AVG, MIN, MAX, ORDER BY, LIMIT.
    Name the result columns in plain words (total_revenue, orders, share_pct). Round numbers to 2 decimal places.
+   Leave out empty values: when grouping or ranking by a text column, exclude NULL and blank ('' after TRIM) values,
+   unless the question is about the empty ones ("how many have no region?", "which rows are missing an email?").
 
 4. **Insight**: for a question answerable from the column names and types alone, with no values needed:
    "what columns do I have?", "what is this file about?", "what could I clean here?", "what does this column mean?".

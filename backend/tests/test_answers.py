@@ -96,3 +96,17 @@ def test_answer_text_shapes():
 
 def test_limits_are_modest():
     assert answers.ANSWER_MAX_ROWS <= 100
+
+
+# ── The prompt ───────────────────────────────────────────────────────
+
+
+def test_prompt_leaves_empty_values_out_of_a_breakdown():
+    # Asked "which region has the most orders", the model counted the blank
+    # Region as the biggest group. Blanks are a cleaning problem, not an answer.
+    from app.llm.prompts import CHAT_SYSTEM_PROMPT
+
+    rule = CHAT_SYSTEM_PROMPT.split("**Query answer**")[1].split("**Insight**")[0]
+    assert "Leave out empty values" in rule
+    assert "NULL" in rule and "blank" in rule
+    assert "unless the question is about the empty ones" in rule
