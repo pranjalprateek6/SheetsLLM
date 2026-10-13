@@ -3,7 +3,7 @@ import dynamic from "next/dynamic";
 import { Suspense, useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import {
-  AlertTriangle, ArrowRight, BarChart3, BookMarked, CalendarClock, Check, ChevronDown, Columns3, FileSpreadsheet, History, Lightbulb, MessageSquare, Pencil, Redo2, Undo2, Upload,
+  AlertTriangle, ArrowRight, BarChart3, BookMarked, CalendarClock, Check, ChefHat, ChevronDown, ChevronRight, Columns3, FileSpreadsheet, History, Lightbulb, MessageSquare, Pencil, Redo2, Undo2, Upload,
 } from "lucide-react";
 import ColumnHealth, { type HealthColumn } from "@/components/ColumnHealth";
 import PipelineSpine from "@/components/PipelineSpine";
@@ -1316,7 +1316,7 @@ function WorkspaceContent() {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className={chatOpen ? "h-8 w-8 text-primary" : "h-8 w-8 text-muted-foreground"}
+                          className={chatOpen ? "hidden h-8 w-8 text-primary lg:inline-flex" : "hidden h-8 w-8 text-muted-foreground lg:inline-flex"}
                           onClick={() => setChatOpen((v) => !v)}
                           aria-label={chatOpen ? "Hide Chef chat panel" : "Show Chef chat panel"}
                         >
@@ -1327,7 +1327,7 @@ function WorkspaceContent() {
                     </Tooltip>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" className="hidden h-8 w-8 text-muted-foreground sm:inline-flex" onClick={() => setChartOpen(true)} aria-label="Quick chart">
+                        <Button variant="ghost" size="icon" className="hidden h-8 w-8 text-muted-foreground sm:inline-flex coarse:h-9 coarse:w-9" onClick={() => setChartOpen(true)} aria-label="Quick chart">
                           <BarChart3 className="h-4 w-4" />
                         </Button>
                       </TooltipTrigger>
@@ -1335,7 +1335,7 @@ function WorkspaceContent() {
                     </Tooltip>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" className="hidden h-8 w-8 text-muted-foreground sm:inline-flex" onClick={() => setSchemaOpen(true)} aria-label="View schema">
+                        <Button variant="ghost" size="icon" className="hidden h-8 w-8 text-muted-foreground sm:inline-flex coarse:h-9 coarse:w-9" onClick={() => setSchemaOpen(true)} aria-label="View schema">
                           <Columns3 className="h-4 w-4" />
                         </Button>
                       </TooltipTrigger>
@@ -1343,7 +1343,7 @@ function WorkspaceContent() {
                     </Tooltip>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" className="hidden h-8 w-8 text-muted-foreground sm:inline-flex" onClick={() => setHistoryOpen(true)} aria-label="History and SQL detail">
+                        <Button variant="ghost" size="icon" className="hidden h-8 w-8 text-muted-foreground sm:inline-flex coarse:h-9 coarse:w-9" onClick={() => setHistoryOpen(true)} aria-label="History and SQL detail">
                           <History className="h-4 w-4" />
                         </Button>
                       </TooltipTrigger>
@@ -1400,12 +1400,41 @@ function WorkspaceContent() {
                   {/* The segments are proportional to column width, so on a
                       phone the narrow ones compress to 14px: too small to read
                       and too small to tap. The row states the count instead. */}
-                  <span className="flex-1 text-[11px] tabular-nums text-muted-foreground sm:hidden">
+                  <button
+                    type="button"
+                    onClick={() => setSchemaOpen(true)}
+                    aria-label={`${healthColumns.length} columns, see types and gaps`}
+                    className="flex min-h-9 flex-1 items-center gap-0.5 text-[11px] tabular-nums text-muted-foreground sm:hidden"
+                  >
                     {healthColumns.length}
-                  </span>
+                    <ChevronRight className="h-3 w-3" aria-hidden />
+                  </button>
                   <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
                     {healthColumns.filter((c) => (c.null_pct ?? 0) > 0).length} with gaps
                   </span>
+                </div>
+              )}
+
+              {/* The steps rail is a desktop column. On a phone the latest step
+                  sits under the toolbar with Undo beside it, and a tap opens the
+                  full history: the work stays visible without a rail's width. */}
+              {steps.length > 0 && (
+                <div className="flex h-10 flex-shrink-0 items-center gap-2 border-b bg-card pl-3 pr-2 lg:hidden">
+                  <button
+                    type="button"
+                    onClick={() => setHistoryOpen(true)}
+                    className="flex h-full min-w-0 flex-1 items-center gap-2 text-left text-xs"
+                    aria-label={`Step ${latestStep} of ${steps.length}: ${steps[steps.length - 1].instruction}. See all steps`}
+                  >
+                    <span className="flex-shrink-0 rounded-md bg-primary/10 px-1.5 py-0.5 font-mono text-[10px] font-semibold tabular-nums text-primary">
+                      {latestStep}
+                    </span>
+                    <span className="min-w-0 truncate text-foreground">{steps[steps.length - 1].instruction}</span>
+                    <ChevronRight className="h-3.5 w-3.5 flex-shrink-0 text-muted-foreground" aria-hidden />
+                  </button>
+                  <Button variant="ghost" size="sm" className="h-8 flex-shrink-0 gap-1 px-2 text-xs" onClick={handleUndo} disabled={loading}>
+                    <Undo2 className="h-3.5 w-3.5" aria-hidden /> Undo
+                  </Button>
                 </div>
               )}
 
@@ -1609,8 +1638,31 @@ function WorkspaceContent() {
             {/* Chef — one instance; the wrapper is an in-flow column at lg
                 and a bottom sheet below it. Rendering it twice mounted two
                 panels with separate state and doubled every fetch. */}
+            {!chatOpen && (
+              <button
+                type="button"
+                onClick={() => setChatOpen(true)}
+                className="fixed bottom-[calc(3.25rem+env(safe-area-inset-bottom))] left-1/2 z-30 flex h-11 -translate-x-1/2 items-center gap-2 rounded-full bg-primary pl-4 pr-5 text-sm font-medium text-primary-foreground shadow-lg shadow-primary/25 transition-transform active:scale-[0.97] lg:hidden"
+                aria-label="Ask Chef"
+              >
+                <ChefHat className="h-4 w-4" aria-hidden />
+                Ask Chef
+              </button>
+            )}
             {chatOpen && (
-              <div className="fixed inset-x-0 bottom-0 z-40 h-[65vh] overflow-hidden rounded-t-lg border-t bg-card shadow-lg lg:static lg:z-auto lg:h-auto lg:w-[340px] lg:flex-shrink-0 lg:rounded-none lg:border-l lg:border-t-0 lg:shadow-none xl:w-[380px]">
+              <button
+                type="button"
+                aria-label="Close Chef"
+                onClick={() => setChatOpen(false)}
+                className="fixed inset-0 z-30 bg-background/50 backdrop-blur-[2px] animate-fade-in lg:hidden"
+              />
+            )}
+            {chatOpen && (
+              <div className="fixed inset-x-0 bottom-0 z-40 flex h-[85dvh] flex-col overflow-hidden rounded-t-2xl border-t bg-card pb-[env(safe-area-inset-bottom)] shadow-lg animate-slide-up lg:static lg:z-auto lg:h-auto lg:w-[340px] lg:flex-shrink-0 lg:rounded-none lg:border-l lg:border-t-0 lg:pb-0 lg:shadow-none xl:w-[380px]">
+                <div className="flex flex-shrink-0 justify-center pb-1 pt-2 lg:hidden" aria-hidden>
+                  <span className="h-1 w-9 rounded-full bg-border" />
+                </div>
+                <div className="min-h-0 flex-1">
                 <ChatPanel
                   fileId={fileId}
                   open={chatOpen}
@@ -1629,7 +1681,9 @@ function WorkspaceContent() {
                     setRecipesFrom("drawer");
                     setRecipesOpen(true);
                   }}
+                  onClose={() => setChatOpen(false)}
                 />
+                </div>
               </div>
             )}
           </div>

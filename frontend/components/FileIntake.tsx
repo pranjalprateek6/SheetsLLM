@@ -89,11 +89,11 @@ export default function FileIntake({
             disabled={disabled}
             onClick={() => setMode(m.key)}
             className={cn(
-              "-mb-px inline-flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-[13px] font-medium transition-colors duration-150 disabled:opacity-50",
+              "-mb-px inline-flex items-center gap-1.5 whitespace-nowrap border-b-2 px-2.5 py-2.5 text-[13px] font-medium transition-colors duration-150 disabled:opacity-50 sm:px-3",
               mode === m.key ? "border-foreground text-foreground" : "border-transparent text-muted-foreground hover:text-foreground",
             )}
           >
-            <m.icon className="h-3.5 w-3.5" /> {m.label}
+            <m.icon className="hidden h-3.5 w-3.5 sm:block" aria-hidden /> {m.label}
           </button>
         ))}
       </div>

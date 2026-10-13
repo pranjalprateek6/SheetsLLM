@@ -3,7 +3,7 @@ import { useRef, useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
 import { useReducedMotion } from "framer-motion";
-import { ArrowDown, ArrowUp, Check, ChefHat, ChevronDown, Code2, Eraser, RotateCcw, Square, Undo2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, ChefHat, ChevronDown, Code2, Eraser, RotateCcw, Square, Undo2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
@@ -54,7 +54,7 @@ export type LateStep = {
 export const LATE_STEP_CHECKS_MS = [1500, 5000, 15000, 30000];
 
 export default function ChatPanel({
-  fileId, onPreview, open, fileName, onUndo, onReset, starterSuggestions, initialInsights,
+  fileId, onPreview, open, fileName, onUndo, onReset, starterSuggestions, initialInsights, onClose,
   latestStep, onLateStep, prefill, columns, onOp, onOpenRecipes,
 }: {
   fileId?: string;
@@ -81,6 +81,8 @@ export default function ChatPanel({
   onOp?: (req: OpRequest, source: "insight" | "intercept") => Promise<boolean>;
   /** "Open recipes" from an error that says the AI is out for today. */
   onOpenRecipes?: () => void;
+  /** Below the desktop breakpoint the panel is a sheet; this closes it. */
+  onClose?: () => void;
 }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -395,6 +397,17 @@ export default function ChatPanel({
                   <TooltipContent>Go back to the original file</TooltipContent>
                 </Tooltip>
               )}
+              {onClose && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-muted-foreground lg:hidden"
+                  onClick={onClose}
+                  aria-label="Close Chef"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              )}
             </div>
           </TooltipProvider>
         </div>
@@ -686,7 +699,7 @@ export default function ChatPanel({
             }}
             aria-label="Ask Chef anything"
             placeholder={sending ? "Chef is working…" : "Ask Chef anything…"}
-            className="block max-h-[160px] min-h-[44px] w-full resize-none bg-transparent px-3.5 pb-1 pt-3 text-[13px] leading-relaxed outline-none placeholder:text-muted-foreground disabled:opacity-60"
+            className="block max-h-[160px] min-h-[44px] w-full resize-none bg-transparent px-3.5 pb-1 pt-3 text-base leading-relaxed outline-none placeholder:text-muted-foreground disabled:opacity-60 sm:text-[13px]"
             disabled={sending}
             rows={1}
           />

@@ -374,7 +374,7 @@ export default function DataGrid({
                     <div className={`flex items-center gap-1.5 ${numeric ? "justify-end" : ""}`}>
                       <TypeGlyph dtype={meta?.dtype} />
                       <button
-                        className="inline-flex h-full min-h-6 min-w-6 items-center gap-1.5 transition-colors hover:text-foreground"
+                        className="inline-flex h-full min-h-6 min-w-6 items-center gap-1.5 transition-colors hover:text-foreground coarse:min-h-9"
                         onClick={() => handleSort(h)}
                         aria-label={`Sort preview by ${h}`}
                         title={
@@ -401,7 +401,7 @@ export default function DataGrid({
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <button
-                            className="relative flex h-4 w-4 items-center justify-center rounded opacity-0 transition-opacity after:absolute after:-inset-[5px] after:content-[''] hover:bg-accent focus-visible:opacity-100 group-hover:opacity-100 data-[state=open]:opacity-100"
+                            className="relative flex h-4 w-4 items-center justify-center rounded opacity-0 transition-opacity after:absolute after:-inset-[5px] after:content-[''] hover:bg-accent focus-visible:opacity-100 group-hover:opacity-100 data-[state=open]:opacity-100 coarse:h-7 coarse:w-7 coarse:opacity-100"
                             aria-label={`Column menu for ${h}`}
                           >
                             <ChevronDown className="h-3 w-3" />
@@ -496,7 +496,7 @@ export default function DataGrid({
                     </div>
                     {field?.column === h && (
                       <form
-                        className="absolute left-0 top-full z-30 mt-1 w-60 rounded-md border bg-popover p-2 text-left font-sans font-normal shadow-md"
+                        className="absolute left-0 top-full z-30 mt-1 w-60 max-w-[calc(100vw-1.5rem)] rounded-md border bg-popover p-2 text-left font-sans font-normal shadow-md"
                         onSubmit={(e) => { e.preventDefault(); submitField(); }}
                         onKeyDown={(e) => { if (e.key === "Escape") { e.preventDefault(); setField(null); } }}
                       >
@@ -523,7 +523,7 @@ export default function DataGrid({
                               aria-label="How to compare"
                               value={field.compare ?? "eq"}
                               onChange={(e) => setField({ ...field, compare: e.target.value })}
-                              className="h-8 w-[112px] flex-shrink-0 rounded border bg-background px-1 text-xs"
+                              className="h-8 w-[112px] flex-shrink-0 rounded border bg-background px-1 text-base sm:text-xs"
                             >
                               {COMPARES.map((c) => (
                                 <option key={c.value} value={c.value}>{c.label}</option>
@@ -536,7 +536,7 @@ export default function DataGrid({
                                 onChange={(e) => setField({ ...field, value: e.target.value })}
                                 maxLength={500}
                                 placeholder="value"
-                                className="h-8 min-w-0 flex-1 rounded border bg-background px-1.5 text-xs outline-none focus:ring-1 focus:ring-ring/40"
+                                className="h-8 min-w-0 flex-1 rounded border bg-background px-1.5 text-base outline-none focus:ring-1 focus:ring-ring/40 sm:text-xs"
                               />
                             )}
                           </div>
@@ -657,7 +657,7 @@ export default function DataGrid({
         </table>
       </div>
       {/* Status bar */}
-      <div className="flex h-8 flex-shrink-0 items-center justify-between gap-2 border-t bg-card px-3">
+      <div className="flex h-8 flex-shrink-0 items-center justify-between gap-2 border-t bg-card px-3 coarse:h-11">
         {sortCol && sortDir && !filterQ.trim() ? (
           // A header sort reorders the loaded preview only; say so, and offer
           // the real thing, which saves as a step and reaches the export.
@@ -712,7 +712,7 @@ export default function DataGrid({
             onChange={(e) => setFilterQ(e.target.value)}
             placeholder="Filter preview…"
             aria-label="Filter the loaded preview rows"
-            className="h-6 w-32 rounded border bg-background px-1.5 text-[11px] outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-ring/40"
+            className="h-6 w-32 rounded border bg-background px-1.5 text-[11px] outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-ring/40 coarse:h-8 coarse:text-base"
           />
           {filterQ && (
             <button
@@ -736,7 +736,7 @@ export default function DataGrid({
             aria-label="Compact rows"
             aria-pressed={density === "compact"}
             onClick={() => changeDensity("compact")}
-            className={`flex h-6 w-7 items-center justify-center rounded transition-colors ${
+            className={`flex h-6 w-7 items-center justify-center rounded transition-colors coarse:h-8 coarse:w-9 ${
               density === "compact"
                 ? "bg-card text-foreground shadow-xs"
                 : "text-muted-foreground hover:text-foreground"
@@ -750,7 +750,7 @@ export default function DataGrid({
             aria-label="Comfortable rows"
             aria-pressed={density === "comfortable"}
             onClick={() => changeDensity("comfortable")}
-            className={`flex h-6 w-7 items-center justify-center rounded transition-colors ${
+            className={`flex h-6 w-7 items-center justify-center rounded transition-colors coarse:h-8 coarse:w-9 ${
               density === "comfortable"
                 ? "bg-card text-foreground shadow-xs"
                 : "text-muted-foreground hover:text-foreground"

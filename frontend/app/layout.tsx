@@ -12,6 +12,12 @@ import WarmBackend from "@/components/WarmBackend";
 // next/font self-hosts both, so there is no layout shift.
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
 
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+};
+
 export const metadata = {
   metadataBase: new URL("https://sheets-llm.vercel.app"),
   title: "SheetsLLM: Clean the same spreadsheet once, never again",
