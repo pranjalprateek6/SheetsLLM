@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
+import { DEFAULT_PLANS, planComparison, planFeatures, planReasons, readPlans, type Plans } from "@/lib/plans";
 import { Button } from "@/components/ui/button";
 import { SiteFooter } from "@/components/marketing/blocks";
 import { Badge } from "@/components/ui/badge";
@@ -17,57 +18,9 @@ import {
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-const FREE_FEATURES = [
-  "50 uploads / month",
-  "200 AI requests / month",
-  "Up to 1M rows per file",
-  "Chat, insights & charts",
-  "Full history, undo & redo",
-  "Strict privacy mode",
-  "1 saved recipe",
-];
-
-const PRO_FEATURES = [
-  "Unlimited saved recipes to automate every recurring export",
-  "1,000 uploads / month",
-  "5,000 AI requests / month",
-  "Priority email support",
-  "Everything in Free",
-];
-
-// Honest values mirrored from backend config — update together.
-const COMPARISON: { label: string; free: string; pro: string }[] = [
-  { label: "Uploads / month", free: "50", pro: "1,000" },
-  { label: "AI requests / month", free: "200", pro: "5,000" },
-  { label: "Saved recipes", free: "1", pro: "Unlimited" },
-  { label: "Rows per file", free: "1M", pro: "1M" },
-  { label: "History, undo & redo", free: "✓", pro: "✓" },
-  { label: "Strict privacy mode", free: "✓", pro: "✓" },
-  { label: "Support", free: "Community", pro: "Priority email" },
-];
-
-// Personalized entry points: the paywall_hit surfaces deep-link here with
-// the cap the user just hit, so the page opens mid-conversation instead
-// of cold ("a paywall is a flow, not a screen").
-const REASONS: Record<string, { headline: string; sub: string }> = {
-  uploads: {
-    headline: "You've used this month's 50 uploads",
-    sub: "Pro lifts the cap to 1,000. Upgrade and keep the files coming.",
-  },
-  ai_requests: {
-    headline: "You've used this month's 200 AI requests",
-    sub: "Pro lifts the cap to 5,000. Your recipes and one-click fixes keep working meanwhile.",
-  },
-  // Older links said chat_requests; same allowance
-  chat_requests: {
-    headline: "You've used this month's 200 AI requests",
-    sub: "Pro lifts the cap to 5,000. Your recipes and one-click fixes keep working meanwhile.",
-  },
-  recipes: {
-    headline: "The Free plan holds one saved recipe",
-    sub: "Pro is unlimited. Save a recipe for every export that keeps coming back.",
-  },
-};
+// The plan numbers live in the backend's config and arrive with
+// /api/billing/status; lib/plans.ts turns them into these lists. The
+// defaults cover the signed-out render and a failed load.
 
 const FAQ = [
   {
@@ -116,7 +69,11 @@ function PricingContent() {
   const { user, loading: authLoading } = useAuth();
   const searchParams = useSearchParams();
   const reasonKey = searchParams.get("reason") ?? "";
-  const reason = REASONS[reasonKey];
+  const [plans, setPlans] = useState<Plans>(DEFAULT_PLANS);
+  const reason = planReasons(plans)[reasonKey];
+  const FREE_FEATURES = planFeatures(plans).free;
+  const PRO_FEATURES = planFeatures(plans).pro;
+  const COMPARISON = planComparison(plans);
 
   const [tier, setTier] = useState<string | null>(null);
   const [billingConfigured, setBillingConfigured] = useState(true);
@@ -136,6 +93,7 @@ function PricingContent() {
       .then((d) => {
         setTier(d.tier ?? "free");
         setBillingConfigured(d.billing_configured ?? false);
+        setPlans(readPlans(d));
       })
       .catch(() => setTier(null));
   }, [user, authLoading]);

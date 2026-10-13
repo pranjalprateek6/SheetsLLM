@@ -42,6 +42,7 @@ def billing_status(request: Request):
     return {
         "tier": usage.get_user_tier(user_id),
         "billing_configured": billing.is_configured(),
+        "plans": usage.plans(),
     }
 
 
