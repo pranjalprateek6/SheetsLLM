@@ -1359,7 +1359,9 @@ function WorkspaceContent() {
                 </div>
               )}
 
-              {/* A sort that came out in text order because the dates mix formats */}
+              {/* After a step that ran but may not have done what was meant: a sort in
+                  text order because the dates mix formats, or numbers cleaned with
+                  some cells emptied */}
               {sortWarning && (
                 <div
                   role="status"
@@ -1368,7 +1370,11 @@ function WorkspaceContent() {
                   <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0 text-warning-text" aria-hidden />
                   <span className="min-w-0 flex-1">{sortWarning.warning.message}</span>
                   <div className="flex items-center gap-2">
-                    {sortWarning.warning.fix ? (
+                    {sortWarning.warning.code === "VALUES_LOST" ? (
+                      <Button size="sm" variant="outline" className="h-7" disabled={loading} onClick={handleUndo}>
+                        Undo this step
+                      </Button>
+                    ) : sortWarning.warning.fix ? (
                       <Button size="sm" className="h-7" disabled={loading} onClick={() => fixDatesThenSort(sortWarning.warning.fix!, sortWarning.sort)}>
                         Fix the dates and sort again
                       </Button>

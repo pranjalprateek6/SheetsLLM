@@ -186,6 +186,36 @@ def _cast(cols, column, args):
     return _select_replacing(cols, c, f"TRY_CAST({quote_ident(c)} AS {sql_type})"), f"Change {c} to {label}"
 
 
+DECIMAL_MARKS = ("point", "comma")
+
+
+def number_expr(column_sql: str, decimal: str = "point") -> str:
+    """SQL reading money-ish text as a number: "$1,234.50" is 1234.5,
+    "(12)" is -12, "12%" is 12, "1.234,50" with a decimal comma is 1234.5.
+    Anything left that is not a number becomes NULL (TRY_CAST)."""
+    v = f"TRIM(CAST({column_sql} AS VARCHAR))"
+    # Accountants' negatives: (12) is -12
+    v = f"regexp_replace({v}, '^[(](.*)[)]$', '-\\1')"
+    if decimal == "comma":
+        v = f"replace(replace({v}, '.', ''), ',', '.')"
+    else:
+        v = f"replace({v}, ',', '')"
+    # Drop currency signs, spaces, percent and whatever else is not part of a number
+    v = f"regexp_replace({v}, '[^0-9.eE+-]', '', 'g')"
+    return f"TRY_CAST(NULLIF({v}, '') AS DOUBLE)"
+
+
+def _clean_number(cols, column, args):
+    c = _column(cols, column)
+    if is_numeric(cols[c]):
+        raise OpError("WRONG_TYPE", f"{c} already holds numbers.")
+    decimal = str(args.get("decimal") or "point")
+    if decimal not in DECIMAL_MARKS:
+        raise OpError("INVALID_ARGS", "decimal must be point or comma.")
+    label = f"Clean numbers in {c}" + (" (decimal comma)" if decimal == "comma" else "")
+    return _select_replacing(cols, c, number_expr(quote_ident(c), decimal)), label
+
+
 def _standardise_date(cols, column, args):
     c = _column(cols, column)
     fmt = str(args.get("format") or "auto")
@@ -327,6 +357,7 @@ OPS: dict[str, Callable[[dict[str, str], Any, dict], tuple[str, str]]] = {
     "dedupe": _dedupe,
     "cast": _cast,
     "standardise_date": _standardise_date,
+    "clean_number": _clean_number,
     "sort": _sort,
     "contains_any": _contains_any,
     "filter_rows": _filter_rows,

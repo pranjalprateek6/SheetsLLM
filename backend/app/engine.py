@@ -256,6 +256,34 @@ def build_replay_sql(
     return f"WITH {', '.join(ctes)} SELECT * FROM step_{last_step}"
 
 
+# ── What an expression would lose ────────────────────────────────────
+
+
+def values_lost_by(
+    local_path: str | Path, steps: list[dict], column: str, expr: str,
+    *, examples: int = 3, timeout: int | None = None,
+) -> dict[str, Any]:
+    """How many filled values of ``column`` become NULL under ``expr`` (an
+    expression over the table data, as the steps so far have left it), with
+    a few distinct examples. The examples are the user's own cells, shown
+    back to them; they go nowhere else."""
+    from app.ops import quote_ident
+
+    def _inner():
+        con = get_connection(read=(local_path,))
+        con.execute(f"CREATE VIEW raw AS SELECT * FROM read_parquet('{_sql_path(local_path)}')")
+        con.execute(f"CREATE VIEW data AS {_retarget_from_data(build_replay_sql(steps), 'raw')}")
+        q = quote_ident(column)
+        lost = f"{q} IS NOT NULL AND TRIM(CAST({q} AS VARCHAR)) <> '' AND ({expr}) IS NULL"
+        count = con.execute(f"SELECT COUNT(*) FROM data WHERE {lost}").fetchone()[0]
+        sample = con.execute(
+            f"SELECT DISTINCT CAST({q} AS VARCHAR) FROM data WHERE {lost} LIMIT {int(examples)}"
+        ).fetchall()
+        return {"count": int(count), "examples": [str(r[0]) for r in sample]}
+
+    return _run_with_timeout(_inner, timeout=timeout if timeout is not None else DUCKDB_QUERY_TIMEOUT)
+
+
 # ── Checking a chain before it is saved ──────────────────────────────
 
 

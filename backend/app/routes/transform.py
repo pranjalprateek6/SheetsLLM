@@ -16,9 +16,9 @@ from fastapi import APIRouter, Request, Response
 
 from app import db, events, usage
 from app.cache import get_local_parquet
-from app.engine import get_schema_after_steps, replay_transformations_local
+from app.engine import get_schema_after_steps, replay_transformations_local, values_lost_by
 from app.insights import sort_warning
-from app.ops import OpError, build_op
+from app.ops import OpError, build_op, number_expr, quote_ident
 from app.security import RateLimitExceeded, check_rate_limit
 from app.sql_validator import SQLValidationError, validate_sql
 
@@ -91,6 +91,30 @@ def _save_transform(
     except Exception:
         pass
     return step_number
+
+
+async def _lost_values_warning(r2_key: str, steps: list[dict], column: str, decimal) -> dict | None:
+    """The warning for a clean_number step that emptied some cells, or None."""
+    try:
+        local_path = await asyncio.to_thread(get_local_parquet, r2_key)
+        expr = number_expr(quote_ident(column), str(decimal or "point"))
+        lost = await asyncio.to_thread(values_lost_by, local_path, steps, column, expr)
+    except Exception as exc:
+        logger.warning("Lost-values check failed for %s: %s", column, exc)
+        return None
+    n = lost["count"]
+    if not n:
+        return None
+    shown = ", ".join(f"\u201c{e}\u201d" for e in lost["examples"])
+    message = (
+        f"{n:,} value{'s' if n != 1 else ''} in {column} couldn't be read as "
+        f"{'numbers' if n != 1 else 'a number'} and {'are' if n != 1 else 'is'} now empty"
+        + (f", like {shown}" if shown else "") + "."
+    )
+    return {
+        "code": "VALUES_LOST", "column": column, "count": n, "examples": lost["examples"],
+        "message": message, "fix": None, "instruction": "",
+    }
 
 
 # ── POST /transform/op: a fix that needs no AI ───────────────────────
@@ -172,6 +196,13 @@ async def transform_op(request: Request):
             logger.warning("Sort date check failed for %s: %s", file_id, exc)
         if warning:
             events.record(user_id, "sort_mixed_dates", column_fixable=warning["fix"] is not None)
+
+    # Cleaning numbers turns anything that is not a number into an empty
+    # cell. Say how many, and show a few, so the step can be undone
+    if op == "clean_number" and body.get("column"):
+        warning = await _lost_values_warning(r2_key, steps, body["column"], (body.get("args") or {}).get("decimal"))
+        if warning:
+            events.record(user_id, "clean_number_lost", count=warning["count"])
 
     return {
         "type": "transform",

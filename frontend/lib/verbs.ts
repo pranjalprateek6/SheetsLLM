@@ -135,6 +135,13 @@ export function matchVerb(raw: string, columns: ColumnInfo[]): VerbMatch | null 
     return col ? { op: "drop_column", column: col, label: `Drop column ${col}` } : null;
   }
 
+  // Clean the numbers in a column: "$1,234.50" read as 1234.5 (the upload's suggestion)
+  if (/^(?:please\s+)?(?:clean|fix|parse|tidy)\s+(?:up\s+)?(?:the\s+)?(?:numbers?|amounts?|prices?|currency|figures)\s+(?:in|of|from)\s+/.test(t) ||
+      /^(?:please\s+)?read\s+.+\s+as\s+(?:a\s+)?numbers?$/.test(t)) {
+    const col = findColumn(text, columns);
+    return col ? { op: "clean_number", column: col, label: `Clean numbers in ${col}` } : null;
+  }
+
   // Standardise the dates in a column (the upload's mixed-format suggestion)
   if (/^(?:please\s+)?standardi[sz]e\s+(?:the\s+)?dates?\s+(?:in|of)\s+/.test(t)) {
     const col = findColumn(text, columns);

@@ -48,6 +48,8 @@ EVENTS = frozenset({
     "recipe_columns_matched", "recipe_run_flagged", "recipe_check_failed", "recipe_checks_saved",
     # a sort whose column mixes date formats, so it came out in text order
     "sort_mixed_dates",
+    # a clean-numbers step that emptied cells it could not read
+    "clean_number_lost",
     # account
     "account_deleted",
     # a recipe's steps removed, reordered or replaced from a file
