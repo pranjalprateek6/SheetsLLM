@@ -8,6 +8,7 @@ import {
 import ColumnHealth, { type HealthColumn } from "@/components/ColumnHealth";
 import PipelineSpine from "@/components/PipelineSpine";
 import DropZone from "@/components/DropZone";
+import UploadMore from "@/components/UploadMore";
 import DataGrid from "@/components/DataGrid";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import SheetSelector from "@/components/SheetSelector";
@@ -372,6 +373,76 @@ function WorkspaceContent() {
     }
   };
 
+  // A finished upload, from a dropped file or a fetched link: the grid, the
+  // URL, the recipe queued for it, and the welcome toast
+  const adoptUpload = async (data: any, displayName: string): Promise<boolean> => {
+    if (data.preview && data.file_id) {
+      setColumns(data.preview.columns);
+      setRows(data.preview.rows);
+      setRowCount(data.preview.total_rows ?? data.preview.rows?.length ?? 0);
+      setColumnCount(data.preview.total_columns ?? data.preview.columns?.length ?? 0);
+      setSteps([]);
+      setLastChange(null);
+      setFileId(data.file_id);
+      setUploadInsights(data.insights ?? null);
+      showFileInUrl(data.file_id);
+      rememberLastFile(data.file_id, displayName);
+      setFileName(displayName);
+      setSchema(data.schema);
+      setFileReady(true);
+      setShowUpload(false);
+      setShowTransform(true); // land in the grid, not an interstitial
+      markOnboardingStep("upload");
+      const nRows = data.preview.total_rows ?? data.preview.rows?.length ?? 0;
+      const nCols = data.preview.total_columns ?? data.preview.columns?.length ?? 0;
+      const pending = pendingRecipeRef.current;
+      pendingRecipeRef.current = null;
+      if (pending) {
+        prevGridRef.current = { columns: data.preview.columns, rowCount: nRows };
+        await runRecipe(pending, data.file_id);
+      } else {
+        toast.success(`Uploaded: ${nRows.toLocaleString()} rows × ${nCols.toLocaleString()} columns detected`);
+      }
+      return true;
+    }
+    return false;
+  };
+
+  // A file from a link, fetched by the server and ingested as an upload
+  const onUploadFromUrl = async (url: string) => {
+    setLoading(true);
+    setOpenSample(null);
+    setNextMonth(null);
+    setSampleSuggestions(null);
+    setUploadInsights(null);
+    setUploadError(null);
+    try {
+      const r = await fetchWithAuth("/api/upload/url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        setUploadError(data.message || "Couldn't fetch that link. Check that it opens in a browser.");
+        return false;
+      }
+      if (data.requires_sheet_selection && data.sheets) {
+        setAvailableSheets(data.sheets);
+        setPendingFile(new File([], data.name || "workbook.xlsx"));
+        setPendingUploadId(data.file_id ?? null);
+        setShowSheetSelector(true);
+        return false;
+      }
+      return await adoptUpload(data, data.name || "linked file");
+    } catch {
+      setUploadError("Couldn't fetch that link. Check your connection and try again.");
+    } finally {
+      setLoading(false);
+    }
+    return false;
+  };
+
   const onUpload = async (file: File, sheetName?: string, suggestions?: string[], pendingId?: string | null) => {
     setLoading(true);
     setOpenSample(null);
@@ -416,35 +487,7 @@ function WorkspaceContent() {
         return false;
       }
 
-      if (data.preview && data.file_id) {
-        setColumns(data.preview.columns);
-        setRows(data.preview.rows);
-        setRowCount(data.preview.total_rows ?? data.preview.rows?.length ?? 0);
-        setColumnCount(data.preview.total_columns ?? data.preview.columns?.length ?? 0);
-        setSteps([]);
-        setLastChange(null);
-        setFileId(data.file_id);
-        setUploadInsights(data.insights ?? null);
-        showFileInUrl(data.file_id);
-        rememberLastFile(data.file_id, file.name);
-        setFileName(file.name);
-        setSchema(data.schema);
-        setFileReady(true);
-        setShowUpload(false);
-        setShowTransform(true); // land in the grid, not an interstitial
-        markOnboardingStep("upload");
-        const nRows = data.preview.total_rows ?? data.preview.rows?.length ?? 0;
-        const nCols = data.preview.total_columns ?? data.preview.columns?.length ?? 0;
-        const pending = pendingRecipeRef.current;
-        pendingRecipeRef.current = null;
-        if (pending) {
-          prevGridRef.current = { columns: data.preview.columns, rowCount: nRows };
-          await runRecipe(pending, data.file_id);
-        } else {
-          toast.success(`Uploaded: ${nRows.toLocaleString()} rows × ${nCols.toLocaleString()} columns detected`);
-        }
-        return true;
-      }
+      return await adoptUpload(data, file.name);
     } catch (error) {
       console.error("Upload error:", error);
       setUploadError("Upload failed. Check your connection and try again.");
@@ -1075,6 +1118,7 @@ function WorkspaceContent() {
                 <div className="rounded-xl border bg-card p-6 shadow-sm">
                   <h2 className="mb-4 text-lg font-semibold tracking-tight">Upload a spreadsheet</h2>
                   <DropZone disabled={loading} onDropFile={onUpload} />
+                  <UploadMore disabled={loading} onPaste={(f) => onUpload(f)} onLink={onUploadFromUrl} />
                   {uploadError && (
                     <div className="mt-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm text-destructive-text">
                       {uploadError}
