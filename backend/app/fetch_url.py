@@ -61,19 +61,32 @@ def normalise_url(raw: str) -> str:
     return url
 
 
-def _check_public(host: str) -> None:
-    """Refuse a host that resolves to a private, loopback or otherwise
-    internal address, so a link cannot reach this server's own network."""
+def _resolve_public(host: str) -> str:
+    """The address ``host`` resolves to, refused when any answer is a
+    private, loopback or otherwise internal address, so a link cannot
+    reach this server's own network. The request then connects to this
+    exact address (not to the name again), so a name that changes its
+    answer between the check and the connect gains nothing."""
     if not host or host.lower() in ("localhost",) or host.endswith(".local"):
         raise FetchError("PRIVATE_HOST", "That link points inside a private network.")
     try:
         infos = socket.getaddrinfo(host, None)
     except socket.gaierror:
         raise FetchError("BAD_HOST", "That address could not be found.")
+    if not infos:
+        raise FetchError("BAD_HOST", "That address could not be found.")
     for info in infos:
         ip = ipaddress.ip_address(info[4][0])
         if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_multicast or ip.is_reserved or ip.is_unspecified:
             raise FetchError("PRIVATE_HOST", "That link points inside a private network.")
+    return infos[0][4][0]
+
+
+def _pinned(parsed, ip: str) -> str:
+    """The same URL with the host replaced by the validated address."""
+    literal = f"[{ip}]" if ":" in ip else ip
+    netloc = f"{literal}:{parsed.port}" if parsed.port else literal
+    return parsed._replace(netloc=netloc).geturl()
 
 
 def _filename(url: str, response: httpx.Response) -> str:
@@ -100,8 +113,15 @@ def fetch_bytes(url: str, *, max_bytes: int = UPLOAD_MAX_BYTES, client: httpx.Cl
             parsed = urlparse(url)
             if parsed.scheme not in ("http", "https"):
                 raise FetchError("BAD_URL", "Only http and https links can be fetched.")
-            _check_public(parsed.hostname or "")
-            with client.stream("GET", url) as response:
+            host = parsed.hostname or ""
+            ip = _resolve_public(host)
+            # Connect to the checked address; the name goes in the Host
+            # header and the TLS handshake, so the certificate is still
+            # verified against it
+            host_header = f"{host}:{parsed.port}" if parsed.port else host
+            with client.stream(
+                "GET", _pinned(parsed, ip), headers={"Host": host_header}, extensions={"sni_hostname": host}
+            ) as response:
                 if response.status_code in (301, 302, 303, 307, 308) and response.headers.get("location"):
                     url = urljoin(url, response.headers["location"])
                     continue

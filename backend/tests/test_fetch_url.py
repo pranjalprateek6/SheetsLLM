@@ -91,7 +91,7 @@ def test_redirects_are_followed_by_hand_and_each_hop_checked(monkeypatch):
 
     def handler(request: httpx.Request):
         hops.append(str(request.url))
-        if request.url.host == "example.com":
+        if request.headers.get("host") == "example.com":
             return httpx.Response(302, headers={"location": "https://cdn.example/file.csv"})
         return httpx.Response(200, content=b"ok\n")
 
@@ -100,7 +100,7 @@ def test_redirects_are_followed_by_hand_and_each_hop_checked(monkeypatch):
     assert data == b"ok\n" and name == "file.csv" and len(hops) == 2
 
     def to_private(request: httpx.Request):
-        return httpx.Response(302, headers={"location": "http://internal.example/secret.csv"}) if request.url.host == "example.com" else httpx.Response(200, content=b"no")
+        return httpx.Response(302, headers={"location": "http://internal.example/secret.csv"}) if request.headers.get("host") == "example.com" else httpx.Response(200, content=b"no")
 
     with pytest.raises(FetchError) as exc:
         fetch_bytes("https://example.com/go", client=httpx.Client(transport=httpx.MockTransport(to_private)))
@@ -136,3 +136,19 @@ def test_hop_limit(monkeypatch):
         fetch_bytes("https://example.com/start", client=client)
     assert "redirected too many times" in str(exc.value)
     assert fetch_url.MAX_HOPS == 4
+
+
+def test_the_request_goes_to_the_checked_address_with_the_name_kept(monkeypatch):
+    # A name that answers differently to the client's own lookup gains nothing:
+    # the connection is made to the address that was checked
+    _public(monkeypatch, {"example.com": "93.184.216.34"})
+    seen = {}
+
+    def handler(request: httpx.Request):
+        seen["url_host"] = request.url.host
+        seen["host_header"] = request.headers.get("host")
+        seen["sni"] = request.extensions.get("sni_hostname")
+        return httpx.Response(200, content=b"a\n")
+
+    fetch_bytes("https://example.com:8443/x.csv", client=httpx.Client(transport=httpx.MockTransport(handler)))
+    assert seen == {"url_host": "93.184.216.34", "host_header": "example.com:8443", "sni": "example.com"}
