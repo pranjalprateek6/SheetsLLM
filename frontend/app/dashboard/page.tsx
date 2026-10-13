@@ -323,7 +323,7 @@ export default function DashboardPage() {
 
         <DueRecipes className="mb-5" />
 
-        <UsageCard />
+        <UsageCard compact />
 
         <div className="mb-4 flex items-center gap-2">
           <div className="relative flex-1">

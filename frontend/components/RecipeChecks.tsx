@@ -86,7 +86,7 @@ export default function RecipeChecks({
 
   return (
     <div className="space-y-2">
-      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Checks on every run</p>
+      <p className="text-[13px] font-medium">Checks on every run</p>
       {checks.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           None yet. A check is a rule the cleaned rows must meet, like &ldquo;Order ID is unique&rdquo;. A run that breaks one
@@ -102,7 +102,7 @@ export default function RecipeChecks({
                 aria-label={`Remove the check: ${checkText(c)}`}
                 disabled={saving}
                 onClick={() => save(checks.filter((_, j) => j !== i))}
-                className="grid h-6 w-6 place-items-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+                className="grid h-6 w-6 place-items-center rounded-lg text-muted-foreground hover:bg-accent hover:text-foreground"
               >
                 <X className="h-3.5 w-3.5" />
               </button>
@@ -137,7 +137,7 @@ export default function RecipeChecks({
           id={`check-kind-${recipeId}`}
           value={kind}
           onChange={(e) => setKind(e.target.value as CheckType)}
-          className="h-8 rounded-md border bg-background px-2 text-sm"
+          className="h-8 rounded-lg border bg-background px-2 text-sm"
         >
           {KINDS.map((k) => (
             <option key={k.value} value={k.value}>
