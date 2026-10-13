@@ -35,6 +35,7 @@ _ROUTE_TIMEOUTS = {
     "/transform/op": 90,  # one-click fixes replay every step on big files
     "/download": 60,
     "/chat": 90,
+    "/insights": 30,  # a budgeted pass over the file as its steps left it
 }
 _DEFAULT_TIMEOUT = 10
 

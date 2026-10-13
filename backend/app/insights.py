@@ -4,23 +4,42 @@ from __future__ import annotations
 
 import logging
 import re
+import time
 from pathlib import Path
 from typing import Any
 
-from app.engine import _run_with_timeout, get_connection
+from app.engine import _retarget_from_data, _run_with_timeout, _sql_path, build_replay_sql, get_connection
 from app.ops import quote_ident, quote_literal  # column names come from the file
 
 logger = logging.getLogger("sheetsllm.insights")
 
+# How long the whole pass may take. The counts always run; the date and
+# number probes, the slow part on a wide file, stop when the budget is
+# spent and the answer says it is partial. The free instance has one core,
+# and a Chef call may be running beside this.
+INSIGHTS_BUDGET_SECONDS = 8.0
 
-def generate_insights(local_path: str | Path) -> dict[str, Any]:
+
+def generate_insights(
+    local_path: str | Path, steps: list[dict] | None = None, *, budget: float = INSIGHTS_BUDGET_SECONDS
+) -> dict[str, Any]:
     """
     Run a set of DuckDB queries against a local Parquet file to produce
     auto-insights: null counts, duplicates, numeric stats, and suggestions.
+
+    With ``steps``, the file as those steps have left it: materialised once
+    as a temp table in this connection, no copy on disk.
     """
+    deadline = time.monotonic() + budget
     con = get_connection(read=(local_path,))
-    lp = str(local_path).replace("\\", "/")
-    con.execute(f"CREATE VIEW data AS SELECT * FROM read_parquet('{lp}')")
+    con.execute(f"CREATE VIEW raw AS SELECT * FROM read_parquet('{_sql_path(local_path)}')")
+    if steps:
+        _run_with_timeout(
+            con.execute, f"CREATE TEMP TABLE data AS {_retarget_from_data(build_replay_sql(steps), 'raw')}",
+            timeout=max(1, int(budget)), interrupt=(con,),
+        )
+    else:
+        con.execute("CREATE VIEW data AS SELECT * FROM raw")
 
     insights: dict[str, Any] = {
         "null_columns": [],
@@ -29,7 +48,11 @@ def generate_insights(local_path: str | Path) -> dict[str, Any]:
         "suggestions": [],
         "row_count": 0,
         "column_count": 0,
+        "partial": False,
     }
+
+    def remaining() -> float:
+        return deadline - time.monotonic()
 
     try:
         # Basic counts
@@ -126,25 +149,26 @@ def generate_insights(local_path: str | Path) -> dict[str, Any]:
         # Bounded: a cheap look at the first rows picks the date-like columns,
         # and only those few are counted in full, under a time limit.
         text_cols = [c for c, t in zip(col_names, col_types) if t.upper().startswith("VARCHAR")]
-        # Numbers written as text with currency signs, separators or brackets
-        for col_name in _number_like(con, text_cols):
-            try:
-                found = _run_with_timeout(
-                    _symbol_numbers, con, col_name, timeout=_DATE_PROBE_SECONDS, interrupt=(con,)
-                )
-            except Exception:
-                found = None
-            if found:
-                insights["suggestions"].append(found)
-        for col_name in _date_like(con, text_cols):
-            try:
-                found = _run_with_timeout(
-                    _mixed_dates, con, col_name, timeout=_DATE_PROBE_SECONDS, interrupt=(con,)
-                )
-            except Exception:
-                found = None
-            if found:
-                insights["suggestions"].append(found)
+        # The probes, each under what is left of the budget
+        for probe, pick in ((_symbol_numbers, _number_like), (_mixed_dates, _date_like)):
+            if remaining() <= 0:
+                insights["partial"] = True
+                break
+            for col_name in pick(con, text_cols):
+                left = remaining()
+                if left <= 0:
+                    insights["partial"] = True
+                    break
+                try:
+                    found = _run_with_timeout(
+                        probe, con, col_name, timeout=max(1, int(min(_DATE_PROBE_SECONDS, left))), interrupt=(con,)
+                    )
+                except Exception:
+                    found = None
+                    if remaining() <= 0:
+                        insights["partial"] = True
+                if found:
+                    insights["suggestions"].append(found)
 
     except Exception as exc:
         logger.error("Insights generation failed: %s", exc)
