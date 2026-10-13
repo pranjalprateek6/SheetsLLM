@@ -18,7 +18,7 @@ import { explainError } from "@/lib/errors";
 import { matchVerb, type ColumnInfo } from "@/lib/verbs";
 import type { OpRequest } from "@/lib/ops";
 import ChatText from "@/components/ChatText";
-import { CopyButton, SqlBlock, Thinking } from "@/components/chat-parts";
+import { AnswerTable, CopyButton, SqlBlock, Thinking } from "@/components/chat-parts";
 import ErrorBubble from "@/components/ErrorBubble";
 import PrivacyChip from "@/components/PrivacyChip";
 import SentDisclosure, { type SentReceipt } from "@/components/SentDisclosure";
@@ -290,6 +290,12 @@ export default function ChatPanel({
           setMessages((prev) => [...prev, {
             role: "assistant", content: data.message, message_type: "insight", metadata: { strict: data.strict },
           }]);
+        } else if (data.type === "answer") {
+          // A question, answered by running a query: the result, not a change
+          setMessages((prev) => [...prev, {
+            role: "assistant", content: data.message, message_type: "answer",
+            metadata: { sql: data.sql, columns: data.columns, rows: data.rows, total_rows: data.total_rows, strict: data.strict, sent: data.sent },
+          }]);
         } else if (data.code) {
           // Keep the whole payload: the bubble explains it by code, and
           // "Edit and retry" needs what was typed.
@@ -476,6 +482,7 @@ export default function ChatPanel({
             }
             const isError = msg.message_type === "error";
             const isStep = msg.message_type === "transform";
+            const isAnswer = msg.message_type === "answer";
             const stepNumber = typeof msg.metadata?.step_number === "number" ? (msg.metadata.step_number as number) : null;
             return (
               <div key={i} className="group">
@@ -534,6 +541,35 @@ export default function ChatPanel({
                         {expandedSql === String(i) && <SqlBlock sql={String(msg.metadata.sql)} id={`sql-${i}`} />}
                       </div>
                     )}
+                  </div>
+                ) : isAnswer ? (
+                  // A question answered from the data: the answer, the rows behind it, and the query
+                  <div className="text-[13px] leading-relaxed">
+                    <ChatText text={msg.content} />
+                    <AnswerTable
+                      columns={Array.isArray(msg.metadata?.columns) ? (msg.metadata.columns as string[]) : []}
+                      rows={Array.isArray(msg.metadata?.rows) ? (msg.metadata.rows as Record<string, unknown>[]) : []}
+                      totalRows={typeof msg.metadata?.total_rows === "number" ? (msg.metadata.total_rows as number) : 0}
+                    />
+                    <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+                      <span>
+                        {msg.metadata?.strict === true
+                          ? "Answered by running a query on every row. No values were sent to the AI."
+                          : "Answered by running a query on every row."}
+                      </span>
+                      {!!msg.metadata?.sql && (
+                        <button
+                          onClick={() => setExpandedSql(expandedSql === String(i) ? null : String(i))}
+                          aria-expanded={expandedSql === String(i)}
+                          aria-controls={`sql-${i}`}
+                          className="inline-flex min-h-6 items-center gap-1 font-medium transition-colors hover:text-foreground"
+                        >
+                          <Code2 className="h-3 w-3" /> Query
+                          <ChevronDown className={cn("h-3 w-3 transition-transform", expandedSql === String(i) && "rotate-180")} />
+                        </button>
+                      )}
+                    </div>
+                    {expandedSql === String(i) && !!msg.metadata?.sql && <SqlBlock sql={String(msg.metadata.sql)} id={`sql-${i}`} />}
                   </div>
                 ) : (
                   <div className="text-[13px] leading-relaxed">

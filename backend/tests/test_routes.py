@@ -211,6 +211,74 @@ class TestChat:
         resp = client.post("/chat", json={"file_id": "ghost", "message": "x"})
         assert resp.status_code == 404
 
+    # ── Questions answered by running a query ──────────────────────
+
+    def test_question_is_answered_from_the_data_and_saves_no_step(self, client, transform_seams, monkeypatch):
+        saved: list[dict] = []
+        monkeypatch.setattr(db, "create_chat_message", lambda **kw: saved.append(kw))
+        monkeypatch.setattr(db, "create_transformation", lambda **kw: pytest.fail("a question is not a step"))
+        monkeypatch.setattr(db, "get_privacy_mode", lambda uid: True)
+        _use_llm(monkeypatch, chat_module, FakeLLM('{"query": "SELECT COUNT(*) AS rows, MAX(a) AS biggest FROM data"}'))
+
+        resp = client.post("/chat", json={"file_id": "f1", "message": "how many rows, and the biggest a?"})
+
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert body["type"] == "answer"
+        assert body["message"] == "rows: 3 · biggest: 3"
+        assert body["columns"] == ["rows", "biggest"]
+        assert body["rows"] == [{"rows": 3, "biggest": 3}]
+        assert body["total_rows"] == 1
+        assert body["strict"] is True
+        assert body["sent"]["mode"] == "strict"
+        kept = [m for m in saved if m["role"] == "assistant"]
+        assert kept[0]["message_type"] == "answer"
+        assert kept[0]["metadata"]["rows"] == [{"rows": 3, "biggest": 3}]
+
+    def test_question_sees_the_steps_so_far(self, client, transform_seams, monkeypatch):
+        monkeypatch.setattr(db, "get_transformations", lambda fid: [
+            {"step_number": 1, "sql_query": "SELECT * FROM data WHERE a > 1"},
+        ])
+        _use_llm(monkeypatch, chat_module, FakeLLM('{"query": "SELECT COUNT(*) AS n FROM data"}'))
+        resp = client.post("/chat", json={"file_id": "f1", "message": "how many rows?"})
+        assert resp.json()["message"] == "n: 2"
+
+    def test_question_is_metered_as_one_ai_request(self, client, transform_seams, monkeypatch):
+        from app import usage
+
+        recorded: list[dict] = []
+        monkeypatch.setattr(usage, "record", lambda uid, **counters: recorded.append(counters))
+        _use_llm(monkeypatch, chat_module, FakeLLM('{"query": "SELECT COUNT(*) AS n FROM data"}'))
+        client.post("/chat", json={"file_id": "f1", "message": "how many rows?"})
+        assert recorded == [{"chat_requests": 1}]
+
+    def test_question_retries_once_with_the_error(self, client, transform_seams, monkeypatch):
+        llm = FakeLLM(
+            '{"query": "SELECT COUNT(*) AS n FROM data WHERE nope > 1"}',
+            '{"query": "SELECT COUNT(*) AS n FROM data WHERE a > 1"}',
+        )
+        _use_llm(monkeypatch, chat_module, llm)
+        resp = client.post("/chat", json={"file_id": "f1", "message": "how many over 1?"})
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["message"] == "n: 2"
+        assert len(llm.calls) == 2
+        assert "nope" in llm.calls[1][1]
+
+    def test_question_that_cannot_run_says_so(self, client, transform_seams, monkeypatch):
+        _use_llm(monkeypatch, chat_module, FakeLLM(
+            '{"query": "SELECT nope FROM data"}', '{"query": "SELECT still_nope FROM data"}',
+        ))
+        resp = client.post("/chat", json={"file_id": "f1", "message": "what is nope?"})
+        assert resp.status_code == 400
+        assert resp.json()["code"] == "ANSWER_FAILED"
+        assert "nope" not in resp.json()["message"], "no engine text in the reply"
+
+    def test_question_query_is_validated_read_only(self, client, transform_seams, monkeypatch):
+        _use_llm(monkeypatch, chat_module, FakeLLM('{"query": "DROP TABLE data"}'))
+        resp = client.post("/chat", json={"file_id": "f1", "message": "drop it"})
+        assert resp.status_code == 400
+        assert resp.json()["code"] == "INVALID_SQL"
+
     def test_get_history_requires_ownership(self, client, transform_seams):
         resp = client.get("/chat/ghost")
         assert resp.status_code == 404

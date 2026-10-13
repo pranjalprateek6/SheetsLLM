@@ -1,10 +1,12 @@
 "use client";
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { LogOut, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import AuthGuard from "@/components/AuthGuard";
 import UsageCard from "@/components/UsageCard";
+import DeleteAccount from "@/components/DeleteAccount";
 import { ONBOARDING_DISMISSED_KEY } from "@/components/GettingStarted";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
@@ -237,7 +239,22 @@ function AccountContent() {
             </Button>
           </div>
         </Row>
+
+        <Row
+          title="Delete account"
+          description="Removes your files, steps, recipes and history, cancels any Pro subscription, and deletes your sign-in. This cannot be undone."
+        >
+          <DeleteAccount email={user?.email ?? ""} />
+        </Row>
       </div>
+
+      <p className="mt-6 text-[13px] text-muted-foreground">
+        <Link href="/legal/terms" className="hover:text-foreground">Terms</Link>
+        {" · "}
+        <Link href="/legal/privacy" className="hover:text-foreground">Privacy policy</Link>
+        {" · "}
+        <Link href="/legal/refunds" className="hover:text-foreground">Refund policy</Link>
+      </p>
 
       <AlertDialog open={confirmCancel} onOpenChange={setConfirmCancel}>
         <AlertDialogContent>

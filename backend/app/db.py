@@ -456,6 +456,26 @@ def upsert_subscription(user_id: str, **fields) -> dict:
     return resp.data[0]
 
 
+# ── Account deletion ─────────────────────────────────────────────────
+
+
+def list_user_files(user_id: str) -> list[dict]:
+    """Every file row of one user, as id and storage key."""
+    resp = get_client().table("files").select("id,r2_key").eq("user_id", user_id).execute()
+    return resp.data or []
+
+
+def delete_user_rows(table: str, user_id: str) -> int:
+    """Delete every row of ``table`` owned by ``user_id``; returns how many."""
+    resp = get_client().table(table).delete().eq("user_id", user_id).execute()
+    return len(resp.data or [])
+
+
+def delete_auth_user(user_id: str) -> None:
+    """Remove the Supabase Auth user, so the sign-in no longer exists."""
+    get_client().auth.admin.delete_user(user_id)
+
+
 # ── Events (funnel analytics) ────────────────────────────────────────
 
 

@@ -105,7 +105,7 @@ Columns:
 {schema_text}
 
 (No sample data available — rely on column names, types, and the instruction.)
-(You have not seen any values. When you describe the data, do not give example values or guess what a column contains; say what can be told from the names and types, and that the values were not shared.)
+(You have not seen any values. When you describe the data, do not give example values or guess what a column contains; say what can be told from the names and types, and that the values were not shared. A question about the values is answered with a query, which runs on the full file.)
 Instruction: {instruction}"""
 
     sample_text = ""
@@ -146,21 +146,28 @@ Given a table schema and a message (with optional conversation history), respond
 2. **Clarification**: If the request is ambiguous, respond with:
    {"needs_clarification": true, "question": "your question", "suggestions": ["option1", "option2"]}
 
-3. **Insight**: Use this for ANY question or inquiry about the data — even if answering it requires looking up specific values.
-   Questions like "which player has the highest X?", "what is the average Y?", "how many rows have Z?",
-   "tell me about the data", "what game is this?", "who scored the most?" are ALL insights.
-   Respond with: {"insight": "your text answer about the data"}
-   You may describe what a query would return, or reason about the schema/samples to answer.
+3. **Query answer**: for a question whose answer is in the values: which X has the highest Y, how many rows have Z,
+   a total, an average, a top N, a breakdown by category, whether something occurs.
+   Respond with: {"query": "a single DuckDB SELECT over data that returns the answer"}
+   The query runs on the whole file and its result is shown to the user. You never see the values and do not need to.
+   Aggregate, so the result is a few rows at most (never more than 50): GROUP BY, COUNT, SUM, AVG, MIN, MAX, ORDER BY, LIMIT.
+   Name the result columns in plain words (total_revenue, orders, share_pct). Round numbers to 2 decimal places.
+
+4. **Insight**: for a question answerable from the column names and types alone, with no values needed:
+   "what columns do I have?", "what is this file about?", "what could I clean here?", "what does this column mean?".
+   Respond with: {"insight": "your text answer"}
+   Never guess a value, a total or a top item in an insight: that is a query answer.
 
 CRITICAL DISTINCTION:
-- "which player has highest ACS?" → INSIGHT (user is asking a question, not changing data)
+- "which player has highest ACS?" → QUERY ANSWER (a question about values, nothing changes)
+- "how many rows have no email?" → QUERY ANSWER
+- "total revenue by region" → QUERY ANSWER (a breakdown to read, not a change to the file)
 - "remove rows with missing values" → SQL TRANSFORM (user wants to modify data)
 - "what columns do I have?" → INSIGHT
 - "sort by rating desc" → SQL TRANSFORM
-- "how many rows?" → INSIGHT
 - "add a column for kill ratio" → SQL TRANSFORM
 
-When in doubt, prefer INSIGHT over SQL TRANSFORM. Only use SQL when the user clearly wants to change the dataset.
+When in doubt between a transform and a question, prefer the question. Only use SQL TRANSFORM when the user clearly wants to change the dataset.
 
 RULES:
 - Use DuckDB syntax (ILIKE, ||, etc.)

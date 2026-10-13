@@ -106,6 +106,53 @@ export function CopyButton({ text, label = "Copy", className }: { text: string; 
   );
 }
 
+/** The rows a question's query returned, as a small table: numbers on the
+ *  right in tabular figures, empty cells named, at most a screen of rows. */
+export function AnswerTable({ columns, rows, totalRows }: { columns: string[]; rows: Record<string, unknown>[]; totalRows: number }) {
+  if (!columns.length || !rows.length) return null;
+  // A single value already reads as the answer line above the table
+  if (rows.length === 1 && columns.length === 1) return null;
+  const numeric = columns.map((c) => rows.every((r) => r[c] === null || r[c] === undefined || typeof r[c] === "number"));
+  return (
+    <div className="mt-2 overflow-x-auto rounded-lg border bg-background">
+      <table className="w-full text-[12px]">
+        <thead>
+          <tr className="border-b">
+            {columns.map((c, i) => (
+              <th key={c} scope="col" className={cn("px-2.5 py-1.5 font-medium text-muted-foreground", numeric[i] ? "text-right" : "text-left")}>
+                {c}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r, i) => (
+            <tr key={i} className="border-b last:border-b-0">
+              {columns.map((c, j) => (
+                <td key={c} className={cn("px-2.5 py-1.5", numeric[j] ? "text-right tabular-nums" : "text-left")}>
+                  {formatCell(r[c])}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {totalRows > rows.length && (
+        <p className="border-t px-2.5 py-1.5 text-[11px] text-muted-foreground">
+          {(totalRows - rows.length).toLocaleString()} more {totalRows - rows.length === 1 ? "row" : "rows"} not shown. Ask for a total or a top few.
+        </p>
+      )}
+    </div>
+  );
+}
+
+export function formatCell(v: unknown): string {
+  if (v === null || v === undefined || v === "") return "empty";
+  if (typeof v === "number") return Number.isInteger(v) ? v.toLocaleString() : v.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  if (typeof v === "boolean") return v ? "yes" : "no";
+  return String(v);
+}
+
 /** SQL as a code block with a header and a copy action. */
 export function SqlBlock({ sql, id }: { sql: string; id: string }) {
   return (

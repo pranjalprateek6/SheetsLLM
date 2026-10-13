@@ -6,6 +6,7 @@ import { ArrowRight, Check, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { LEGAL_DOCS } from "@/components/marketing/legal";
 import { PRODUCT_PAGES } from "@/components/marketing/product-pages";
 import { TOOLS } from "@/components/tools/catalog";
 
@@ -305,7 +306,9 @@ export function SiteFooter() {
         <Container className="flex flex-col gap-3 py-6 text-[12px] text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
           <p>© {new Date().getFullYear()} SheetsLLM. Made for the monthly export.</p>
           <nav aria-label="Footer" className="flex flex-wrap gap-x-5 gap-y-2">
-            <Link href="/product/privacy" className="transition-colors hover:text-foreground">Privacy &amp; history</Link>
+            {LEGAL_DOCS.map((d) => (
+              <Link key={d.slug} href={d.href} className="transition-colors hover:text-foreground">{d.name}</Link>
+            ))}
             <Link href="/pricing" className="transition-colors hover:text-foreground">Pricing</Link>
             <Link href="/tools" className="transition-colors hover:text-foreground">Free tools</Link>
           </nav>

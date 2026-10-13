@@ -148,7 +148,7 @@ describe("PricingPage", () => {
     render(<PricingPage />);
     expect(await screen.findByRole("button", { name: /Upgrade to Pro/ })).toBeInTheDocument();
     expect(screen.getByText("What happens when you upgrade")).toBeInTheDocument();
-    expect(screen.getByText("No commitment. Cancel anytime in one click.")).toBeInTheDocument();
+    expect(screen.getByText(/No commitment\. Cancel anytime in one click\./)).toBeInTheDocument();
   });
 
   it("with checkout closed: the waitlist, and no promises it can't keep", async () => {
