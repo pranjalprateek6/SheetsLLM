@@ -8,9 +8,9 @@ import uuid
 
 from fastapi import APIRouter, Query, Request, Response
 
-from app import db, storage
+from app import db, events, storage
 from app.cache import get_local_parquet, invalidate_file
-from app.engine import execute_sql_from_local, replay_transformations_local
+from app.engine import first_failing_step, execute_sql_from_local, replay_transformations_local
 
 logger = logging.getLogger("sheetsllm.routes.files")
 
@@ -325,6 +325,73 @@ async def add_step(request: Request, file_id: str):
 
 
 # ── Revert ────────────────────────────────────────────────────────────
+
+
+@router.delete("/files/{file_id}/steps/{step_num}")
+def remove_step(request: Request, file_id: str, step_num: int):
+    """Take one step out of the middle of a file's history.
+
+    The steps after it run again without it. The new chain is planned on
+    the file first: a later step that needs what this one did (a column it
+    added, say) is named, and nothing changes.
+    """
+    user_id = getattr(request.state, "user_id", "anonymous")
+
+    file_rec = db.get_file(file_id, user_id)
+    if not file_rec:
+        return _json_response(404, "FILE_NOT_FOUND", "File not found")
+
+    steps = db.get_transformations(file_id)
+    target = next((s for s in steps if s.get("step_number") == step_num), None)
+    if target is None:
+        return _json_response(404, "STEP_NOT_FOUND", f"There is no step {step_num}")
+
+    kept = [s for s in steps if s is not target]
+    renumbered = [{**s, "step_number": i + 1} for i, s in enumerate(kept)]
+
+    local_path = get_local_parquet(file_rec["r2_key"])
+    broken = first_failing_step(local_path, renumbered) if renumbered else None
+    if broken is not None:
+        needs = kept[broken - 1]
+        return _json_response(
+            409, "STEP_NEEDED",
+            f"Step {step_num} can't be removed: step {needs.get('step_number')} "
+            f"({needs.get('instruction') or 'untitled'}) needs what it did. Nothing changed.",
+            step=needs.get("step_number"),
+        )
+
+    db.delete_transformation(file_id, step_num)
+    db.renumber_transformations_after(file_id, step_num)
+
+    if renumbered:
+        result = replay_transformations_local(local_path, renumbered)
+    else:
+        result = execute_sql_from_local(local_path, "SELECT * FROM data")
+
+    try:
+        db.update_file(file_id, user_id, row_count=result["total_rows"], column_count=result["total_columns"])
+    except Exception:
+        pass
+    try:
+        db.create_audit_entry(
+            user_id=user_id, file_id=file_id, action="step_remove",
+            metadata={"removed_step": step_num, "instruction": target.get("instruction"), "steps_left": len(renumbered)},
+        )
+    except Exception:
+        pass
+    events.record(user_id, "step_removed", position=step_num, of=len(steps))
+
+    return {
+        "file_id": file_id,
+        "removed_step": step_num,
+        "steps": len(renumbered),
+        "preview": {
+            "columns": result["columns"],
+            "rows": result["preview"],
+            "total_rows": result["total_rows"],
+            "total_columns": result["total_columns"],
+        },
+    }
 
 
 @router.post("/files/{file_id}/revert/{step_num}")
