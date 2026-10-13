@@ -40,7 +40,7 @@ export function SectionHead({
       <div className="max-w-[560px]">
         <p className={cn("text-soft", large ? "text-[19px] leading-[1.45] sm:text-[22px]" : "text-[17px] leading-relaxed")}>{body}</p>
         {href && (
-          <Link href={href} className="group mt-8 inline-flex items-center gap-1.5 text-base text-muted-foreground transition-colors hover:text-foreground">
+          <Link href={href} className="group mt-8 inline-flex items-center gap-1.5 text-base text-muted-foreground transition-colors hover:text-foreground coarse:min-h-9">
             Learn more <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
           </Link>
         )}
@@ -99,7 +99,7 @@ export function FeaturesRow({ items }: { items: { name: string; detail: string }
                   <button
                     type="button"
                     onClick={() => setOpen(i)}
-                    className="group inline-flex items-center gap-1.5 rounded-md py-0.5 text-base text-foreground/90 transition-colors hover:text-foreground"
+                    className="group inline-flex items-center gap-1.5 rounded-md py-0.5 text-base text-foreground/90 transition-colors hover:text-foreground coarse:py-1.5"
                   >
                     {f.name}
                     <Plus className="h-3.5 w-3.5 text-muted-foreground transition-transform duration-200 group-hover:rotate-90 group-hover:text-foreground" />
@@ -282,7 +282,7 @@ export function SiteFooter() {
           </p>
           <Link
             href="/auth?mode=signup"
-            className="group mt-5 inline-flex items-center gap-1 text-[13px] font-medium text-foreground/90 transition-colors hover:text-foreground"
+            className="group mt-5 inline-flex items-center gap-1 text-[13px] font-medium text-foreground/90 transition-colors hover:text-foreground coarse:min-h-9"
           >
             Start free <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
           </Link>
@@ -293,7 +293,7 @@ export function SiteFooter() {
             <ul className="mt-4 space-y-2.5">
               {col.links.map(([label, href]) => (
                 <li key={href}>
-                  <Link href={href} className="text-[13px] text-muted-foreground transition-colors hover:text-foreground">
+                  <Link href={href} className="text-[13px] text-muted-foreground transition-colors hover:text-foreground coarse:inline-flex coarse:min-h-9 coarse:items-center">
                     {label}
                   </Link>
                 </li>
@@ -306,14 +306,14 @@ export function SiteFooter() {
         <Container className="flex flex-col gap-3 py-6 text-[12px] text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
           <p>© {new Date().getFullYear()} SheetsLLM. Made for the monthly export.</p>
           <nav aria-label="Footer" className="flex flex-wrap gap-x-5 gap-y-2">
-            <Link href="/help" className="transition-colors hover:text-foreground">Help</Link>
-            <Link href="/changelog" className="transition-colors hover:text-foreground">What&apos;s new</Link>
-            <Link href="/status" className="transition-colors hover:text-foreground">Status</Link>
+            <Link href="/help" className="transition-colors hover:text-foreground coarse:inline-flex coarse:min-h-9 coarse:items-center">Help</Link>
+            <Link href="/changelog" className="transition-colors hover:text-foreground coarse:inline-flex coarse:min-h-9 coarse:items-center">What&apos;s new</Link>
+            <Link href="/status" className="transition-colors hover:text-foreground coarse:inline-flex coarse:min-h-9 coarse:items-center">Status</Link>
             {LEGAL_DOCS.map((d) => (
-              <Link key={d.slug} href={d.href} className="transition-colors hover:text-foreground">{d.name}</Link>
+              <Link key={d.slug} href={d.href} className="transition-colors hover:text-foreground coarse:inline-flex coarse:min-h-9 coarse:items-center">{d.name}</Link>
             ))}
-            <Link href="/pricing" className="transition-colors hover:text-foreground">Pricing</Link>
-            <Link href="/tools" className="transition-colors hover:text-foreground">Free tools</Link>
+            <Link href="/pricing" className="transition-colors hover:text-foreground coarse:inline-flex coarse:min-h-9 coarse:items-center">Pricing</Link>
+            <Link href="/tools" className="transition-colors hover:text-foreground coarse:inline-flex coarse:min-h-9 coarse:items-center">Free tools</Link>
           </nav>
         </Container>
       </div>

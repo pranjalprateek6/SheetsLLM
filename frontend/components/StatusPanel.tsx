@@ -103,7 +103,7 @@ export default function StatusPanel() {
       </ul>
       <p className="mt-3 text-[12px] text-muted-foreground">
         Checked {checked ? timeOf(checked.toISOString()) : ""}, and again every minute.{" "}
-        <button type="button" onClick={check} className="underline underline-offset-2 hover:text-foreground">
+        <button type="button" onClick={check} className="underline underline-offset-2 hover:text-foreground coarse:inline-block coarse:py-2">
           Check now
         </button>
       </p>
