@@ -8,6 +8,7 @@ DELETE /recipes/{id}         delete a recipe
 POST   /recipes/{id}/apply   append the recipe's steps to another file, with
                              a run report, its checks, and column matching
 PUT    /recipes/{id}/checks  replace the checks a recipe runs
+PUT    /recipes/{id}/steps   remove or reorder steps, or take a file's steps
 """
 
 from __future__ import annotations
@@ -21,7 +22,7 @@ from fastapi import APIRouter, Request, Response
 
 from app import db, events, usage
 from app.cache import get_local_parquet
-from app.engine import get_schema_after_steps, measure_run, replay_transformations_local
+from app.engine import first_failing_step, get_schema_after_steps, measure_run, replay_transformations_local
 from app.recipe_runs import (
     check_label,
     check_sql,
@@ -35,6 +36,7 @@ from app.recipes import (
     RecipeError,
     missing_columns,
     renumber_after,
+    reorder_steps,
     snapshot_steps,
     validate_recipe_steps,
 )
@@ -476,6 +478,99 @@ async def apply_recipe(request: Request, recipe_id: str):
             "total_rows": result["total_rows"],
             "total_columns": result["total_columns"],
         },
+    }
+
+
+@router.put("/recipes/{recipe_id}/steps")
+async def put_recipe_steps(request: Request, recipe_id: str):
+    """Change what a recipe does, without the client ever sending SQL.
+
+    Body is one of:
+      {"keep": [3, 1, 2]}   the step numbers to keep, in their new order
+      {"file_id": "..."}    replace the steps with that file's steps, and
+                            its columns as the ones the recipe needs
+
+    A reordered chain is planned on the recipe's source file before it is
+    saved, so a step moved ahead of the one it depends on is refused by
+    name rather than failing on next month's run.
+    """
+    user_id = getattr(request.state, "user_id", "anonymous")
+    try:
+        body = await request.json()
+    except Exception:
+        return _json_response(400, "INVALID_JSON", "Request body must be JSON")
+    if not isinstance(body, dict):
+        return _json_response(400, "INVALID_JSON", "Request body must be a JSON object")
+
+    recipe = db.get_recipe(recipe_id, user_id)
+    if not recipe:
+        return _json_response(404, "RECIPE_NOT_FOUND", "Recipe not found")
+    before = recipe.get("steps") or []
+    updates: dict = {}
+
+    if body.get("file_id"):
+        file_rec = db.get_file(body["file_id"], user_id)
+        if not file_rec:
+            return _json_response(404, "FILE_NOT_FOUND", "File not found")
+        try:
+            updates["steps"] = snapshot_steps(db.get_transformations(body["file_id"]))
+        except RecipeError as exc:
+            return _json_response(400, "EMPTY_RECIPE", str(exc))
+        updates["required_columns"] = _base_columns(file_rec)
+        updates["source_file_id"] = body["file_id"]
+        change = {"from_file": body["file_id"]}
+    elif "keep" in body:
+        try:
+            updates["steps"] = reorder_steps(before, body.get("keep"))
+        except RecipeError as exc:
+            return _json_response(400, "INVALID_STEPS", str(exc))
+        order_changed = [s["sql_query"] for s in updates["steps"]] != [
+            s["sql_query"] for s in before if s.get("step_number") in set(body["keep"])
+        ]
+        # Plan the new chain on the file the recipe came from, when it is still here
+        src = recipe.get("source_file_id")
+        src_rec = db.get_file(src, user_id) if src else None
+        if src_rec:
+            try:
+                local_path = await asyncio.to_thread(get_local_parquet, src_rec["r2_key"])
+                broken = await asyncio.to_thread(first_failing_step, local_path, updates["steps"])
+            except Exception as exc:
+                logger.warning("Could not plan edited recipe %s on its source: %s", recipe_id, exc)
+                broken = None
+            if broken is not None:
+                step = updates["steps"][broken - 1]
+                return _json_response(
+                    400, "STEPS_DO_NOT_RUN",
+                    f"In this order, step {broken} ({step.get('instruction') or 'untitled'}) can't run "
+                    "on the file this recipe came from. Put it back after the step it needs, or remove it.",
+                    step=broken,
+                )
+        change = {"kept": len(updates["steps"]), "removed": len(before) - len(updates["steps"]),
+                  "reordered": order_changed}
+    else:
+        return _json_response(400, "NO_FIELDS", "Send keep (step numbers in order) or file_id")
+
+    updated = db.update_recipe(recipe_id, user_id, **updates)
+    if not updated:
+        return _json_response(404, "RECIPE_NOT_FOUND", "Recipe not found")
+    try:
+        db.create_audit_entry(
+            user_id=user_id, file_id=updated.get("source_file_id"), action="recipe_update",
+            metadata={"recipe_id": recipe_id, "fields": ["steps"], **change},
+        )
+    except Exception:
+        logger.warning("Audit entry failed for recipe_update %s", recipe_id)
+    events.record(user_id, "recipe_steps_edited", recipe_id=recipe_id, steps=len(updates["steps"]), **change)
+    return {
+        "recipe_id": recipe_id,
+        "steps": [
+            {"step_number": s["step_number"], "instruction": s.get("instruction", "")}
+            for s in updates["steps"]
+        ],
+        "required_columns": [
+            c.get("name") for c in (updated.get("required_columns") or [])
+            if isinstance(c, dict) and c.get("name")
+        ],
     }
 
 

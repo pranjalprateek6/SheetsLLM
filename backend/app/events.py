@@ -50,6 +50,8 @@ EVENTS = frozenset({
     "sort_mixed_dates",
     # account
     "account_deleted",
+    # a recipe's steps removed, reordered or replaced from a file
+    "recipe_steps_edited",
 })
 
 

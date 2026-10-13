@@ -164,7 +164,7 @@ describe("PricingPage", () => {
 });
 
 describe("RecipesDrawer wall", () => {
-  it("while billing is off, replaces the saved recipe: delete, then create", async () => {
+  it("while billing is off, replaces the saved recipe's steps in place, keeping the recipe", async () => {
     billing(false);
     const calls: string[] = [];
     server.use(
@@ -177,6 +177,16 @@ describe("RecipesDrawer wall", () => {
           ? HttpResponse.json({ code: "RECIPE_LIMIT_REACHED", message: "The free plan includes 1 saved recipe." }, { status: 402 })
           : HttpResponse.json({ recipe_id: "new", name: body.name, steps: 3 });
       }),
+      http.put("/api/recipes/:id/steps", async ({ params, request }) => {
+        const body = (await request.json()) as { file_id: string };
+        calls.push(`PUT ${params.id} ${body.file_id}`);
+        return HttpResponse.json({ recipe_id: params.id, steps: [{}, {}, {}] });
+      }),
+      http.patch("/api/recipes/:id", async ({ params, request }) => {
+        const body = (await request.json()) as { name: string };
+        calls.push(`PATCH ${params.id} ${body.name}`);
+        return HttpResponse.json({ recipe_id: params.id, name: body.name });
+      }),
       http.delete("/api/recipes/:id", ({ params }) => {
         calls.push(`DELETE ${params.id}`);
         return HttpResponse.json({ deleted: true });
@@ -186,7 +196,8 @@ describe("RecipesDrawer wall", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Save these 3 steps as a recipe" }));
     await userEvent.click(screen.getByRole("button", { name: "Save recipe" }));
     await userEvent.click(await screen.findByRole("button", { name: /Replace ‘Old cleanup’ with these steps/ }));
-    await waitFor(() => expect(calls).toEqual(["POST orders cleanup", "DELETE old", "POST orders cleanup"]));
-    expect(await screen.findByText(/Replaced "Old cleanup"/)).toBeInTheDocument();
+    // The recipe keeps its id, checks and last run; only its steps and name change
+    await waitFor(() => expect(calls).toEqual(["POST orders cleanup", "PUT old f1", "PATCH old orders cleanup"]));
+    expect(await screen.findByText(/Replaced the steps of "Old cleanup" \(3 steps\)/)).toBeInTheDocument();
   });
 });

@@ -256,6 +256,30 @@ def build_replay_sql(
     return f"WITH {', '.join(ctes)} SELECT * FROM step_{last_step}"
 
 
+# ── Checking a chain before it is saved ──────────────────────────────
+
+
+def first_failing_step(
+    local_path: str | Path, steps: list[dict], *, timeout: int | None = None
+) -> int | None:
+    """The 1-based position of the first step that cannot run on this file
+    after the steps before it, or None when the whole chain plans. An
+    EXPLAIN per prefix: a step that uses a column a later step adds, or one
+    a removed step used to add, fails to bind and is named."""
+
+    def _inner():
+        con = get_connection(read=(local_path,))
+        con.execute(f"CREATE VIEW data AS SELECT * FROM read_parquet('{_sql_path(local_path)}')")
+        for k in range(1, len(steps) + 1):
+            try:
+                con.execute(f"EXPLAIN {build_replay_sql(steps, up_to=k)}")
+            except Exception:
+                return k
+        return None
+
+    return _run_with_timeout(_inner, timeout=timeout if timeout is not None else DUCKDB_QUERY_TIMEOUT)
+
+
 # ── Measuring a run ──────────────────────────────────────────────────
 
 

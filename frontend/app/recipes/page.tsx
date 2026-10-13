@@ -7,6 +7,7 @@ import { BookMarked, ChevronDown, FileSpreadsheet, Play, Upload } from "lucide-r
 import AuthGuard from "@/components/AuthGuard";
 import EmptyState from "@/components/EmptyState";
 import RecipeChecks from "@/components/RecipeChecks";
+import RecipeStepsEditor, { type RecipeStep } from "@/components/RecipeStepsEditor";
 import type { Recipe } from "@/components/RecipesDrawer";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -15,7 +16,6 @@ import { fetchWithAuth } from "@/lib/fetch-with-auth";
 import type { RecipeCheck } from "@/lib/recipe-run";
 import { cn } from "@/lib/utils";
 
-type RecipeStep = { step_number: number; instruction: string };
 type FileRow = { id: string; name: string; row_count?: number; step_count?: number };
 
 export default function RecipesPage() {
@@ -161,18 +161,19 @@ function RecipesContent() {
               </div>
               {open === r.id && (
                 <div className="border-t">
-                <ol className="px-4 py-3 text-sm">
-                  {!steps[r.id] && !stepsFailed[r.id] && <li className="text-muted-foreground">Loading…</li>}
-                  {stepsFailed[r.id] && <li className="text-muted-foreground">Couldn&apos;t load the steps. Close and open the recipe to try again.</li>}
-                  {steps[r.id]?.map((s) => (
-                    <li key={s.step_number} className="flex gap-2 py-0.5">
-                      <span className="w-5 flex-shrink-0 text-right text-[13px] tabular-nums text-muted-foreground">
-                        {s.step_number}
-                      </span>
-                      <span>{s.instruction}</span>
-                    </li>
-                  ))}
-                </ol>
+                {!steps[r.id] && !stepsFailed[r.id] && <p className="px-4 py-3 text-sm text-muted-foreground">Loading…</p>}
+                {stepsFailed[r.id] && <p className="px-4 py-3 text-sm text-muted-foreground">Couldn&apos;t load the steps. Close and open the recipe to try again.</p>}
+                {steps[r.id] && (
+                  <RecipeStepsEditor
+                    recipeId={r.id}
+                    name={r.name}
+                    steps={steps[r.id]}
+                    onSaved={({ name, steps: next }) => {
+                      setSteps((s) => ({ ...s, [r.id]: next }));
+                      setRecipes((list) => list?.map((x) => (x.id === r.id ? { ...x, name, steps: next.length } : x)) ?? list);
+                    }}
+                  />
+                )}
                 {steps[r.id] && (
                   <div className="border-t px-4 py-3">
                     <RecipeChecks recipeId={r.id} columns={r.required_columns ?? []} initial={checksOf[r.id] ?? []} />
