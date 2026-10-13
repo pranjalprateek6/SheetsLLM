@@ -112,6 +112,72 @@ describe("ChatPanel suggestions", () => {
   });
 });
 
+describe("ChatPanel answers", () => {
+  beforeEach(() => server.use(chatHistory(), insights([])));
+
+  it("shows a question's answer with the rows behind it and says no values went to the AI", async () => {
+    server.use(
+      http.post("/api/chat", () =>
+        HttpResponse.json({
+          type: "answer",
+          message: "3 rows.",
+          sql: 'SELECT "Region" AS region, SUM("MRP") AS total FROM data GROUP BY 1',
+          columns: ["region", "total"],
+          rows: [{ region: "North", total: 1200.5 }, { region: "South", total: 900 }, { region: "West", total: null }],
+          total_rows: 3,
+          strict: true,
+        }),
+      ),
+    );
+    render(<ChatPanel fileId="f1" open onPreview={noop} />);
+    await userEvent.type(screen.getByRole("textbox"), "which region sold the most");
+    await userEvent.keyboard("{Enter}");
+
+    expect(await screen.findByText("3 rows.")).toBeInTheDocument();
+    const table = screen.getByRole("table");
+    expect(table).toHaveTextContent("North");
+    expect(table).toHaveTextContent("1,200.5");
+    expect(table).toHaveTextContent("empty");
+    expect(screen.getByText(/No values were sent to the AI/)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /Query/ }));
+    expect(screen.getByRole("region", { name: "Generated SQL" })).toHaveTextContent("GROUP BY 1");
+  });
+
+  it("renders an answer from the saved conversation, and a single value as a line only", async () => {
+    server.use(
+      http.get("/api/chat/:fileId", () =>
+        HttpResponse.json({
+          messages: [
+            { role: "user", content: "how many rows" },
+            { role: "assistant", content: "rows: 912", message_type: "answer",
+              metadata: { sql: "SELECT COUNT(*) AS rows FROM data", columns: ["rows"], rows: [{ rows: 912 }], total_rows: 1, strict: false } },
+          ],
+        }),
+      ),
+    );
+    render(<ChatPanel fileId="f1" open onPreview={noop} />);
+    expect(await screen.findByText("rows: 912")).toBeInTheDocument();
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+    expect(screen.getByText("Answered by running a query on every row.")).toBeInTheDocument();
+  });
+
+  it("says when the rows shown are not all of them", async () => {
+    server.use(
+      http.post("/api/chat", () =>
+        HttpResponse.json({
+          type: "answer", message: "120 rows. Here are the first 2.", sql: "SELECT * FROM data",
+          columns: ["a"], rows: [{ a: 1 }, { a: 2 }], total_rows: 120, strict: true,
+        }),
+      ),
+    );
+    render(<ChatPanel fileId="f1" open onPreview={noop} />);
+    await userEvent.type(screen.getByRole("textbox"), "show everything");
+    await userEvent.keyboard("{Enter}");
+    expect(await screen.findByText(/118 more rows not shown/)).toBeInTheDocument();
+  });
+});
+
 describe("ChatPanel stop", () => {
   const saved = [...LATE_STEP_CHECKS_MS];
   beforeEach(() => {
