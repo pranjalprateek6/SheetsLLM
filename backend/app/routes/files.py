@@ -8,7 +8,10 @@ import uuid
 
 from fastapi import APIRouter, Query, Request, Response
 
+import datetime as _dt
+
 from app import db, events, storage
+from app.share import SHARE_TTL_SECONDS, make_token
 from app.cache import get_local_parquet, invalidate_file
 from app.engine import first_failing_step, execute_sql_from_local, replay_transformations_local
 
@@ -391,6 +394,22 @@ def remove_step(request: Request, file_id: str, step_num: int):
             "total_rows": result["total_rows"],
             "total_columns": result["total_columns"],
         },
+    }
+
+
+@router.post("/files/{file_id}/share")
+def share_file(request: Request, file_id: str):
+    """A link that serves this file's cleaned CSV to anyone who has it, for
+    seven days. Nothing is stored: the token is signed and expires alone."""
+    user_id = getattr(request.state, "user_id", "anonymous")
+    if not db.get_file(file_id, user_id):
+        return _json_response(404, "FILE_NOT_FOUND", "File not found")
+    token, expires = make_token(file_id, user_id)
+    events.record(user_id, "share_link_created")
+    return {
+        "token": token,
+        "expires_at": _dt.datetime.fromtimestamp(expires, _dt.timezone.utc).isoformat().replace("+00:00", "Z"),
+        "days": SHARE_TTL_SECONDS // 86400,
     }
 
 

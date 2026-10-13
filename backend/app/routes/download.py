@@ -26,6 +26,7 @@ from app.engine import (
     export_full_result_local,
 )
 from app.security import RateLimitExceeded, check_rate_limit
+from app.share import read_token
 
 logger = logging.getLogger("sheetsllm.routes.download")
 
@@ -82,6 +83,58 @@ def _cleanup(path: str) -> None:
         os.unlink(path)
     except OSError:
         pass
+
+
+def _stream_export(user_id: str, file_id: str, file_rec: dict, steps: list[dict], fmt: str, *, purpose: str | None = None, via: str | None = None):
+    """Write the file as the steps left it to a temp file in ``fmt`` and
+    serve it from disk, cleaning up afterwards."""
+    media_type, ext = _STREAMED_FORMATS[fmt]
+    base_name = file_rec.get("name", "data").rsplit(".", 1)[0]
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}")
+    tmp.close()
+    try:
+        local_path = get_local_parquet(file_rec["r2_key"])
+        export_full_result_local(local_path, steps, fmt, tmp.name)
+    except QueryTimeoutError as exc:
+        _cleanup(tmp.name)
+        return _json_response(504, "QUERY_TIMEOUT", str(exc))
+    except Exception as exc:
+        _cleanup(tmp.name)
+        logger.error("Export failed for file_id=%s fmt=%s: %s", file_id, fmt, exc)
+        return _json_response(
+            500, "EXPORT_FAILED",
+            "Preparing the download failed. Please try again.",
+        )
+
+    _audit(user_id, file_id, fmt, os.path.getsize(tmp.name), steps=len(steps), preview=purpose == "preview")
+    if via:
+        events.record(user_id, "export_completed", format=fmt, steps=len(steps), via=via)
+    return FileResponse(
+        tmp.name,
+        media_type=media_type,
+        filename=f"{base_name}.{ext}",
+        background=BackgroundTask(_cleanup, tmp.name),
+    )
+
+
+@router.get("/shared/{token}")
+def shared(token: str):
+    """A share link: the file's cleaned CSV for anyone with the token, no
+    sign-in. The token names the file and its owner and expires on its own;
+    the file is read as the owner, as the steps have left it."""
+    try:
+        check_rate_limit(f"shared:{token[-24:]}", max_requests=_DOWNLOAD_RATE_MAX, window=_DOWNLOAD_RATE_WINDOW)
+    except RateLimitExceeded as exc:
+        return _json_response(429, "RATE_LIMITED", f"Too many downloads. Retry after {exc.retry_after:.0f}s")
+    ids = read_token(token)
+    if not ids:
+        return _json_response(404, "LINK_NOT_FOUND", "This link has expired or never existed.")
+    file_id, user_id = ids
+    file_rec = db.get_file(file_id, user_id)
+    if not file_rec:
+        return _json_response(404, "LINK_NOT_FOUND", "This link has expired or never existed.")
+    steps = db.get_transformations(file_id)
+    return _stream_export(user_id, file_id, file_rec, steps, "csv", via="share_link")
 
 
 @router.get("/download")
@@ -154,27 +207,4 @@ def download(
         )
 
     # ── Streamed formats: DuckDB COPY TO temp file, serve from disk ───
-    media_type, ext = _STREAMED_FORMATS[fmt]
-    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}")
-    tmp.close()
-    try:
-        local_path = get_local_parquet(r2_key)
-        export_full_result_local(local_path, steps, fmt, tmp.name)
-    except QueryTimeoutError as exc:
-        _cleanup(tmp.name)
-        return _json_response(504, "QUERY_TIMEOUT", str(exc))
-    except Exception as exc:
-        _cleanup(tmp.name)
-        logger.error("Export failed for file_id=%s fmt=%s: %s", file_id, fmt, exc)
-        return _json_response(
-            500, "EXPORT_FAILED",
-            "Preparing the download failed. Please try again.",
-        )
-
-    _audit(user_id, file_id, fmt, os.path.getsize(tmp.name), steps=len(steps), preview=purpose == "preview")
-    return FileResponse(
-        tmp.name,
-        media_type=media_type,
-        filename=f"{base_name}.{ext}",
-        background=BackgroundTask(_cleanup, tmp.name),
-    )
+    return _stream_export(user_id, file_id, file_rec, steps, fmt, purpose=purpose)

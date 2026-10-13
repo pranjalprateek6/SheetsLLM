@@ -12,7 +12,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import JSONResponse
 
-from app.auth import PUBLIC_PATHS, verify_token
+from app.auth import PUBLIC_PATHS, PUBLIC_PREFIXES, verify_token
 from app import cache
 from app.config import ALLOW_ANONYMOUS, ALLOWED_ORIGINS, IS_PRODUCTION
 from app.routes import register_routes
@@ -138,7 +138,7 @@ async def auth_middleware(request: Request, call_next):
     """Verify Supabase JWT for protected routes."""
     path = request.url.path.rstrip("/")
 
-    if request.method == "OPTIONS" or path in PUBLIC_PATHS:
+    if request.method == "OPTIONS" or path in PUBLIC_PATHS or path.startswith(PUBLIC_PREFIXES):
         return await call_next(request)
 
     try:

@@ -50,6 +50,8 @@ EVENTS = frozenset({
     "sort_mixed_dates",
     # a step taken out of the middle of a file's history
     "step_removed",
+    # a link that serves the cleaned file to anyone for a week
+    "share_link_created",
     # a clean-numbers step that emptied cells it could not read
     "clean_number_lost",
     # account
