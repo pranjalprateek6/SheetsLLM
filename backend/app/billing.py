@@ -82,15 +82,16 @@ def create_checkout_session(user_id: str, email: str | None) -> str:
     return short_url
 
 
-def cancel_subscription(user_id: str) -> dict:
-    """Cancel at the end of the current cycle (user keeps Pro until then)."""
+def cancel_subscription(user_id: str, *, at_cycle_end: bool = True) -> dict:
+    """Cancel at the end of the current cycle (the user keeps Pro until then),
+    or at once when ``at_cycle_end`` is False, as when the account is deleted."""
     client = _client()
     sub = db.get_subscription(user_id)
     sub_id = sub.get("provider_subscription_id") if sub else None
     if not sub_id:
         raise BillingError("No active subscription for this user")
 
-    result = client.subscription.cancel(sub_id, {"cancel_at_cycle_end": 1})
+    result = client.subscription.cancel(sub_id, {"cancel_at_cycle_end": 1 if at_cycle_end else 0})
     db.upsert_subscription(user_id, status=result.get("status"))
     return {"status": result.get("status"), "ends_at": _period_end_iso(result.get("current_end"))}
 

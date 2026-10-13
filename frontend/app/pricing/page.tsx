@@ -378,8 +378,11 @@ function PricingContent() {
               </Button>
             )}
             {!isPro && billingConfigured && (
-              <p className="mt-2 text-center text-xs text-muted-foreground">
-                No commitment. Cancel anytime in one click.
+              <p className="mt-2 text-center text-xs leading-relaxed text-muted-foreground">
+                No commitment. Cancel anytime in one click. By upgrading you agree to the{" "}
+                <Link href="/legal/terms" className="underline underline-offset-2 hover:text-foreground">Terms</Link>
+                {" "}and the{" "}
+                <Link href="/legal/refunds" className="underline underline-offset-2 hover:text-foreground">Refund policy</Link>.
               </p>
             )}
             {!isPro && !billingConfigured && !signedOut && (

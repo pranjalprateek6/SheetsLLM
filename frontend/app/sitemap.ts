@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 
+import { LEGAL_DOCS } from "@/components/marketing/legal";
 import { PRODUCT_PAGES } from "@/components/marketing/product-pages";
 import { TOOLS } from "@/components/tools/catalog";
 
@@ -14,5 +15,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${BASE}/pricing`, changeFrequency: "monthly", priority: 0.8 },
     { url: `${BASE}/tools`, changeFrequency: "monthly", priority: 0.9 },
     ...TOOLS.map((t) => ({ url: `${BASE}${t.href}`, changeFrequency: "monthly" as const, priority: 0.9 })),
+    ...LEGAL_DOCS.map((d) => ({ url: `${BASE}${d.href}`, changeFrequency: "yearly" as const, priority: 0.3 })),
   ];
 }
