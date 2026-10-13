@@ -308,6 +308,7 @@ export function SiteFooter() {
           <nav aria-label="Footer" className="flex flex-wrap gap-x-5 gap-y-2">
             <Link href="/help" className="transition-colors hover:text-foreground">Help</Link>
             <Link href="/changelog" className="transition-colors hover:text-foreground">What&apos;s new</Link>
+            <Link href="/status" className="transition-colors hover:text-foreground">Status</Link>
             {LEGAL_DOCS.map((d) => (
               <Link key={d.slug} href={d.href} className="transition-colors hover:text-foreground">{d.name}</Link>
             ))}

@@ -18,5 +18,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
     ...LEGAL_DOCS.map((d) => ({ url: `${BASE}${d.href}`, changeFrequency: "yearly" as const, priority: 0.3 })),
     { url: `${BASE}/help`, changeFrequency: "monthly", priority: 0.6 },
     { url: `${BASE}/changelog`, changeFrequency: "weekly", priority: 0.5 },
+    { url: `${BASE}/status`, changeFrequency: "always", priority: 0.3 },
   ];
 }
