@@ -12,6 +12,7 @@ from fastapi import APIRouter, Header, HTTPException, Query, Request, Response
 
 from app.config import MAX_COLUMNS, MAX_UPLOAD_MB, UPLOAD_MAX_BYTES
 from app import cache, db, storage
+from app.fetch_url import FetchError, fetch_bytes, normalise_url
 from app.engine import (
     UnreadableFileError,
     convert_to_parquet,
@@ -101,6 +102,19 @@ async def upload(
         if not file_bytes:
             return _json_response(400, "EMPTY_FILE", "No file data received")
 
+    return await _ingest(
+        user_id=user_id, file_id=file_id, filename=filename, file_bytes=file_bytes,
+        sheet_name=sheet_name, pending_id=pending_id, source=source, start_time=start_time,
+    )
+
+
+async def _ingest(
+    *, user_id: str, file_id: str, filename: str, file_bytes: bytes,
+    sheet_name: str | None, pending_id: str | None, source: str | None, start_time: float,
+):
+    """Everything after the bytes are in hand: checks, the sheet question,
+    Parquet, storage, the record, the preview and the insights. Shared by a
+    dropped file and a fetched link."""
     # ── Security validation ────────────────────────────────────────────
     try:
         validate_file_magic(file_bytes, filename)
@@ -121,6 +135,7 @@ async def upload(
                 "requires_sheet_selection": True,
                 "sheets": sheets,
                 "file_id": file_id,
+                "name": filename,
             }
 
     # ── Convert to Parquet ───────────────────────────────────────────
@@ -242,10 +257,11 @@ async def upload(
 
     events.record(
         user_id, "upload_completed", rows=preview["total_rows"], columns=preview["total_columns"],
-        file_id=file_id, sample=source == "sample",
+        file_id=file_id, sample=source == "sample", **({"via": "url"} if source == "url" else {}),
     )
     return {
         "file_id": file_id,
+        "name": filename,
         "schema": schema,
         "preview": {
             "columns": preview["columns"],
@@ -255,3 +271,34 @@ async def upload(
         },
         "insights": insights,
     }
+
+
+@router.post("/upload/url")
+async def upload_from_url(request: Request):
+    """A file from a link: a CSV on a server, a shared export, or a Google
+    Sheet shared with anyone who has the link. Fetched by the server with
+    the care in app/fetch_url.py, then ingested exactly as a dropped file."""
+    user_id = getattr(request.state, "user_id", "anonymous")
+    start_time = perf_counter()
+    try:
+        usage.enforce(user_id, "uploads")
+    except UsageLimitExceeded as exc:
+        events.record(user_id, "paywall_hit", action="uploads", used=exc.used, limit=exc.limit)
+        events.record(user_id, "usage_cap_hit", meter="uploads")
+        return _json_response(429, "USAGE_LIMIT_EXCEEDED", str(exc), **usage.limit_payload(exc))
+    try:
+        body = await request.json()
+    except Exception:
+        return _json_response(400, "INVALID_JSON", "Request body must be JSON")
+    if not isinstance(body, dict) or not isinstance(body.get("url"), str):
+        return _json_response(400, "BAD_URL", "Paste a link to a file.")
+    sheet_name = body.get("sheet_name") if isinstance(body.get("sheet_name"), str) else None
+    try:
+        url = normalise_url(body["url"])
+        file_bytes, filename = await asyncio.to_thread(fetch_bytes, url)
+    except FetchError as exc:
+        return _json_response(400, exc.code, str(exc))
+    return await _ingest(
+        user_id=user_id, file_id=str(uuid.uuid4()), filename=filename, file_bytes=file_bytes,
+        sheet_name=sheet_name, pending_id=None, source="url", start_time=start_time,
+    )

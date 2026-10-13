@@ -306,6 +306,8 @@ export function SiteFooter() {
         <Container className="flex flex-col gap-3 py-6 text-[12px] text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
           <p>© {new Date().getFullYear()} SheetsLLM. Made for the monthly export.</p>
           <nav aria-label="Footer" className="flex flex-wrap gap-x-5 gap-y-2">
+            <Link href="/help" className="transition-colors hover:text-foreground">Help</Link>
+            <Link href="/changelog" className="transition-colors hover:text-foreground">What&apos;s new</Link>
             {LEGAL_DOCS.map((d) => (
               <Link key={d.slug} href={d.href} className="transition-colors hover:text-foreground">{d.name}</Link>
             ))}

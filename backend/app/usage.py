@@ -49,6 +49,19 @@ TIER_LIMITS: dict[str, dict[str, int]] = {
 }
 
 
+def plans() -> dict[str, dict[str, int]]:
+    """What each plan allows, from config, for the pages that describe plans.
+    0 means unlimited. The one place the numbers live; the UI reads them."""
+    return {
+        tier: {
+            "uploads": TIER_LIMITS[tier]["uploads"],
+            "ai_requests": TIER_LIMITS[tier]["chat_requests"],
+            "recipes": RECIPE_LIMITS[tier],
+        }
+        for tier in ("free", "pro")
+    }
+
+
 class UsageLimitExceeded(Exception):
     """Raised when a metered action would exceed the user's monthly cap."""
 
@@ -170,6 +183,7 @@ def summary(user_id: str) -> dict:
         # stays in "used" as a ledger, not as a second allowance.
         "ai_requests": {"used": int(row.get("chat_requests", 0)), "limit": limits.get("chat_requests", 0)},
         "resets_at": resets_at(),
+        "plans": plans(),
     }
 
 

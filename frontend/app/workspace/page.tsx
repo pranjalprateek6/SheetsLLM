@@ -8,6 +8,7 @@ import {
 import ColumnHealth, { type HealthColumn } from "@/components/ColumnHealth";
 import PipelineSpine from "@/components/PipelineSpine";
 import DropZone from "@/components/DropZone";
+import UploadMore from "@/components/UploadMore";
 import DataGrid from "@/components/DataGrid";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import SheetSelector from "@/components/SheetSelector";
@@ -163,6 +164,7 @@ function WorkspaceContent() {
   const [confirmRevert, setConfirmRevert] = useState<number | null>(null);
   // What the revert dialog shows. Holds the last target through the closing
   // animation, which otherwise reads "Go back to step null?".
+  const [confirmRemove, setConfirmRemove] = useState<number | null>(null);
   const revertShownRef = useRef(0);
   if (confirmRevert !== null) revertShownRef.current = confirmRevert;
   const revertShown = revertShownRef.current;
@@ -371,6 +373,76 @@ function WorkspaceContent() {
     }
   };
 
+  // A finished upload, from a dropped file or a fetched link: the grid, the
+  // URL, the recipe queued for it, and the welcome toast
+  const adoptUpload = async (data: any, displayName: string): Promise<boolean> => {
+    if (data.preview && data.file_id) {
+      setColumns(data.preview.columns);
+      setRows(data.preview.rows);
+      setRowCount(data.preview.total_rows ?? data.preview.rows?.length ?? 0);
+      setColumnCount(data.preview.total_columns ?? data.preview.columns?.length ?? 0);
+      setSteps([]);
+      setLastChange(null);
+      setFileId(data.file_id);
+      setUploadInsights(data.insights ?? null);
+      showFileInUrl(data.file_id);
+      rememberLastFile(data.file_id, displayName);
+      setFileName(displayName);
+      setSchema(data.schema);
+      setFileReady(true);
+      setShowUpload(false);
+      setShowTransform(true); // land in the grid, not an interstitial
+      markOnboardingStep("upload");
+      const nRows = data.preview.total_rows ?? data.preview.rows?.length ?? 0;
+      const nCols = data.preview.total_columns ?? data.preview.columns?.length ?? 0;
+      const pending = pendingRecipeRef.current;
+      pendingRecipeRef.current = null;
+      if (pending) {
+        prevGridRef.current = { columns: data.preview.columns, rowCount: nRows };
+        await runRecipe(pending, data.file_id);
+      } else {
+        toast.success(`Uploaded: ${nRows.toLocaleString()} rows × ${nCols.toLocaleString()} columns detected`);
+      }
+      return true;
+    }
+    return false;
+  };
+
+  // A file from a link, fetched by the server and ingested as an upload
+  const onUploadFromUrl = async (url: string) => {
+    setLoading(true);
+    setOpenSample(null);
+    setNextMonth(null);
+    setSampleSuggestions(null);
+    setUploadInsights(null);
+    setUploadError(null);
+    try {
+      const r = await fetchWithAuth("/api/upload/url", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        setUploadError(data.message || "Couldn't fetch that link. Check that it opens in a browser.");
+        return false;
+      }
+      if (data.requires_sheet_selection && data.sheets) {
+        setAvailableSheets(data.sheets);
+        setPendingFile(new File([], data.name || "workbook.xlsx"));
+        setPendingUploadId(data.file_id ?? null);
+        setShowSheetSelector(true);
+        return false;
+      }
+      return await adoptUpload(data, data.name || "linked file");
+    } catch {
+      setUploadError("Couldn't fetch that link. Check your connection and try again.");
+    } finally {
+      setLoading(false);
+    }
+    return false;
+  };
+
   const onUpload = async (file: File, sheetName?: string, suggestions?: string[], pendingId?: string | null) => {
     setLoading(true);
     setOpenSample(null);
@@ -415,35 +487,7 @@ function WorkspaceContent() {
         return false;
       }
 
-      if (data.preview && data.file_id) {
-        setColumns(data.preview.columns);
-        setRows(data.preview.rows);
-        setRowCount(data.preview.total_rows ?? data.preview.rows?.length ?? 0);
-        setColumnCount(data.preview.total_columns ?? data.preview.columns?.length ?? 0);
-        setSteps([]);
-        setLastChange(null);
-        setFileId(data.file_id);
-        setUploadInsights(data.insights ?? null);
-        showFileInUrl(data.file_id);
-        rememberLastFile(data.file_id, file.name);
-        setFileName(file.name);
-        setSchema(data.schema);
-        setFileReady(true);
-        setShowUpload(false);
-        setShowTransform(true); // land in the grid, not an interstitial
-        markOnboardingStep("upload");
-        const nRows = data.preview.total_rows ?? data.preview.rows?.length ?? 0;
-        const nCols = data.preview.total_columns ?? data.preview.columns?.length ?? 0;
-        const pending = pendingRecipeRef.current;
-        pendingRecipeRef.current = null;
-        if (pending) {
-          prevGridRef.current = { columns: data.preview.columns, rowCount: nRows };
-          await runRecipe(pending, data.file_id);
-        } else {
-          toast.success(`Uploaded: ${nRows.toLocaleString()} rows × ${nCols.toLocaleString()} columns detected`);
-        }
-        return true;
-      }
+      return await adoptUpload(data, file.name);
     } catch (error) {
       console.error("Upload error:", error);
       setUploadError("Upload failed. Check your connection and try again.");
@@ -592,6 +636,44 @@ function WorkspaceContent() {
     setExportStrip(null);
     showFileInUrl(undefined);
     announceOpenFile(null);
+  };
+
+  // Take one step out of the middle. The server plans the rest without it
+  // first, so a step a later one needs stays, with that step named.
+  const handleRemoveStep = async (stepNum: number) => {
+    if (!fileId) return;
+    setLoading(true);
+    try {
+      const res = await fetchWithAuth(`/api/files/${fileId}/steps/${stepNum}`, { method: "DELETE" });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.preview) {
+        setColumns(data.preview.columns);
+        setRows(data.preview.rows);
+        setRowCount(data.preview.total_rows);
+        setColumnCount(data.preview.total_columns);
+        await refreshSteps(fileId);
+        setLastChange({
+          kind: "back",
+          label: `Removed step ${stepNum}`,
+          rowsBefore: data.preview.total_rows,
+          rowsAfter: data.preview.total_rows,
+          addedCols: [],
+          removedCols: [],
+          note: `${data.preview.total_rows.toLocaleString()} rows × ${data.preview.total_columns.toLocaleString()} cols`,
+        });
+        setHealthNonce((n) => n + 1);
+        toast.success(`Removed step ${stepNum}. ${data.steps} step${data.steps === 1 ? "" : "s"} left.`);
+      } else if (data.code === "STEP_NEEDED") {
+        toast.error(data.message);
+      } else {
+        toast.error(explainError(data).text);
+      }
+      setHistoryOpen(false);
+    } catch {
+      toast.error("Couldn't remove that step. Check your connection and try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleRevert = async (stepNum: number) => {
@@ -1036,6 +1118,7 @@ function WorkspaceContent() {
                 <div className="rounded-xl border bg-card p-6 shadow-sm">
                   <h2 className="mb-4 text-lg font-semibold tracking-tight">Upload a spreadsheet</h2>
                   <DropZone disabled={loading} onDropFile={onUpload} />
+                  <UploadMore disabled={loading} onPaste={(f) => onUpload(f)} onLink={onUploadFromUrl} />
                   {uploadError && (
                     <div className="mt-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm text-destructive-text">
                       {uploadError}
@@ -1499,12 +1582,31 @@ function WorkspaceContent() {
           onClose={() => setSchemaOpen(false)}
           columns={schema?.columns ?? []}
           fileName={fileName}
+          fileId={fileId ?? undefined}
           onJumpToColumn={(name) => {
             setSchemaOpen(false);
             setGridJump({ name, nonce: Date.now() });
           }}
         />
-        <HistoryDrawer open={historyOpen} onClose={() => setHistoryOpen(false)} fileId={fileId} onRevert={(n) => { setHistoryOpen(false); setConfirmRevert(n); }} />
+        <HistoryDrawer
+          open={historyOpen}
+          onClose={() => setHistoryOpen(false)}
+          fileId={fileId}
+          onRevert={(n) => { setHistoryOpen(false); setConfirmRevert(n); }}
+          onRemove={(n) => { setHistoryOpen(false); setConfirmRemove(n); }}
+        />
+        <ConfirmDialog
+          isOpen={confirmRemove !== null}
+          onConfirm={() => {
+            const target = confirmRemove;
+            setConfirmRemove(null);
+            if (target !== null) handleRemoveStep(target);
+          }}
+          onCancel={() => setConfirmRemove(null)}
+          title={`Remove step ${confirmRemove ?? ""}?`}
+          message="The steps after it run again without it. If one of them needs what this step did, nothing changes and you are told which."
+          confirmText="Remove step"
+        />
         <RecipesDrawer
           open={recipesOpen}
           onClose={() => setRecipesOpen(false)}

@@ -1,7 +1,7 @@
 """Route-level tests through the real ASGI app (TestClient) with the db,
 storage, and LLM seams monkeypatched — covers the wiring the unit suites
 can't: middleware, request parsing, the transform sync/async split, chat
-branching, upload sheet-selection + pending redeem, and jobs polling.
+branching, and upload sheet-selection + pending redeem.
 
 The bare TestClient (no context manager) deliberately skips lifespan, so
 no startup sweep / eviction loop / Supabase calls happen here.
@@ -17,7 +17,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 import app.main as main_module
-from app import cache, db, jobs
+from app import cache, db
 from app.main import app
 from app.routes import chat as chat_module
 from app.routes import transform as transform_module
@@ -58,23 +58,6 @@ def _no_usage(monkeypatch):
     monkeypatch.setattr(usage, "enforce", lambda *a, **kw: None)
     monkeypatch.setattr(usage, "record", lambda *a, **kw: None)
     monkeypatch.setattr(events, "record", lambda *a, **kw: None)
-
-
-@pytest.fixture(autouse=True)
-def _clean_caches():
-    with jobs._lock:
-        jobs._jobs.clear()
-    yield
-    with jobs._lock:
-        jobs._jobs.clear()
-
-
-@pytest.fixture(autouse=True)
-def _jobs_no_db(monkeypatch):
-    """Job persistence fails open (no Supabase in tests)."""
-    def _boom():
-        raise RuntimeError("no supabase in tests")
-    monkeypatch.setattr(jobs, "_table", _boom)
 
 
 @pytest.fixture
@@ -284,21 +267,6 @@ class TestChat:
         assert resp.status_code == 404
 
 
-# ── /jobs ─────────────────────────────────────────────────────────────
-
-
-class TestJobs:
-    def test_unknown_job_404(self, client):
-        resp = client.get("/jobs/does-not-exist")
-        assert resp.status_code == 404
-        assert resp.json()["code"] == "JOB_NOT_FOUND"
-
-    def test_foreign_job_hidden(self, client):
-        job_id = jobs.create_job("someone-else", "transform")
-        resp = client.get(f"/jobs/{job_id}")
-        assert resp.status_code == 404
-
-
 # ── /download (wiring; format logic covered in test_download.py) ─────
 
 
@@ -395,6 +363,32 @@ class TestUpload:
         )
         assert resp.status_code == 410
         assert resp.json()["code"] == "PENDING_UPLOAD_EXPIRED"
+
+    def test_a_link_is_fetched_and_ingested_like_a_drop(self, client, upload_seams, monkeypatch):
+        seen = {}
+
+        def _fetch(url, **kw):
+            seen["url"] = url
+            return b"item,cost\nx,1\ny,2\n", "orders.csv"
+
+        monkeypatch.setattr(upload_module, "fetch_bytes", _fetch)
+        resp = client.post("/upload/url", json={"url": "docs.google.com/spreadsheets/d/1AbC/edit#gid=3"})
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert seen["url"] == "https://docs.google.com/spreadsheets/d/1AbC/export?format=csv&gid=3"
+        assert body["name"] == "orders.csv"
+        assert body["preview"]["columns"] == ["item", "cost"] and body["preview"]["total_rows"] == 2
+
+    def test_a_bad_link_answers_with_its_reason(self, client, upload_seams, monkeypatch):
+        from app.fetch_url import FetchError
+
+        def _fetch(url, **kw):
+            raise FetchError("PRIVATE_HOST", "That link points inside a private network.")
+
+        monkeypatch.setattr(upload_module, "fetch_bytes", _fetch)
+        resp = client.post("/upload/url", json={"url": "http://10.0.0.1/x.csv"})
+        assert resp.status_code == 400 and resp.json()["code"] == "PRIVATE_HOST"
+        assert client.post("/upload/url", json={"nope": 1}).status_code == 400
 
     def test_csv_upload_full_flow(self, client, upload_seams):
         resp = client.post(
