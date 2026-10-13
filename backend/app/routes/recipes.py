@@ -163,6 +163,15 @@ def list_recipes(request: Request):
     }
 
 
+@router.get("/recipes/due")
+def recipes_due(request: Request):
+    """The user's recipes with how long since each ran, due ones first."""
+    from app import reminders
+
+    user_id = getattr(request.state, "user_id", "anonymous")
+    return {"days": reminders.REMINDER_DAYS, "recipes": reminders.due_for_user(user_id)}
+
+
 @router.get("/recipes/{recipe_id}")
 def get_recipe(request: Request, recipe_id: str):
     user_id = getattr(request.state, "user_id", "anonymous")

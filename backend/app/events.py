@@ -52,6 +52,8 @@ EVENTS = frozenset({
     "step_removed",
     # a link that serves the cleaned file to anyone for a week
     "share_link_created",
+    # a recipe its owner was told is ready for this month's file
+    "reminder_sent",
     # a clean-numbers step that emptied cells it could not read
     "clean_number_lost",
     # account

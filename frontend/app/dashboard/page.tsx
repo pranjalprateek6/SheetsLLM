@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import AuthGuard from "@/components/AuthGuard";
+import DueRecipes from "@/components/DueRecipes";
 import EmptyState from "@/components/EmptyState";
 import UsageCard from "@/components/UsageCard";
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
@@ -319,6 +320,8 @@ export default function DashboardPage() {
             <UploadIcon ref={uploadIconRef} size={16} className="mr-2" /> Upload
           </Button>
         </div>
+
+        <DueRecipes className="mb-5" />
 
         <UsageCard />
 
