@@ -33,6 +33,25 @@ export async function addLookup(fileId: string, lookupFileId: string, alias?: st
   return d as Lookup;
 }
 
+/** Upload `file` as its own file, then link it to `fileId` under `alias`.
+ *  Used when a sample opens with its lookup beside it. The upload counts
+ *  as one of the month's uploads, like any file. */
+export async function uploadAndLink(fileId: string, file: File, alias: string): Promise<Lookup> {
+  const form = new FormData();
+  form.append("file", file);
+  const r = await fetchWithAuth("/api/upload?source=sample", { method: "POST", body: form });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok || !d.file_id) throw new LookupFailure(d.code ?? "UPLOAD_FAILED", d.message ?? `Couldn't upload ${file.name}.`);
+  try {
+    return await addLookup(fileId, d.file_id, alias);
+  } catch (e) {
+    // Not linked, so not wanted: a lookup that failed to link would otherwise
+    // sit in the file list as a stray upload.
+    await fetchWithAuth(`/api/files/${encodeURIComponent(d.file_id)}`, { method: "DELETE" }).catch(() => {});
+    throw e;
+  }
+}
+
 export async function removeLookup(fileId: string, alias: string): Promise<boolean> {
   const r = await fetchWithAuth(`/api/files/${encodeURIComponent(fileId)}/lookups/${encodeURIComponent(alias)}`, { method: "DELETE" });
   return r.ok;

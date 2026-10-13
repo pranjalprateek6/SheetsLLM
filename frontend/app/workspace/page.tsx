@@ -30,7 +30,7 @@ import { useOpenFileUrl } from "@/lib/use-open-file-url";
 import { announceOpenFile } from "@/lib/open-file";
 import { downloadExport, exportFileName, fileStem as stemOf } from "@/lib/export";
 import { type SchemaColumn } from "@/components/SchemaPanel";
-import { listLookups, type Lookup } from "@/lib/lookups";
+import { listLookups, uploadAndLink, type Lookup } from "@/lib/lookups";
 const LookupsPanel = dynamic(() => import("@/components/LookupsPanel"));
 const SchemaPanel = dynamic(() => import("@/components/SchemaPanel"));
 const ChartPanel = dynamic(() => import("@/components/ChartPanel"));
@@ -392,7 +392,7 @@ function WorkspaceContent() {
 
   // A finished upload, from a dropped file or a fetched link: the grid, the
   // URL, the recipe queued for it, and the welcome toast
-  const adoptUpload = async (data: any, displayName: string): Promise<boolean> => {
+  const adoptUpload = async (data: any, displayName: string): Promise<string | false> => {
     if (data.preview && data.file_id) {
       setColumns(data.preview.columns);
       setRows(data.preview.rows);
@@ -420,7 +420,7 @@ function WorkspaceContent() {
       } else {
         toast.success(`Uploaded: ${nRows.toLocaleString()} rows × ${nCols.toLocaleString()} columns detected`);
       }
-      return true;
+      return data.file_id as string;
     }
     return false;
   };
@@ -531,11 +531,31 @@ function WorkspaceContent() {
       if (!res.ok) return;
       const blob = await res.blob();
       const file = new File([blob], sample.uploadName, { type: "text/csv" });
-      if (await onUpload(file, undefined, sample.suggestions)) setOpenSample(sample);
+      const id = await onUpload(file, undefined, sample.suggestions);
+      if (id) {
+        setOpenSample(sample);
+        if (sample.lookup) void linkSampleLookup(id, sample.lookup);
+      }
     } catch (e) {
       console.error("Failed to load sample dataset:", e);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // The sample's second file, linked as a lookup once the first is open, so
+  // the join is one click away without reading help. Quiet on failure: the
+  // sample is still usable without it.
+  const linkSampleLookup = async (id: string, lookup: NonNullable<SampleDataset["lookup"]>) => {
+    try {
+      const res = await fetch(lookup.file);
+      if (!res.ok) return;
+      const file = new File([await res.blob()], lookup.uploadName, { type: "text/csv" });
+      const added = await uploadAndLink(id, file, lookup.alias);
+      setLookups((prev) => [...prev.filter((l) => l.alias !== added.alias), added]);
+      toast.success(`${added.alias} is linked as a lookup table. Try: ${lookup.suggestion}`, { duration: 8000 });
+    } catch (e) {
+      console.error("Failed to link the sample's lookup:", e);
     }
   };
 

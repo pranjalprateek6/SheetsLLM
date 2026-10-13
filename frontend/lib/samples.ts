@@ -12,6 +12,9 @@ export type SampleDataset = {
   suggestions: string[];
   /** Next month's file, offered once a recipe is saved from this one */
   next?: { file: string; uploadName: string; label: string };
+  /** A second file linked as a lookup table when this one opens, and the
+   *  one line that shows what a lookup is for */
+  lookup?: { file: string; uploadName: string; alias: string; suggestion: string };
 };
 
 export const SAMPLE_DATASETS: SampleDataset[] = [
@@ -23,9 +26,15 @@ export const SAMPLE_DATASETS: SampleDataset[] = [
     name: "Monthly orders",
     file: "/samples/orders_oct.csv",
     uploadName: "orders_oct.csv",
-    description: "October's export: duplicate orders, empty regions, two date formats. November's is ready for your recipe.",
+    description: "October's export: duplicate orders, empty regions, two date formats, and a managers list linked to join by region. November's is ready for your recipe.",
     suggestions: [],
     next: { file: "/samples/orders_nov.csv", uploadName: "orders_nov.csv", label: "November's orders" },
+    lookup: {
+      file: "/samples/regions.csv",
+      uploadName: "regions.csv",
+      alias: "managers",
+      suggestion: "Add Manager from managers, matched on Region",
+    },
   },
   {
     id: "sales",

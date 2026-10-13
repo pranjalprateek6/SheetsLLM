@@ -51,7 +51,7 @@ export const HELP_SECTIONS: HelpSection[] = [
       "A change: \"add a Margin column equal to MRP minus Landing Cost\", \"title-case the Region column\", \"keep rows where Status is paid\". The result is a step you can undo.",
       "A question: \"which region has the most orders?\", \"how many rows have no email?\", \"total MRP by month\". Chef runs a query on every row and shows the answer and the rows behind it. Nothing changes.",
       "A question about the file itself: \"what columns do I have?\", \"what could I clean here?\". Answered from the column names and types.",
-      "Another file of yours, linked from the Lookup tables button under a short name: \"add Manager from managers by Region\" brings its columns in on a key, keeping every row of this file. Chef sees its column names and types, nothing else.",
+      "Another file of yours, linked from the Lookup tables button under a short name: \"add Manager from managers by Region\" brings its columns in on a key, keeping every row of this file. Chef sees its column names and types, nothing else. The Monthly orders sample opens with a managers list already linked, to try it on.",
       "Strict privacy is on by default: Chef sees column names, types and counts, never a value. Turn it off on the account page to send a few sample rows for harder requests. Every AI step records what was sent.",
       "A request a one-click fix already covers (\"trim Email\", \"keep rows where Amount > 0\") shows an Apply without AI chip; use it and no AI request is spent.",
       "Esc stops Chef. A stopped request may still land as a step; the panel watches for it.",
