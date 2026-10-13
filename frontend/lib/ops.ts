@@ -12,7 +12,8 @@ export type OpName =
   | "standardise_date"
   | "sort"
   | "contains_any"
-  | "clean_number";
+  | "clean_number"
+  | "filter_rows";
 
 export type OpRequest = {
   op: OpName;
@@ -57,6 +58,22 @@ export const DATE_FORMATS: { value: string; example: string }[] = [
   { value: "%Y/%m/%d", example: "2026/10/31" },
   { value: "%d %b %Y", example: "31 Oct 2026" },
   { value: "%b %d, %Y", example: "Oct 31, 2026" },
+];
+
+/** How "Keep rows where…" compares (backend COMPARES), in the words the menu shows. */
+export const COMPARES: { value: string; label: string; needsValue: boolean }[] = [
+  { value: "eq", label: "is", needsValue: true },
+  { value: "ne", label: "is not", needsValue: true },
+  { value: "contains", label: "contains", needsValue: true },
+  { value: "not_contains", label: "doesn't contain", needsValue: true },
+  { value: "starts_with", label: "starts with", needsValue: true },
+  { value: "ends_with", label: "ends with", needsValue: true },
+  { value: "gt", label: "is more than", needsValue: true },
+  { value: "gte", label: "is at least", needsValue: true },
+  { value: "lt", label: "is less than", needsValue: true },
+  { value: "lte", label: "is at most", needsValue: true },
+  { value: "empty", label: "is empty", needsValue: false },
+  { value: "not_empty", label: "is not empty", needsValue: false },
 ];
 
 export const CAST_TYPES: { value: string; label: string }[] = [

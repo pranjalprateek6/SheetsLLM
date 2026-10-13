@@ -244,6 +244,97 @@ def _sort(cols, column, args):
     )
 
 
+# How a filter compares, and the words the step is saved under
+COMPARES = {
+    "eq": "is", "ne": "is not",
+    "gt": ">", "gte": ">=", "lt": "<", "lte": "<=",
+    "contains": "contains", "not_contains": "doesn't contain",
+    "starts_with": "starts with", "ends_with": "ends with",
+    "empty": "is empty", "not_empty": "is not empty",
+}
+_NO_VALUE = ("empty", "not_empty")
+_ORDERED = {"gt": ">", "gte": ">=", "lt": "<", "lte": "<="}
+
+
+def _is_date(dtype: str) -> bool:
+    return _base(dtype) in ("DATE", "TIMESTAMP", "TIMESTAMP_NS", "TIMESTAMP_MS", "TIMESTAMP_S", "DATETIME")
+
+
+def _filter_rows(cols, column, args):
+    """Keep (or remove) the rows where one column meets a plain condition.
+
+    Text compares ignore case and surrounding spaces. Numbers and dates
+    compare as what they are, so the value must read as one. A row whose
+    cell is empty never meets a condition, so "is not" and "doesn't contain"
+    keep it, and "Remove rows where" leaves it alone.
+    """
+    c = _column(cols, column)
+    compare = str(args.get("compare") or "")
+    if compare not in COMPARES:
+        raise OpError("INVALID_ARGS", f"compare must be one of: {', '.join(COMPARES)}.")
+    keep = args.get("keep", True)
+    if not isinstance(keep, bool):
+        raise OpError("INVALID_ARGS", "keep must be true or false.")
+    q = quote_ident(c)
+    dtype = cols[c]
+    as_text = f"TRIM(CAST({q} AS VARCHAR))"
+
+    if compare in _NO_VALUE:
+        cond = f"{q} IS NULL" + (f" OR {as_text} = ''" if is_string(dtype) else "")
+        cond = f"({cond})"
+        if compare == "not_empty":
+            cond = f"NOT {cond}"
+        phrase = COMPARES[compare]
+    else:
+        value = _text(args.get("value"), "A value to compare with", MAX_VALUE)
+        phrase = f"{COMPARES[compare]} {value}"
+        lit = quote_literal(value)
+        if compare in _ORDERED or (compare in ("eq", "ne") and not is_string(dtype)):
+            if is_numeric(dtype):
+                try:
+                    number = float(value)
+                except ValueError:
+                    number = math.nan
+                if not math.isfinite(number):
+                    raise OpError("WRONG_TYPE", f"{c} holds numbers, so compare it with a number.")
+                rhs = f"CAST({quote_literal(value.strip())} AS DOUBLE)"
+                lhs = f"CAST({q} AS DOUBLE)"
+            elif _is_date(dtype):
+                import datetime as _dt
+
+                try:
+                    _dt.date.fromisoformat(value.strip()[:10])
+                except ValueError:
+                    raise OpError("WRONG_TYPE", f"{c} holds dates, so compare it with a date like 2026-10-31.")
+                rhs = f"CAST({quote_literal(value.strip()[:10])} AS DATE)"
+                lhs = f"CAST({q} AS DATE)"
+            else:
+                rhs, lhs = f"lower({lit})", f"lower({as_text})"
+            op = _ORDERED.get(compare, "=")
+            cond = f"({lhs} {op} {rhs})"
+            if compare == "ne":
+                cond = f"NOT COALESCE({cond}, FALSE)"
+        else:
+            low = f"lower({as_text})"
+            needle = f"lower({lit})"
+            if compare in ("eq", "ne"):
+                cond = f"({low} = {needle})"
+            elif compare in ("contains", "not_contains"):
+                cond = f"contains({low}, {needle})"
+            elif compare == "starts_with":
+                cond = f"starts_with({low}, {needle})"
+            else:
+                cond = f"ends_with({low}, {needle})"
+            if compare in ("ne", "not_contains"):
+                cond = f"NOT COALESCE({cond}, FALSE)"
+
+    where = f"COALESCE({cond}, FALSE)"
+    if not keep:
+        where = f"NOT {where}"
+    verb = "Keep" if keep else "Remove"
+    return f"SELECT * FROM data WHERE {where}", f"{verb} rows where {c} {phrase}"
+
+
 def _contains_any(cols, column, args):
     needle = _text(args.get("needle"), "Text to look for", MAX_VALUE)
     targets = _columns(cols, args.get("columns")) or [n for n, t in cols.items() if is_string(t)]
@@ -269,6 +360,7 @@ OPS: dict[str, Callable[[dict[str, str], Any, dict], tuple[str, str]]] = {
     "clean_number": _clean_number,
     "sort": _sort,
     "contains_any": _contains_any,
+    "filter_rows": _filter_rows,
 }
 
 

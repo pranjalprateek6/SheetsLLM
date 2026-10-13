@@ -12,6 +12,17 @@ const COLS = [
   { name: "Amount", dtype: "BIGINT" },
 ];
 
+describe("matchVerb filters", () => {
+  it("leaves a filter it cannot read to Chef", () => {
+    expect(matchVerb("keep rows where the total is high", COLS)).toBeNull();
+    expect(matchVerb("keep rows where Amount is between 1 and 5", COLS)).toBeNull();
+    expect(matchVerb("remove rows where Amount", COLS)).toBeNull();
+  });
+  it("still prefers the empty-rows fix for a plain empty-rows phrase", () => {
+    expect(matchVerb("drop rows where Region is empty", COLS)?.op).toBe("drop_empty_rows");
+  });
+});
+
 describe("matchVerb", () => {
   it.each([
     // [phrase, op, column, args]
@@ -23,6 +34,15 @@ describe("matchVerb", () => {
     ["clean numbers in Amount", "clean_number", "Amount", undefined],
     ["Fix the amounts in Amount", "clean_number", "Amount", undefined],
     ["read Amount as numbers", "clean_number", "Amount", undefined],
+    ["keep rows where Amount > 0", "filter_rows", "Amount", { compare: "gt", value: "0", keep: true }],
+    ["Keep rows where Region is North", "filter_rows", "Region", { compare: "eq", value: "North", keep: true }],
+    ["remove rows where Region is not North", "filter_rows", "Region", { compare: "ne", value: "North", keep: false }],
+    ["filter Email contains @acme.com", "filter_rows", "Email", { compare: "contains", value: "@acme.com", keep: true }],
+    ["drop rows where Email doesn't contain acme", "filter_rows", "Email", { compare: "not_contains", value: "acme", keep: false }],
+    ["only rows where Amount is at least 100", "filter_rows", "Amount", { compare: "gte", value: "100", keep: true }],
+    ["keep rows where Order Date is after 2026-10-01", "filter_rows", "Order Date", { compare: "gt", value: "2026-10-01", keep: true }],
+    ["keep rows where Email is not empty", "filter_rows", "Email", { compare: "not_empty", keep: true }],
+    ["show rows with Order ID starting with ORD", "filter_rows", "Order ID", { compare: "starts_with", value: "ORD", keep: true }],
     ["Trim whitespace in Customer Email", "trim", "Customer Email", undefined],
     ["strip spaces from Region", "trim", "Region", undefined],
     ["remove whitespace in \"Region\"", "trim", "Region", undefined],

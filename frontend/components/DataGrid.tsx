@@ -11,18 +11,19 @@ import {
   DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  CAST_TYPES, DATE_FORMATS, isTextType, looksLikeDates, type OpRequest,
+  CAST_TYPES, COMPARES, DATE_FORMATS, isTextType, looksLikeDates, type OpRequest,
 } from "@/lib/ops";
 
 type SortDir = "asc" | "desc" | null;
 type Density = "compact" | "comfortable";
 /** A column fix that needs one value before it runs. */
-type FieldKind = "rename" | "fill" | "date";
+type FieldKind = "rename" | "fill" | "date" | "filter";
 
 const FIELD_LABEL: Record<FieldKind, string> = {
   rename: "New name",
   fill: "Fill empty cells with",
   date: "The dates look like",
+  filter: "Keep rows where this column",
 };
 
 export type ColumnMeta = {
@@ -135,20 +136,24 @@ export default function DataGrid({
 
   const [filterQ, setFilterQ] = useState("");
   // The value a column fix is waiting for, shown under that column's header
-  const [field, setField] = useState<{ kind: FieldKind; column: string; value: string } | null>(null);
+  const [field, setField] = useState<{ kind: FieldKind; column: string; value: string; compare?: string } | null>(null);
 
   const openField = useCallback((kind: FieldKind, column: string) => {
-    setField({ kind, column, value: kind === "rename" ? column : kind === "date" ? "auto" : "" });
+    setField({ kind, column, value: kind === "rename" ? column : kind === "date" ? "auto" : "", ...(kind === "filter" ? { compare: "eq" } : {}) });
   }, []);
 
   const submitField = useCallback(() => {
     if (!field || !onOp) return;
     const value = field.value.trim();
-    if (field.kind !== "date" && !value) return;
+    const compare = COMPARES.find((c) => c.value === field.compare) ?? COMPARES[0];
+    const needsValue = field.kind !== "date" && !(field.kind === "filter" && !compare.needsValue);
+    if (needsValue && !value) return;
     if (field.kind === "rename") {
       if (value !== field.column) onOp({ op: "rename", column: field.column, args: { new_name: value } });
     } else if (field.kind === "fill") {
       onOp({ op: "fill_nulls", column: field.column, args: { value: field.value } });
+    } else if (field.kind === "filter") {
+      onOp({ op: "filter_rows", column: field.column, args: { compare: compare.value, ...(compare.needsValue ? { value } : {}), keep: true } });
     } else {
       onOp({ op: "standardise_date", column: field.column, args: { format: field.value } });
     }
@@ -436,6 +441,9 @@ export default function DataGrid({
                               <DropdownMenuItem onClick={() => onOp({ op: "drop_empty_rows", column: h })}>
                                 <Filter className="mr-2 h-3.5 w-3.5" /> Drop rows where empty
                               </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => openField("filter", h)}>
+                                <Filter className="mr-2 h-3.5 w-3.5" /> Keep rows where…
+                              </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => onOp({ op: "dedupe", column: h })}>
                                 <Copy className="mr-2 h-3.5 w-3.5" /> Remove duplicate rows (this column)
                               </DropdownMenuItem>
@@ -507,6 +515,31 @@ export default function DataGrid({
                               <option key={f.value} value={f.value}>{f.example}</option>
                             ))}
                           </select>
+                        ) : field.kind === "filter" ? (
+                          <div className="flex gap-1.5">
+                            <select
+                              id={`field-${h}`}
+                              autoFocus
+                              aria-label="How to compare"
+                              value={field.compare ?? "eq"}
+                              onChange={(e) => setField({ ...field, compare: e.target.value })}
+                              className="h-8 w-[112px] flex-shrink-0 rounded border bg-background px-1 text-xs"
+                            >
+                              {COMPARES.map((c) => (
+                                <option key={c.value} value={c.value}>{c.label}</option>
+                              ))}
+                            </select>
+                            {COMPARES.find((c) => c.value === (field.compare ?? "eq"))?.needsValue !== false && (
+                              <input
+                                aria-label="Value"
+                                value={field.value}
+                                onChange={(e) => setField({ ...field, value: e.target.value })}
+                                maxLength={500}
+                                placeholder="value"
+                                className="h-8 min-w-0 flex-1 rounded border bg-background px-1.5 text-xs outline-none focus:ring-1 focus:ring-ring/40"
+                              />
+                            )}
+                          </div>
                         ) : (
                           <input
                             id={`field-${h}`}
