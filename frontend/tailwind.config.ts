@@ -1,5 +1,6 @@
 import type { Config } from "tailwindcss";
 import animate from "tailwindcss-animate";
+import plugin from "tailwindcss/plugin";
 
 const config: Config = {
   darkMode: ["class"],
@@ -99,15 +100,30 @@ const config: Config = {
           from: { opacity: "1", transform: "scale(0.4)" },
           to: { opacity: "0", transform: "scale(1.6)" },
         },
+        "fade-in": {
+          from: { opacity: "0" },
+          to: { opacity: "1" },
+        },
+        "slide-up": {
+          from: { transform: "translateY(100%)" },
+          to: { transform: "translateY(0)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         "fade-in-up": "fade-in-up 0.4s cubic-bezier(0.22, 1, 0.36, 1) both",
         "ghost-press": "ghost-press 0.5s cubic-bezier(0.22, 1, 0.36, 1) both",
+        "fade-in": "fade-in 0.2s ease-out both",
+        "slide-up": "slide-up 0.3s cubic-bezier(0.22, 1, 0.36, 1) both",
       },
     },
   },
-  plugins: [animate],
+  plugins: [
+    animate,
+    // A finger, not a cursor: nothing is revealed on hover, and a target
+    // needs the room a fingertip takes.
+    plugin(({ addVariant }) => addVariant("coarse", "@media (pointer: coarse)")),
+  ],
 };
 export default config;
