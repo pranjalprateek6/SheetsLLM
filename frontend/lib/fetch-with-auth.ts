@@ -1,4 +1,29 @@
+import { toast } from "sonner";
+
 import { supabase } from "./supabase";
+
+/** How long a request may take before the app says the server is waking. */
+export const WAKING_AFTER_MS = 5000;
+const WAKING_TOAST_ID = "waking";
+const WAKING_TEXT = "Starting the server. The first request after a quiet spell can take up to a minute.";
+
+// Requests past the threshold right now; the notice shows while any are
+let slowInFlight = 0;
+
+function slowStarted() {
+  slowInFlight += 1;
+  if (slowInFlight === 1) {
+    toast.loading(WAKING_TEXT, { id: WAKING_TOAST_ID, duration: Infinity });
+  }
+}
+
+function slowEnded() {
+  slowInFlight -= 1;
+  if (slowInFlight <= 0) {
+    slowInFlight = 0;
+    toast.dismiss(WAKING_TOAST_ID);
+  }
+}
 
 /**
  * Wrapper around fetch that automatically adds the Supabase auth token.
@@ -7,6 +32,10 @@ import { supabase } from "./supabase";
  * On a 401 the session is treated as dead: the user is signed out locally
  * and sent to /auth with an "expired" notice, instead of every surface
  * failing silently with generic errors.
+ *
+ * A request still waiting after WAKING_AFTER_MS shows one notice that the
+ * server is starting (the free instance sleeps when idle), and takes it
+ * away when the request answers.
  */
 export async function fetchWithAuth(
   url: string,
@@ -20,7 +49,19 @@ export async function fetchWithAuth(
     headers.set("Authorization", `Bearer ${token}`);
   }
 
-  const response = await fetch(url, { ...options, headers });
+  let slow = false;
+  const timer = setTimeout(() => {
+    slow = true;
+    slowStarted();
+  }, WAKING_AFTER_MS);
+
+  let response: Response;
+  try {
+    response = await fetch(url, { ...options, headers });
+  } finally {
+    clearTimeout(timer);
+    if (slow) slowEnded();
+  }
 
   if (response.status === 401 && typeof window !== "undefined") {
     // Only redirect if we THOUGHT we were signed in — anonymous 401s on
