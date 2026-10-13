@@ -111,9 +111,9 @@ export function FeaturesRow({ items }: { items: { name: string; detail: string }
         ))}
       </div>
       <Dialog open={open !== null} onOpenChange={(o) => !o && setOpen(null)}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md" onOpenAutoFocus={(e) => e.preventDefault()}>
           {open !== null && (
-            <DialogHeader>
+            <DialogHeader className="pr-8">
               <DialogTitle>{items[open].name}</DialogTitle>
               <DialogDescription className="text-[15px] leading-relaxed">{items[open].detail}</DialogDescription>
             </DialogHeader>

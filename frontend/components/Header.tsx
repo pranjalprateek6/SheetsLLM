@@ -44,13 +44,13 @@ function ThemeToggle() {
   const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
-  if (!mounted) return <span className="h-8 w-8" aria-hidden />; // avoid hydration mismatch
+  if (!mounted) return <span className="h-9 w-9" aria-hidden />; // avoid hydration mismatch
   const dark = resolvedTheme === "dark";
   return (
     <Button
       variant="ghost"
       size="icon"
-      className="h-8 w-8 rounded-full text-muted-foreground"
+      className="h-9 w-9 rounded-full text-muted-foreground"
       onClick={() => setTheme(dark ? "light" : "dark")}
       aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
     >
@@ -383,7 +383,7 @@ export default function Header() {
           {!marketing && <ThemeToggle />}
           <button
             onClick={() => setMobileOpen(!mobileOpen)}
-            className="rounded-full p-2 text-muted-foreground hover:bg-accent"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground hover:bg-accent"
             aria-label="Toggle menu"
             aria-expanded={mobileOpen}
             aria-controls="mobile-nav"
