@@ -66,6 +66,12 @@ export function explainError(payload: ErrorPayload | null | undefined): Explaine
         text: "Chef is out of AI capacity for today. Your recipes and one-click fixes still work.",
         actions: ["open_recipes"],
       };
+    case "LLM_UNAVAILABLE":
+      return {
+        code,
+        text: "Google's model is overloaded right now. Not anything you did; try again in a minute. Your recipes and one-click fixes still work.",
+        actions: ["retry", "open_recipes"],
+      };
     case "RATE_LIMITED": {
       const secs = Math.max(1, Math.round(p.retry_after ?? 20));
       return { code, text: `Too many requests. Try again in ${secs} seconds.`, actions: ["wait"], retryAfter: secs };

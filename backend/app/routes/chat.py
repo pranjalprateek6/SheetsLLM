@@ -21,7 +21,8 @@ from app.engine import (
     get_schema_after_steps,
     replay_transformations_local,
 )
-from app.llm.errors import is_quota_error
+from app.llm import health as llm_health
+from app.llm.errors import is_quota_error, is_unavailable_error
 from app.llm.factory import get_llm
 from app.llm.prompts import (
     CHAT_SYSTEM_PROMPT,
@@ -184,15 +185,26 @@ async def chat(request: Request):
         logger.error("LLM generation failed: %s", exc)
         events.record(user_id, "chat_sent", kind="error")
         if is_quota_error(exc):
+            llm_health.note_failure("quota")
             events.record(user_id, "llm_quota_hit")
             text = "Chef is out of AI capacity for today. Your recipes and one-click fixes still work."
             _save_error(file_id, text, "LLM_QUOTA")
             return _json_response(503, "LLM_QUOTA", text)
+        if is_unavailable_error(exc):
+            # Their side: the model is overloaded. Say so, so nobody retypes
+            llm_health.note_failure("unavailable")
+            events.record(user_id, "llm_unavailable")
+            text = ("Google's model is overloaded right now. Not anything you did; try again in a minute. "
+                    "Your recipes and one-click fixes still work.")
+            _save_error(file_id, text, "LLM_UNAVAILABLE")
+            return _json_response(503, "LLM_UNAVAILABLE", text)
+        llm_health.note_failure("other")
         # The provider's error text (URLs, quota details) is logged above,
         # never sent to the browser
         _save_error(file_id, "Chef didn't answer. Try again in a moment.", "LLM_FAILED")
         return _json_response(502, "LLM_FAILED", "Chef didn't answer. Try again in a moment.")
 
+    llm_health.note_success()
     # The LLM call is the metered cost, regardless of response type
     usage.record(user_id, chat_requests=1)
 
