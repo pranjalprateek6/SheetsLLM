@@ -1499,6 +1499,7 @@ function WorkspaceContent() {
           onClose={() => setSchemaOpen(false)}
           columns={schema?.columns ?? []}
           fileName={fileName}
+          fileId={fileId ?? undefined}
           onJumpToColumn={(name) => {
             setSchemaOpen(false);
             setGridJump({ name, nonce: Date.now() });
