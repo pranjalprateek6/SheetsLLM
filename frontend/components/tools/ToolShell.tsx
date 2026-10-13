@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, Lock } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import { Container, Prefooter, SiteFooter } from "@/components/marketing/blocks";
 import { relatedTools, TOOLS, type Tool } from "@/components/tools/catalog";
 
@@ -47,6 +48,36 @@ export function ToolRow({ current, tools: given }: { current?: string; tools?: T
   );
 }
 
+/** Under the tool, where the download just happened: the same job as a
+ *  saved step in the app, so next month is one click instead of a visit. */
+export function RecipeHook({ href }: { href?: string }) {
+  const tool = TOOLS.find((t) => t.href === href);
+  const slug = href?.split("/").pop() ?? "tools";
+  return (
+    <section>
+      <Container className="pt-8 sm:pt-10">
+        <div className="flex flex-col gap-5 rounded-xl border border-primary/25 bg-primary/[0.06] px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-7">
+          <div className="max-w-[640px]">
+            <p className="text-[17px] font-medium tracking-[-0.01em]">Doing this every month?</p>
+            <p className="mt-1.5 text-[14px] leading-relaxed text-soft">
+              In the SheetsLLM app {tool?.recipe ?? "this is a step you save once"}. Save the steps as a recipe and
+              next month&apos;s file runs them in one click, with no AI call.
+            </p>
+          </div>
+          <div className="flex flex-shrink-0 items-center gap-3">
+            <Button variant="inverse" className="h-9 px-4" asChild>
+              <Link href={`/auth?mode=signup&from=tool-${slug}`}>Start free</Link>
+            </Button>
+            <Link href="/product/recipes" className="group inline-flex items-center gap-1 text-[13px] font-medium text-foreground/90 transition-colors hover:text-foreground">
+              How recipes work <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+            </Link>
+          </div>
+        </div>
+      </Container>
+    </section>
+  );
+}
+
 export default function ToolShell({
   title,
   intro,
@@ -90,6 +121,8 @@ export default function ToolShell({
           <div className="rounded-xl border bg-card p-5 shadow-[0_16px_40px_-20px_rgb(0_0_0/0.6)] sm:p-8">{children}</div>
         </Container>
       </section>
+
+      <RecipeHook href={href} />
 
       {/* How it works */}
       <section>
