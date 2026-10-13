@@ -8,6 +8,7 @@ import logging
 
 from fastapi import APIRouter, Request, Response
 
+from app import lookups
 from app import db
 from app.cache import get_local_parquet
 from app.engine import execute_sql_from_local, replay_transformations_local
@@ -43,6 +44,7 @@ async def undo(request: Request):
         return _json_response(404, "FILE_NOT_FOUND", "File not found")
 
     r2_key = file_rec["r2_key"]
+    lookups_now = lookups.use(file_id, user_id)
 
     # ── Get transformation steps ───────────────────────────────────────
     steps = db.get_transformations(file_id)

@@ -54,7 +54,7 @@ export type LateStep = {
 export const LATE_STEP_CHECKS_MS = [1500, 5000, 15000, 30000];
 
 export default function ChatPanel({
-  fileId, onPreview, open, fileName, onUndo, onReset, starterSuggestions, initialInsights, onClose,
+  fileId, onPreview, open, fileName, onUndo, onReset, starterSuggestions, initialInsights, lookups = [], onClose,
   latestStep, onLateStep, prefill, columns, onOp, onOpenRecipes,
 }: {
   fileId?: string;
@@ -81,6 +81,8 @@ export default function ChatPanel({
   onOp?: (req: OpRequest, source: "insight" | "intercept") => Promise<boolean>;
   /** "Open recipes" from an error that says the AI is out for today. */
   onOpenRecipes?: () => void;
+  /** The file's lookup tables, named in the welcome and usable in typed joins */
+  lookups?: { alias: string; columns: { name: string }[] }[];
   /** Below the desktop breakpoint the panel is a sheet; this closes it. */
   onClose?: () => void;
 }) {
@@ -109,7 +111,7 @@ export default function ChatPanel({
   });
   const coolingDown = cooldownUntil > Date.now();
   // A typed request a one-click fix already covers
-  const intercept = columns && onOp ? matchVerb(input, columns) : null;
+  const intercept = columns && onOp ? matchVerb(input, columns, lookups) : null;
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -428,6 +430,7 @@ export default function ChatPanel({
               {strict
                 ? "Chef sees column names and types, never your values."
                 : "Chef sees column names, types and a few sample rows."}
+              {lookups.length > 0 && ` It can also join ${lookups.map((l) => l.alias).join(", ")}.`}
             </p>
           )}
 

@@ -1,6 +1,7 @@
 import type { OpRequest } from "@/lib/ops";
 
 export type ColumnInfo = { name: string; dtype?: string };
+export type LookupInfo = { alias: string; columns: { name: string }[] };
 
 export type VerbMatch = OpRequest & {
   /** What the chip says: "Trim Email", "Remove duplicate rows". */
@@ -74,10 +75,30 @@ function parseCondition(rest: string, columns: ColumnInfo[]): { column: string; 
   return null;
 }
 
-export function matchVerb(raw: string, columns: ColumnInfo[]): VerbMatch | null {
+export function matchVerb(raw: string, columns: ColumnInfo[], lookups: LookupInfo[] = []): VerbMatch | null {
   const text = raw.trim();
   if (!text || text.length > 120) return null;
   const t = text.toLowerCase();
+
+  // Columns from a lookup: "add Manager from managers by Region",
+  // "bring in Manager and Code from managers matched on Region"
+  const join = text.match(/^(?:please\s+)?(?:add|bring\s+in|pull\s+in|join|look\s*up)\s+(.+?)\s+from\s+([a-z][a-z0-9_]*)\s+(?:by|on|matched\s+on|using|via)\s+(.+)$/i);
+  if (join) {
+    const lookup = lookups.find((l) => l.alias === join[2].toLowerCase());
+    const col = findColumn(join[3], columns);
+    if (lookup && col) {
+      const names = lookup.columns.map((c) => c.name);
+      const take = join[1].split(/\s*(?:,|\band\b)\s*/).map((s) => s.trim().replace(/^["'`](.*)["'`]$/, "$1")).filter(Boolean);
+      const found = take.map((w) => names.find((n) => n.toLowerCase() === w.toLowerCase())).filter((n): n is string => !!n);
+      if (found.length === take.length) {
+        const lookupOn = names.find((n) => n.toLowerCase() === col.toLowerCase()) ?? names.find((n) => /^(id|key|code)$/i.test(n)) ?? col;
+        return {
+          op: "join_lookup", column: col, args: { alias: lookup.alias, lookup_on: lookupOn, take: found },
+          label: `Add ${found.join(", ")} from ${lookup.alias}, matched on ${col}`,
+        };
+      }
+    }
+  }
 
   // Remove duplicates: the whole row, or one column
   if (/^(please\s+)?(remove|drop|delete|dedupe|de-duplicate|deduplicate)\b.*\bduplicates?\b|^dedupe\b|^deduplicate\b/.test(t)) {

@@ -131,4 +131,21 @@ describe("DataGrid preview sort", () => {
     await userEvent.click(screen.getByRole("button", { name: "Sort preview by Amount" }));
     expect(screen.getByText("Preview sorted by Amount ↑")).toBeInTheDocument();
   });
+
+  it("Add columns from a lookup… is not offered without a lookup", async () => {
+    grid();
+    const menu = await openMenu("Email");
+    expect(within(menu).queryByRole("menuitem", { name: "Add columns from a lookup…" })).not.toBeInTheDocument();
+  });
+
+  it("Add columns from a lookup… picks the key and the columns, and posts the join", async () => {
+    const onOp = grid({ lookups: [{ alias: "people", columns: [{ name: "Email" }, { name: "Team" }, { name: "Manager" }] }] });
+    const menu = await openMenu("Email");
+    await userEvent.click(within(menu).getByRole("menuitem", { name: "Add columns from a lookup…" }));
+    expect(await screen.findByLabelText("Lookup table")).toHaveValue("people");
+    expect(screen.getByLabelText("Lookup key column")).toHaveValue("Email");
+    await userEvent.click(screen.getByLabelText("Team"));
+    await userEvent.keyboard("{Enter}");
+    expect(onOp).toHaveBeenCalledWith({ op: "join_lookup", column: "Email", args: { alias: "people", lookup_on: "Email", take: ["Team"] } });
+  });
 });

@@ -3,7 +3,7 @@ import dynamic from "next/dynamic";
 import { Suspense, useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import {
-  AlertTriangle, ArrowRight, BarChart3, BookMarked, CalendarClock, Check, ChefHat, ChevronDown, ChevronRight, Columns3, FileSpreadsheet, History, Lightbulb, MessageSquare, Pencil, Redo2, Undo2, Upload,
+  AlertTriangle, ArrowRight, BarChart3, BookMarked, CalendarClock, Check, ChefHat, ChevronDown, ChevronRight, Columns3, FileSpreadsheet, History, Lightbulb, Link2, MessageSquare, Pencil, Redo2, Undo2, Upload,
 } from "lucide-react";
 import ColumnHealth, { type HealthColumn } from "@/components/ColumnHealth";
 import PipelineSpine from "@/components/PipelineSpine";
@@ -30,10 +30,12 @@ import { useOpenFileUrl } from "@/lib/use-open-file-url";
 import { announceOpenFile } from "@/lib/open-file";
 import { downloadExport, exportFileName, fileStem as stemOf } from "@/lib/export";
 import { type SchemaColumn } from "@/components/SchemaPanel";
+import { listLookups, type Lookup } from "@/lib/lookups";
+const LookupsPanel = dynamic(() => import("@/components/LookupsPanel"));
 const SchemaPanel = dynamic(() => import("@/components/SchemaPanel"));
 const ChartPanel = dynamic(() => import("@/components/ChartPanel"));
 const CommandPalette = dynamic(() => import("@/components/CommandPalette"));
-import GettingStarted, { markOnboardingStep, ONBOARDING_FLAGS } from "@/components/GettingStarted";
+import GettingStarted, { markOnboardingStep, ONBOARDING_FLAGS, type OnboardingStep } from "@/components/GettingStarted";
 import OnboardingIntent, { INTENT_LABELS, loadIntents, type Intent } from "@/components/OnboardingIntent";
 const KeyboardShortcuts = dynamic(() => import("@/components/KeyboardShortcuts"));
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -125,6 +127,18 @@ function WorkspaceContent() {
   );
   const [chartOpen, setChartOpen] = useState(false);
   const [schemaOpen, setSchemaOpen] = useState(false);
+  // The file's lookup tables: other files joined by a short name
+  const [lookups, setLookups] = useState<Lookup[]>([]);
+  const [lookupsOpen, setLookupsOpen] = useState(false);
+  useEffect(() => {
+    if (!fileId) {
+      setLookups([]);
+      return;
+    }
+    let alive = true;
+    listLookups(fileId).then((l) => alive && setLookups(l)).catch(() => {});
+    return () => { alive = false; };
+  }, [fileId]);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [sampleSuggestions, setSampleSuggestions] = useState<string[] | null>(null);
   // The sample the open file came from, and, once a recipe is saved from it,
@@ -800,6 +814,7 @@ function WorkspaceContent() {
   // A recipe apply is a transform too: same change-bar treatment, wherever
   // it was applied from (the drawer, or the hint over the grid).
   const handleRecipeApplied = useCallback((result: RecipeApplyResult, appliedTo?: string) => {
+    markOnboardingStep("rerun");
     const prev = prevGridRef.current;
     setLastChange({
       label: `Recipe applied: ${result.steps_added} step${result.steps_added === 1 ? "" : "s"}`,
@@ -988,7 +1003,34 @@ function WorkspaceContent() {
     }
   };
 
-  // Recipes for the upload screen's re-run card
+  // The checklist's last step, as one click: November's orders through the
+  // recipe saved from October's, or the first recipe there is
+  const runMonthTwo = async () => {
+    const sample = SAMPLE_DATASETS.find((s) => s.id === "orders");
+    if (!sample?.next || loading) return;
+    const recipe = recipes.find((r) => r.source_file_name === sample.uploadName) ?? recipes[0];
+    if (!recipe) {
+      toast("Save a recipe first. Open Monthly orders, fix it, and save the steps.");
+      await loadSample("orders");
+      return;
+    }
+    setArmedId(recipe.id);
+    try {
+      const res = await fetch(sample.next.file);
+      if (!res.ok) throw new Error(String(res.status));
+      const file = new File([await res.blob()], sample.next.uploadName, { type: "text/csv" });
+      handleRerun(file, recipe);
+    } catch {
+      toast.error(`Couldn't load ${sample.next.label}. Try again.`);
+    }
+  };
+
+  const actOnChecklist = (step: OnboardingStep) => {
+    if (step === "upload") void loadSample("orders");
+    else if (step === "rerun") void runMonthTwo();
+  };
+
+  // Recipes for the start screen's rail
   useEffect(() => {
     if (fileReady) return;
     let alive = true;
@@ -1223,7 +1265,7 @@ function WorkspaceContent() {
                       </ul>
                     </section>
                   )}
-                  <GettingStarted />
+                  <GettingStarted onAct={actOnChecklist} />
                   <section>
                     <h2 className="flex items-center gap-2 text-[13px] font-medium">
                       <Lightbulb className="h-4 w-4 text-primary-accent" aria-hidden /> Things you can say
@@ -1299,6 +1341,9 @@ function WorkspaceContent() {
                       <DropdownMenuItem className="sm:hidden" onClick={() => setChartOpen(true)}>
                         <BarChart3 className="mr-2 h-4 w-4" /> Quick chart
                       </DropdownMenuItem>
+                      <DropdownMenuItem className="sm:hidden" onClick={() => setLookupsOpen(true)}>
+                        <Link2 className="mr-2 h-4 w-4" /> Lookup tables
+                      </DropdownMenuItem>
                       <DropdownMenuItem className="sm:hidden" onClick={() => setSchemaOpen(true)}>
                         <Columns3 className="mr-2 h-4 w-4" /> Schema
                       </DropdownMenuItem>
@@ -1332,6 +1377,19 @@ function WorkspaceContent() {
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent>Quick chart</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="ghost" size="icon" className="relative hidden h-8 w-8 text-muted-foreground sm:inline-flex coarse:h-9 coarse:w-9" onClick={() => setLookupsOpen(true)} aria-label={lookups.length ? `Lookup tables (${lookups.length} linked)` : "Lookup tables"}>
+                          <Link2 className="h-4 w-4" />
+                          {lookups.length > 0 && (
+                            <span aria-hidden className="absolute -right-0.5 -top-0.5 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-primary px-1 text-[9px] font-semibold leading-none text-primary-foreground">
+                              {lookups.length}
+                            </span>
+                          )}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>{lookups.length ? `Lookup tables: ${lookups.map((l) => l.alias).join(", ")}` : "Lookup tables"}</TooltipContent>
                     </Tooltip>
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -1540,7 +1598,7 @@ function WorkspaceContent() {
                   <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0 text-warning-text" aria-hidden />
                   <span className="min-w-0 flex-1">{sortWarning.warning.message}</span>
                   <div className="flex items-center gap-2">
-                    {sortWarning.warning.code === "VALUES_LOST" ? (
+                    {sortWarning.warning.code === "VALUES_LOST" || sortWarning.warning.code === "NO_MATCH" ? (
                       <Button size="sm" variant="outline" className="h-7" disabled={loading} onClick={handleUndo}>
                         Undo this step
                       </Button>
@@ -1631,7 +1689,8 @@ function WorkspaceContent() {
                     setChatPrefill({ text, nonce: Date.now() });
                   }}
                   scrollToCol={gridJump}
-                />
+                lookups={lookups.map((l) => ({ alias: l.alias, columns: l.columns }))}
+                        />
               </div>
             </div>
 
@@ -1681,6 +1740,7 @@ function WorkspaceContent() {
                     setRecipesFrom("drawer");
                     setRecipesOpen(true);
                   }}
+                  lookups={lookups.map((l) => ({ alias: l.alias, columns: l.columns }))}
                   onClose={() => setChatOpen(false)}
                 />
                 </div>
@@ -1689,6 +1749,13 @@ function WorkspaceContent() {
           </div>
         )}
 
+        <LookupsPanel
+          open={lookupsOpen}
+          onClose={() => setLookupsOpen(false)}
+          fileId={fileId ?? undefined}
+          lookups={lookups}
+          onChange={setLookups}
+        />
         <SchemaPanel
           open={schemaOpen}
           onClose={() => setSchemaOpen(false)}

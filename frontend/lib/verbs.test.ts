@@ -88,3 +88,19 @@ describe("matchVerb", () => {
     expect(matchVerb("remove duplicate rows", COLS)?.label).toBe("Remove duplicate rows");
   });
 });
+
+describe("matchVerb joins", () => {
+  const lookups = [{ alias: "managers", columns: [{ name: "Region" }, { name: "Manager" }, { name: "Code" }] }];
+  it("adds columns from a linked table, matched on a column", () => {
+    const m = matchVerb("add Manager from managers by Region", COLS, lookups);
+    expect(m?.op).toBe("join_lookup");
+    expect(m?.column).toBe("Region");
+    expect(m?.args).toEqual({ alias: "managers", lookup_on: "Region", take: ["Manager"] });
+  });
+  it("takes several columns, and leaves it to Chef when the table or column is unknown", () => {
+    expect(matchVerb("bring in Manager and Code from managers matched on Region", COLS, lookups)?.args).toMatchObject({ take: ["Manager", "Code"] });
+    expect(matchVerb("add Manager from prices by Region", COLS, lookups)).toBeNull();
+    expect(matchVerb("add Boss from managers by Region", COLS, lookups)).toBeNull();
+    expect(matchVerb("add Manager from managers by Region", COLS)).toBeNull();
+  });
+});

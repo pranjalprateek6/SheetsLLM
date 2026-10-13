@@ -66,6 +66,12 @@ export function explainError(payload: ErrorPayload | null | undefined): Explaine
         text: "Chef is out of AI capacity for today. Your recipes and one-click fixes still work.",
         actions: ["open_recipes"],
       };
+    case "LLM_UNAVAILABLE":
+      return {
+        code,
+        text: "Google's model is overloaded right now. Not anything you did; try again in a minute. Your recipes and one-click fixes still work.",
+        actions: ["retry", "open_recipes"],
+      };
     case "RATE_LIMITED": {
       const secs = Math.max(1, Math.round(p.retry_after ?? 20));
       return { code, text: `Too many requests. Try again in ${secs} seconds.`, actions: ["wait"], retryAfter: secs };
@@ -92,6 +98,8 @@ export function explainError(payload: ErrorPayload | null | undefined): Explaine
       return { code, text: "Chef didn't answer. Try again in a moment.", actions: ["retry"] };
     case "REQUEST_TIMEOUT":
       return { code, text: "That took too long and was stopped. Try again, or ask something more specific.", actions: ["edit_retry"] };
+    case "RECIPE_NEEDS_LOOKUP":
+      return { code, text: p.message ?? "This recipe uses a lookup table that is no longer in your files.", actions: [] };
     case "RECIPE_INCOMPATIBLE": {
       const missing = p.missing?.length ? p.missing.join(", ") : null;
       return {

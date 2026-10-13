@@ -2,7 +2,7 @@
 import { useRef, useState, useMemo, useCallback, useEffect } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
-  ArrowDown, ArrowUp, ArrowUpDown, Calendar, CalendarDays, Check, ChevronDown, Copy, Filter, Hash,
+  ArrowDown, ArrowUp, ArrowUpDown, Calendar, CalendarDays, Check, ChevronDown, Copy, Filter, Link2, Hash,
   PaintBucket, Pencil, Replace, Rows3, Rows4, Scissors, ChefHat, ToggleLeft, Trash2, Type,
 } from "lucide-react";
 import { TextShimmer } from "@/components/ui/text-shimmer";
@@ -17,13 +17,14 @@ import {
 type SortDir = "asc" | "desc" | null;
 type Density = "compact" | "comfortable";
 /** A column fix that needs one value before it runs. */
-type FieldKind = "rename" | "fill" | "date" | "filter";
+type FieldKind = "rename" | "fill" | "date" | "filter" | "join";
 
 const FIELD_LABEL: Record<FieldKind, string> = {
   rename: "New name",
   fill: "Fill empty cells with",
   date: "The dates look like",
   filter: "Keep rows where this column",
+  join: "Add columns from a lookup, matched on this column",
 };
 
 export type ColumnMeta = {
@@ -85,8 +86,11 @@ export default function DataGrid({
   onAskChef,
   scrollToCol,
   onColumnWidths,
+  lookups = [],
 }: {
   columns: string[];
+  /** The file's lookup tables, for "Add columns from a lookup" */
+  lookups?: { alias: string; columns: { name: string }[] }[];
   rows: Record<string, unknown>[];
   loading: boolean;
   onSort?: (column: string, direction: "asc" | "desc") => void;
@@ -136,17 +140,22 @@ export default function DataGrid({
 
   const [filterQ, setFilterQ] = useState("");
   // The value a column fix is waiting for, shown under that column's header
-  const [field, setField] = useState<{ kind: FieldKind; column: string; value: string; compare?: string } | null>(null);
+  const [field, setField] = useState<{ kind: FieldKind; column: string; value: string; compare?: string; alias?: string; take?: string[] } | null>(null);
 
   const openField = useCallback((kind: FieldKind, column: string) => {
-    setField({ kind, column, value: kind === "rename" ? column : kind === "date" ? "auto" : "", ...(kind === "filter" ? { compare: "eq" } : {}) });
-  }, []);
+    const first = lookups[0];
+    setField({
+      kind, column, value: kind === "rename" ? column : kind === "date" ? "auto" : "",
+      ...(kind === "filter" ? { compare: "eq" } : {}),
+      ...(kind === "join" && first ? { alias: first.alias, value: first.columns.find((c) => c.name === column)?.name ?? first.columns[0]?.name ?? "", take: [] } : {}),
+    });
+  }, [lookups]);
 
   const submitField = useCallback(() => {
     if (!field || !onOp) return;
     const value = field.value.trim();
     const compare = COMPARES.find((c) => c.value === field.compare) ?? COMPARES[0];
-    const needsValue = field.kind !== "date" && !(field.kind === "filter" && !compare.needsValue);
+    const needsValue = field.kind !== "date" && field.kind !== "join" && !(field.kind === "filter" && !compare.needsValue);
     if (needsValue && !value) return;
     if (field.kind === "rename") {
       if (value !== field.column) onOp({ op: "rename", column: field.column, args: { new_name: value } });
@@ -154,6 +163,9 @@ export default function DataGrid({
       onOp({ op: "fill_nulls", column: field.column, args: { value: field.value } });
     } else if (field.kind === "filter") {
       onOp({ op: "filter_rows", column: field.column, args: { compare: compare.value, ...(compare.needsValue ? { value } : {}), keep: true } });
+    } else if (field.kind === "join") {
+      if (!field.alias || !field.take?.length) return;
+      onOp({ op: "join_lookup", column: field.column, args: { alias: field.alias, lookup_on: field.value, take: field.take } });
     } else {
       onOp({ op: "standardise_date", column: field.column, args: { format: field.value } });
     }
@@ -444,6 +456,11 @@ export default function DataGrid({
                               <DropdownMenuItem onClick={() => openField("filter", h)}>
                                 <Filter className="mr-2 h-3.5 w-3.5" /> Keep rows where…
                               </DropdownMenuItem>
+                              {lookups.length > 0 && (
+                                <DropdownMenuItem onClick={() => openField("join", h)}>
+                                  <Link2 className="mr-2 h-3.5 w-3.5" /> Add columns from a lookup…
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuItem onClick={() => onOp({ op: "dedupe", column: h })}>
                                 <Copy className="mr-2 h-3.5 w-3.5" /> Remove duplicate rows (this column)
                               </DropdownMenuItem>
@@ -515,6 +532,59 @@ export default function DataGrid({
                               <option key={f.value} value={f.value}>{f.example}</option>
                             ))}
                           </select>
+                        ) : field.kind === "join" ? (
+                          (() => {
+                            const lookup = lookups.find((l) => l.alias === field.alias) ?? lookups[0];
+                            const names = lookup?.columns.map((c) => c.name) ?? [];
+                            const taken = field.take ?? [];
+                            return (
+                              <div className="space-y-2">
+                                <select
+                                  id={`field-${h}`}
+                                  autoFocus
+                                  aria-label="Lookup table"
+                                  value={field.alias ?? ""}
+                                  onChange={(e) => {
+                                    const next = lookups.find((l) => l.alias === e.target.value);
+                                    setField({ ...field, alias: e.target.value, value: next?.columns.find((c) => c.name === field.column)?.name ?? next?.columns[0]?.name ?? "", take: [] });
+                                  }}
+                                  className="h-8 w-full rounded border bg-background px-1.5 text-xs"
+                                >
+                                  {lookups.map((l) => (
+                                    <option key={l.alias} value={l.alias}>{l.alias}</option>
+                                  ))}
+                                </select>
+                                <label className="block text-[11px] text-muted-foreground">
+                                  Matched on its column
+                                  <select
+                                    aria-label="Lookup key column"
+                                    value={field.value}
+                                    onChange={(e) => setField({ ...field, value: e.target.value })}
+                                    className="mt-1 h-8 w-full rounded border bg-background px-1.5 text-xs"
+                                  >
+                                    {names.map((n) => (
+                                      <option key={n} value={n}>{n}</option>
+                                    ))}
+                                  </select>
+                                </label>
+                                <fieldset>
+                                  <legend className="text-[11px] text-muted-foreground">Columns to bring in</legend>
+                                  <div className="mt-1 max-h-32 space-y-1 overflow-y-auto">
+                                    {names.filter((n) => n !== field.value).map((n) => (
+                                      <label key={n} className="flex items-center gap-2 text-xs">
+                                        <input
+                                          type="checkbox"
+                                          checked={taken.includes(n)}
+                                          onChange={(e) => setField({ ...field, take: e.target.checked ? [...taken, n] : taken.filter((x) => x !== n) })}
+                                        />
+                                        {n}
+                                      </label>
+                                    ))}
+                                  </div>
+                                </fieldset>
+                              </div>
+                            );
+                          })()
                         ) : field.kind === "filter" ? (
                           <div className="flex gap-1.5">
                             <select

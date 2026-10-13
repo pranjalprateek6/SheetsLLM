@@ -13,7 +13,8 @@ export type OpName =
   | "sort"
   | "contains_any"
   | "clean_number"
-  | "filter_rows";
+  | "filter_rows"
+  | "join_lookup";
 
 export type OpRequest = {
   op: OpName;
@@ -26,7 +27,7 @@ export type OpRequest = {
  *  (MIXED_DATES), or cleaning numbers emptied cells it could not read
  *  (VALUES_LOST). */
 export type OpWarning = {
-  code: "MIXED_DATES" | "VALUES_LOST";
+  code: "MIXED_DATES" | "VALUES_LOST" | "NO_MATCH";
   column: string;
   message: string;
   /** The one-click fix, when the data shows the day/month order; else null */

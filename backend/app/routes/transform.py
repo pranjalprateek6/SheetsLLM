@@ -14,6 +14,7 @@ from time import perf_counter
 
 from fastapi import APIRouter, Request, Response
 
+from app import lookups
 from app import db, events, usage
 from app.cache import get_local_parquet
 from app.engine import get_schema_after_steps, replay_transformations_local, values_lost_by
@@ -93,6 +94,27 @@ def _save_transform(
     return step_number
 
 
+async def _unmatched_warning(r2_key: str, steps: list[dict], column: str, args: dict) -> dict | None:
+    """The warning for a join whose key found nothing for some rows."""
+    from app.engine import count_on_current
+    from app.ops import unmatched_sql
+
+    alias = str(args.get("alias") or "")
+    lookup_key = str(args.get("lookup_on") or column)
+    try:
+        local_path = await asyncio.to_thread(get_local_parquet, r2_key)
+        n = await asyncio.to_thread(count_on_current, local_path, steps, unmatched_sql(column, alias, lookup_key))
+    except Exception as exc:
+        logger.warning("Unmatched check failed for %s: %s", column, exc)
+        return None
+    if not n:
+        return None
+    return {
+        "code": "NO_MATCH", "column": column, "count": n, "fix": None, "instruction": "",
+        "message": f"{n:,} row{'s' if n != 1 else ''} found no match in {alias} for {'their' if n != 1 else 'its'} {column}, so the new columns are empty there.",
+    }
+
+
 async def _lost_values_warning(r2_key: str, steps: list[dict], column: str, decimal) -> dict | None:
     """The warning for a clean_number step that emptied some cells, or None."""
     try:
@@ -155,6 +177,7 @@ async def transform_op(request: Request):
     if not file_rec:
         return _json_response(404, "FILE_NOT_FOUND", "File not found")
     r2_key = file_rec["r2_key"]
+    lookups_now = lookups.use(file_id, user_id)
 
     steps = db.get_transformations(file_id)
     try:
@@ -164,7 +187,10 @@ async def transform_op(request: Request):
         return _json_response(500, "SCHEMA_FAILED", f"Schema retrieval failed: {exc}")
 
     try:
-        sql, instruction = build_op(op, schema.get("columns", []), body.get("column"), body.get("args"))
+        sql, instruction = build_op(
+            op, schema.get("columns", []), body.get("column"), body.get("args"),
+            lookups=lookups.schemas(lookups_now) if lookups_now else None,
+        )
         sql = validate_sql(sql)
     except OpError as exc:
         return _json_response(400, exc.code, str(exc))
@@ -196,6 +222,13 @@ async def transform_op(request: Request):
             logger.warning("Sort date check failed for %s: %s", file_id, exc)
         if warning:
             events.record(user_id, "sort_mixed_dates", column_fixable=warning["fix"] is not None)
+
+    # A join leaves the new columns empty on rows whose key found nothing
+    # in the lookup. Say how many
+    if op == "join_lookup" and body.get("column"):
+        warning = await _unmatched_warning(r2_key, steps, body["column"], body.get("args") or {})
+        if warning:
+            events.record(user_id, "join_unmatched", count=warning["count"])
 
     # Cleaning numbers turns anything that is not a number into an empty
     # cell. Say how many, and show a few, so the step can be undone

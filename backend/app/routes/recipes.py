@@ -20,6 +20,7 @@ from time import perf_counter
 
 from fastapi import APIRouter, Request, Response
 
+from app import lookups
 from app import db, events, usage
 from app.cache import get_local_parquet
 from app.engine import first_failing_step, get_schema_after_steps, measure_run, replay_transformations_local
@@ -114,6 +115,7 @@ async def create_recipe(request: Request):
         source_file_id=file_id,
         steps=recipe_steps,
         required_columns=_base_columns(file_rec),
+        required_lookups=lookups.required_for(recipe_steps, lookups.load(file_id, user_id)),
     )
 
     try:
@@ -238,6 +240,28 @@ def delete_recipe(request: Request, recipe_id: str):
     return {"deleted": True, "recipe_id": recipe_id}
 
 
+def _link_required_lookups(user_id: str, file_id: str, required: list[dict]) -> list[dict]:
+    """Give the target file every lookup the recipe needs, under the same
+    alias, when the lookup file still exists. Returns the ones that do not."""
+    if not required:
+        return []
+    try:
+        have = {l["alias"]: l for l in db.list_lookups(file_id)}
+    except Exception as exc:  # the table is missing (migration 015 not applied): nothing to link
+        logger.warning("lookups unavailable for %s: %s", file_id, exc)
+        return list(required)
+    missing = []
+    for need in required:
+        alias, lookup_id = need.get("alias"), need.get("lookup_file_id")
+        if not alias or alias in have:
+            continue
+        if lookup_id and lookup_id != file_id and db.get_file(lookup_id, user_id):
+            db.add_lookup(user_id=user_id, file_id=file_id, lookup_file_id=lookup_id, alias=alias)
+        else:
+            missing.append(need)
+    return missing
+
+
 def _checks_of(recipe: dict) -> list[dict]:
     """A recipe's checks; none before migration 011 adds the column."""
     try:
@@ -311,6 +335,18 @@ async def apply_recipe(request: Request, recipe_id: str):
 
     required = recipe.get("required_columns") or []
     required_names = [c["name"] for c in required if isinstance(c, dict) and c.get("name")]
+    # The lookups the recipe's steps name: link the same ones to this file
+    # first, so the steps find their tables
+    missing_lookups = _link_required_lookups(user_id, file_id, recipe.get("required_lookups") or [])
+    if missing_lookups:
+        gone = ", ".join(f"{m['alias']} ({m.get('lookup_file_name') or 'a deleted file'})" for m in missing_lookups)
+        return _json_response(
+            400, "RECIPE_NEEDS_LOOKUP",
+            f"This recipe uses the lookup {gone}, which is no longer in your files. "
+            "Link a file under that name to this file first, then run it again.",
+            lookups=missing_lookups,
+        )
+    lookups.use(file_id, user_id)
     existing = db.get_transformations(file_id)
 
     try:

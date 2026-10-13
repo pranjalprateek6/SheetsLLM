@@ -11,6 +11,7 @@ from time import perf_counter
 
 from fastapi import APIRouter, Request, Response
 
+from app import lookups
 from app import db
 from app.answers import answer_text, extract_query, run_question
 from app.cache import (
@@ -21,7 +22,8 @@ from app.engine import (
     get_schema_after_steps,
     replay_transformations_local,
 )
-from app.llm.errors import is_quota_error
+from app.llm import health as llm_health
+from app.llm.errors import is_quota_error, is_unavailable_error
 from app.llm.factory import get_llm
 from app.llm.prompts import (
     CHAT_SYSTEM_PROMPT,
@@ -151,6 +153,7 @@ async def chat(request: Request):
         return _json_response(404, "FILE_NOT_FOUND", "File not found")
 
     r2_key = file_rec["r2_key"]
+    lookups_now = lookups.use(file_id, user_id)
 
     # Save user message
     db.create_chat_message(file_id=file_id, role="user", content=message)
@@ -170,10 +173,11 @@ async def chat(request: Request):
 
     # Generate response with conversational context
     privacy_mode = db.get_privacy_mode(user_id)
+    lookup_schemas = lookups.schemas(lookups_now) if lookups_now else None
     user_message = build_user_message(
-        message, schema, privacy_mode=privacy_mode
+        message, schema, privacy_mode=privacy_mode, lookups=lookup_schemas
     )
-    sent = sent_receipt(schema, privacy_mode=privacy_mode)
+    sent = sent_receipt(schema, privacy_mode=privacy_mode, lookups=lookup_schemas)
     if conversation_context:
         user_message = f"Previous conversation:\n{conversation_context}\n\nNew request:\n{user_message}"
 
@@ -184,15 +188,26 @@ async def chat(request: Request):
         logger.error("LLM generation failed: %s", exc)
         events.record(user_id, "chat_sent", kind="error")
         if is_quota_error(exc):
+            llm_health.note_failure("quota")
             events.record(user_id, "llm_quota_hit")
             text = "Chef is out of AI capacity for today. Your recipes and one-click fixes still work."
             _save_error(file_id, text, "LLM_QUOTA")
             return _json_response(503, "LLM_QUOTA", text)
+        if is_unavailable_error(exc):
+            # Their side: the model is overloaded. Say so, so nobody retypes
+            llm_health.note_failure("unavailable")
+            events.record(user_id, "llm_unavailable")
+            text = ("Google's model is overloaded right now. Not anything you did; try again in a minute. "
+                    "Your recipes and one-click fixes still work.")
+            _save_error(file_id, text, "LLM_UNAVAILABLE")
+            return _json_response(503, "LLM_UNAVAILABLE", text)
+        llm_health.note_failure("other")
         # The provider's error text (URLs, quota details) is logged above,
         # never sent to the browser
         _save_error(file_id, "Chef didn't answer. Try again in a moment.", "LLM_FAILED")
         return _json_response(502, "LLM_FAILED", "Chef didn't answer. Try again in a moment.")
 
+    llm_health.note_success()
     # The LLM call is the metered cost, regardless of response type
     usage.record(user_id, chat_requests=1)
 
