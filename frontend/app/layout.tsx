@@ -5,6 +5,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import Header from "@/components/Header";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
+import WarmBackend from "@/components/WarmBackend";
 
 // Inter (variable, so the in-between 510 and 590 weights exist) for every
 // word of interface and prose; Geist Mono only for code: SQL and column types.
@@ -30,6 +31,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             >
               Skip to content
             </a>
+            <WarmBackend />
             <Header />
             <main id="main" tabIndex={-1}>{children}</main>
             {/* Bottom-left: the right edge of the workspace is Chef's composer,
