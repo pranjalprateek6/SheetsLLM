@@ -14,3 +14,15 @@ def _reset_rate_limiter():
     yield
     with security._rate_lock:
         security._rate_store.clear()
+
+
+@pytest.fixture(autouse=True)
+def _no_file_links(monkeypatch):
+    """Lookups come from the file_links table. Tests that want some stub
+    db.list_lookups themselves; everyone else gets none, not a DB call."""
+    from app import db, lookups
+
+    monkeypatch.setattr(db, "list_lookups", lambda fid: [])
+    lookups.clear()
+    yield
+    lookups.clear()

@@ -77,8 +77,20 @@ Original instruction: {instruction}
 Fix the SQL to avoid this error. Return ONLY the corrected SELECT statement."""
 
 
+def lookups_text(lookups: dict[str, list[dict]] | None) -> str:
+    """The other tables a query may name, with their columns and types.
+    Names and types only, in every mode: a lookup's values are the user's too."""
+    if not lookups:
+        return ""
+    lines = ["", "Other tables you may JOIN (LEFT JOIN on a key, keep every row of data; one match per key):"]
+    for alias, cols in lookups.items():
+        described = ", ".join(f"{c['name']} ({c['dtype']})" for c in cols) or "no columns"
+        lines.append(f"  - {alias}: {described}")
+    return "\n".join(lines) + "\n"
+
+
 def build_user_message(
-    instruction: str, schema: dict, *, privacy_mode: bool = False
+    instruction: str, schema: dict, *, privacy_mode: bool = False, lookups: dict[str, list[dict]] | None = None
 ) -> str:
     """Build the user message with enriched schema context for the LLM.
 
@@ -103,7 +115,7 @@ def build_user_message(
         return f"""Table: data
 Columns:
 {schema_text}
-
+{lookups_text(lookups)}
 (No sample data available — rely on column names, types, and the instruction.)
 (You have not seen any values. When you describe the data, do not give example values or guess what a column contains; say what can be told from the names and types, and that the values were not shared. A question about the values is answered with a query, which runs on the full file.)
 Instruction: {instruction}"""
@@ -121,7 +133,7 @@ Instruction: {instruction}"""
     return f"""Table: data
 Columns:
 {schema_text}
-
+{lookups_text(lookups)}
 Sample rows:
 {sample_text}
 Instruction: {instruction}"""
@@ -182,7 +194,7 @@ RULES:
 """
 
 
-def sent_receipt(schema: dict, *, privacy_mode: bool, source: str = "llm") -> dict:
+def sent_receipt(schema: dict, *, privacy_mode: bool, source: str = "llm", lookups: dict[str, list[dict]] | None = None) -> dict:
     """What build_user_message sends for this schema, as counts and column
     names only: the "Sent to Chef" receipt stored with a step. It never holds
     the sample values themselves."""
@@ -201,4 +213,5 @@ def sent_receipt(schema: dict, *, privacy_mode: bool, source: str = "llm") -> di
         "columns_sent": columns,
         "sample_rows_sent": rows,
         "values_per_column": per_column,
+        **({"lookups_sent": {a: [c["name"] for c in cols] for a, cols in lookups.items()}} if lookups else {}),
     }

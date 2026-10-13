@@ -3,7 +3,7 @@ import dynamic from "next/dynamic";
 import { Suspense, useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import {
-  AlertTriangle, ArrowRight, BarChart3, BookMarked, CalendarClock, Check, ChevronDown, Columns3, FileSpreadsheet, History, Lightbulb, MessageSquare, Pencil, Redo2, Undo2, Upload,
+  AlertTriangle, ArrowRight, BarChart3, BookMarked, CalendarClock, Check, ChevronDown, Columns3, FileSpreadsheet, History, Lightbulb, Link2, MessageSquare, Pencil, Redo2, Undo2, Upload,
 } from "lucide-react";
 import ColumnHealth, { type HealthColumn } from "@/components/ColumnHealth";
 import PipelineSpine from "@/components/PipelineSpine";
@@ -30,6 +30,8 @@ import { useOpenFileUrl } from "@/lib/use-open-file-url";
 import { announceOpenFile } from "@/lib/open-file";
 import { downloadExport, exportFileName, fileStem as stemOf } from "@/lib/export";
 import { type SchemaColumn } from "@/components/SchemaPanel";
+import { listLookups, type Lookup } from "@/lib/lookups";
+const LookupsPanel = dynamic(() => import("@/components/LookupsPanel"));
 const SchemaPanel = dynamic(() => import("@/components/SchemaPanel"));
 const ChartPanel = dynamic(() => import("@/components/ChartPanel"));
 const CommandPalette = dynamic(() => import("@/components/CommandPalette"));
@@ -125,6 +127,18 @@ function WorkspaceContent() {
   );
   const [chartOpen, setChartOpen] = useState(false);
   const [schemaOpen, setSchemaOpen] = useState(false);
+  // The file's lookup tables: other files joined by a short name
+  const [lookups, setLookups] = useState<Lookup[]>([]);
+  const [lookupsOpen, setLookupsOpen] = useState(false);
+  useEffect(() => {
+    if (!fileId) {
+      setLookups([]);
+      return;
+    }
+    let alive = true;
+    listLookups(fileId).then((l) => alive && setLookups(l)).catch(() => {});
+    return () => { alive = false; };
+  }, [fileId]);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [sampleSuggestions, setSampleSuggestions] = useState<string[] | null>(null);
   // The sample the open file came from, and, once a recipe is saved from it,
@@ -1299,6 +1313,9 @@ function WorkspaceContent() {
                       <DropdownMenuItem className="sm:hidden" onClick={() => setChartOpen(true)}>
                         <BarChart3 className="mr-2 h-4 w-4" /> Quick chart
                       </DropdownMenuItem>
+                      <DropdownMenuItem className="sm:hidden" onClick={() => setLookupsOpen(true)}>
+                        <Link2 className="mr-2 h-4 w-4" /> Lookup tables
+                      </DropdownMenuItem>
                       <DropdownMenuItem className="sm:hidden" onClick={() => setSchemaOpen(true)}>
                         <Columns3 className="mr-2 h-4 w-4" /> Schema
                       </DropdownMenuItem>
@@ -1332,6 +1349,19 @@ function WorkspaceContent() {
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent>Quick chart</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="ghost" size="icon" className="relative hidden h-8 w-8 text-muted-foreground sm:inline-flex" onClick={() => setLookupsOpen(true)} aria-label={lookups.length ? `Lookup tables (${lookups.length} linked)` : "Lookup tables"}>
+                          <Link2 className="h-4 w-4" />
+                          {lookups.length > 0 && (
+                            <span aria-hidden className="absolute -right-0.5 -top-0.5 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-primary px-1 text-[9px] font-semibold leading-none text-primary-foreground">
+                              {lookups.length}
+                            </span>
+                          )}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>{lookups.length ? `Lookup tables: ${lookups.map((l) => l.alias).join(", ")}` : "Lookup tables"}</TooltipContent>
                     </Tooltip>
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -1511,7 +1541,7 @@ function WorkspaceContent() {
                   <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0 text-warning-text" aria-hidden />
                   <span className="min-w-0 flex-1">{sortWarning.warning.message}</span>
                   <div className="flex items-center gap-2">
-                    {sortWarning.warning.code === "VALUES_LOST" ? (
+                    {sortWarning.warning.code === "VALUES_LOST" || sortWarning.warning.code === "NO_MATCH" ? (
                       <Button size="sm" variant="outline" className="h-7" disabled={loading} onClick={handleUndo}>
                         Undo this step
                       </Button>
@@ -1602,7 +1632,8 @@ function WorkspaceContent() {
                     setChatPrefill({ text, nonce: Date.now() });
                   }}
                   scrollToCol={gridJump}
-                />
+                lookups={lookups.map((l) => ({ alias: l.alias, columns: l.columns }))}
+                        />
               </div>
             </div>
 
@@ -1629,12 +1660,20 @@ function WorkspaceContent() {
                     setRecipesFrom("drawer");
                     setRecipesOpen(true);
                   }}
-                />
+                lookups={lookups.map((l) => ({ alias: l.alias, columns: l.columns }))}
+                    />
               </div>
             )}
           </div>
         )}
 
+        <LookupsPanel
+          open={lookupsOpen}
+          onClose={() => setLookupsOpen(false)}
+          fileId={fileId ?? undefined}
+          lookups={lookups}
+          onChange={setLookups}
+        />
         <SchemaPanel
           open={schemaOpen}
           onClose={() => setSchemaOpen(false)}

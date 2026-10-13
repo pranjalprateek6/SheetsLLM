@@ -10,6 +10,7 @@ from fastapi import APIRouter, Query, Request, Response
 
 import datetime as _dt
 
+from app import lookups
 from app import db, events, storage
 from app.share import SHARE_TTL_SECONDS, make_token
 from app.cache import get_local_parquet, invalidate_file
@@ -294,6 +295,7 @@ async def add_step(request: Request, file_id: str):
 
     steps = db.get_transformations(file_id)
     step_number = len(steps) + 1
+    lookups.use(file_id, user_id)
     try:
         local_path = get_local_parquet(file_rec["r2_key"])
         result = replay_transformations_local(
@@ -344,6 +346,7 @@ def remove_step(request: Request, file_id: str, step_num: int):
     if not file_rec:
         return _json_response(404, "FILE_NOT_FOUND", "File not found")
 
+    lookups_now = lookups.use(file_id, user_id)
     steps = db.get_transformations(file_id)
     target = next((s for s in steps if s.get("step_number") == step_num), None)
     if target is None:
@@ -397,6 +400,80 @@ def remove_step(request: Request, file_id: str, step_num: int):
     }
 
 
+@router.get("/files/{file_id}/lookups")
+def list_file_lookups(request: Request, file_id: str):
+    """The lookup tables linked to a file, with their columns."""
+    user_id = getattr(request.state, "user_id", "anonymous")
+    if not db.get_file(file_id, user_id):
+        return _json_response(404, "FILE_NOT_FOUND", "File not found")
+    views = lookups.use(file_id, user_id)
+    schemas = lookups.schemas(views) if views else {}
+    return {
+        "lookups": [
+            {"alias": a, "file_id": lv.file_id, "name": lv.name, "columns": schemas.get(a, [])}
+            for a, lv in views.items()
+        ],
+    }
+
+
+@router.post("/files/{file_id}/lookups")
+async def add_file_lookup(request: Request, file_id: str):
+    """Link another of the user's files to this one under an alias."""
+    user_id = getattr(request.state, "user_id", "anonymous")
+    try:
+        body = await request.json()
+    except Exception:
+        return _json_response(400, "INVALID_JSON", "Request body must be JSON")
+    if not isinstance(body, dict):
+        return _json_response(400, "INVALID_JSON", "Request body must be a JSON object")
+    file_rec = db.get_file(file_id, user_id)
+    if not file_rec:
+        return _json_response(404, "FILE_NOT_FOUND", "File not found")
+    lookup_id = body.get("lookup_file_id")
+    lookup_rec = db.get_file(lookup_id, user_id) if isinstance(lookup_id, str) else None
+    if not lookup_rec:
+        return _json_response(404, "LOOKUP_NOT_FOUND", "Pick one of your files to use as the lookup.")
+    if lookup_id == file_id:
+        return _json_response(400, "SAME_FILE", "A file cannot be its own lookup.")
+    if (lookup_rec.get("row_count") or 0) > lookups.MAX_LOOKUP_ROWS:
+        return _json_response(400, "LOOKUP_TOO_BIG", f"A lookup can have up to {lookups.MAX_LOOKUP_ROWS:,} rows.")
+    try:
+        existing = db.list_lookups(file_id)
+    except Exception as exc:
+        logger.warning("lookups unavailable: %s", exc)
+        return _json_response(503, "LOOKUPS_UNAVAILABLE", "Lookup tables aren't ready on this server yet. Try again later.")
+    taken = {l["alias"] for l in existing}
+    try:
+        alias = lookups.check_alias(body.get("alias") or lookups.suggest_alias(lookup_rec.get("name", ""), taken))
+    except lookups.LookupError as exc:
+        return _json_response(400, exc.code, str(exc))
+    if alias not in taken and len(existing) >= lookups.MAX_LOOKUPS:
+        return _json_response(400, "TOO_MANY_LOOKUPS", f"A file can have up to {lookups.MAX_LOOKUPS} lookups.")
+    try:
+        db.add_lookup(user_id=user_id, file_id=file_id, lookup_file_id=lookup_id, alias=alias)
+    except Exception as exc:
+        logger.warning("lookup link failed: %s", exc)
+        return _json_response(503, "LOOKUPS_UNAVAILABLE", "Couldn't link that file right now. Try again later.")
+    events.record(user_id, "lookup_linked")
+    views = lookups.use(file_id, user_id)
+    return {"alias": alias, "file_id": lookup_id, "name": lookup_rec.get("name"), "columns": lookups.schemas(views).get(alias, [])}
+
+
+@router.delete("/files/{file_id}/lookups/{alias}")
+def remove_file_lookup(request: Request, file_id: str, alias: str):
+    user_id = getattr(request.state, "user_id", "anonymous")
+    if not db.get_file(file_id, user_id):
+        return _json_response(404, "FILE_NOT_FOUND", "File not found")
+    try:
+        removed = db.remove_lookup(file_id, alias)
+    except Exception as exc:
+        logger.warning("lookup unlink failed: %s", exc)
+        return _json_response(503, "LOOKUPS_UNAVAILABLE", "Couldn't unlink that table right now. Try again later.")
+    if not removed:
+        return _json_response(404, "LOOKUP_NOT_FOUND", "There is no lookup by that name on this file.")
+    return {"removed": True, "alias": alias}
+
+
 @router.post("/files/{file_id}/share")
 def share_file(request: Request, file_id: str):
     """A link that serves this file's cleaned CSV to anyone who has it, for
@@ -421,6 +498,7 @@ def revert_to_step(request: Request, file_id: str, step_num: int):
     if not file_rec:
         return _json_response(404, "FILE_NOT_FOUND", "File not found")
 
+    lookups_now = lookups.use(file_id, user_id)
     r2_key = file_rec["r2_key"]
     steps = db.get_transformations(file_id)
 

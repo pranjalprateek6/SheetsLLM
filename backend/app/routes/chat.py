@@ -11,6 +11,7 @@ from time import perf_counter
 
 from fastapi import APIRouter, Request, Response
 
+from app import lookups
 from app import db
 from app.answers import answer_text, extract_query, run_question
 from app.cache import (
@@ -151,6 +152,7 @@ async def chat(request: Request):
         return _json_response(404, "FILE_NOT_FOUND", "File not found")
 
     r2_key = file_rec["r2_key"]
+    lookups_now = lookups.use(file_id, user_id)
 
     # Save user message
     db.create_chat_message(file_id=file_id, role="user", content=message)
@@ -170,10 +172,11 @@ async def chat(request: Request):
 
     # Generate response with conversational context
     privacy_mode = db.get_privacy_mode(user_id)
+    lookup_schemas = lookups.schemas(lookups_now) if lookups_now else None
     user_message = build_user_message(
-        message, schema, privacy_mode=privacy_mode
+        message, schema, privacy_mode=privacy_mode, lookups=lookup_schemas
     )
-    sent = sent_receipt(schema, privacy_mode=privacy_mode)
+    sent = sent_receipt(schema, privacy_mode=privacy_mode, lookups=lookup_schemas)
     if conversation_context:
         user_message = f"Previous conversation:\n{conversation_context}\n\nNew request:\n{user_message}"
 

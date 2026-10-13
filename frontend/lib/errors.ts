@@ -92,6 +92,8 @@ export function explainError(payload: ErrorPayload | null | undefined): Explaine
       return { code, text: "Chef didn't answer. Try again in a moment.", actions: ["retry"] };
     case "REQUEST_TIMEOUT":
       return { code, text: "That took too long and was stopped. Try again, or ask something more specific.", actions: ["edit_retry"] };
+    case "RECIPE_NEEDS_LOOKUP":
+      return { code, text: p.message ?? "This recipe uses a lookup table that is no longer in your files.", actions: [] };
     case "RECIPE_INCOMPATIBLE": {
       const missing = p.missing?.length ? p.missing.join(", ") : null;
       return {

@@ -10,6 +10,7 @@ import time
 
 from fastapi import APIRouter, Request, Response
 
+from app import lookups
 from app import db
 from app.cache import get_local_parquet
 from app.insights import generate_insights
@@ -74,8 +75,9 @@ def get_insights(file_id: str, request: Request):
         return _json_response(404, "FILE_NOT_FOUND", "File not found")
 
     r2_key = file_rec["r2_key"]
+    lookups_now = lookups.use(file_id, user_id)
     steps = db.get_transformations(file_id)
-    key = _state_key(file_id, r2_key, steps)
+    key = _state_key(file_id, r2_key, steps) + ":" + ",".join(f"{a}={lv.file_id}:{len(lv.steps)}" for a, lv in lookups_now.items())
     insights = _cached(key)
     if insights is None:
         try:

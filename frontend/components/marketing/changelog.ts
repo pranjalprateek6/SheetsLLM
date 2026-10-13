@@ -13,6 +13,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     date: "2026-10-13",
     title: "Questions answered from the data, recipes you can edit, and no AI for the common fixes",
     items: [
+      "Lookup tables: link another file of yours under a short name, then add its columns from the column menu or ask Chef to join it. A recipe that uses one asks for it on a new file.",
       "Chef answers a question about the values by running a query on every row and showing the result, so strict privacy mode answers real questions for the first time.",
       "Recipes can be edited: rename, move steps, remove steps, or take another file's steps. A reorder is planned on the file first.",
       "Clean numbers: \"$1,234.50\", \"(12)\" and \"12%\" read as numbers in one click, with a count of what could not be read and Undo beside it.",
