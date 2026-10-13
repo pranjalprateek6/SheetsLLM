@@ -2,11 +2,10 @@
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 
-/* A short personal note on the first visit — products that feel made
-   with intention convert and retain better than anonymous ones. One
-   dismissal, remembered forever. Rendered as a slim full-width strip
-   under the upload grid so it reads as a sign-off, not another card
-   competing in the sidebar. */
+/* A short personal note on the first visit: products that feel made with
+   intention convert and retain better than anonymous ones. One dismissal,
+   remembered forever. At the foot of the start screen's rail, in the
+   quietest ink, so it reads as a sign-off and competes with nothing. */
 
 const DISMISSED_KEY = "sllm_founder_note_dismissed";
 
@@ -29,15 +28,15 @@ export default function FounderNote() {
   };
 
   return (
-    <div className="relative rounded-md border bg-muted/30 px-5 py-4">
+    <div className="relative border-t pt-4">
       <button
         onClick={dismiss}
-        className="absolute right-3 top-3 rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+        className="absolute right-0 top-3 rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
         aria-label="Dismiss note"
       >
         <X className="h-3.5 w-3.5" />
       </button>
-      <p className="pr-8 text-sm leading-relaxed text-muted-foreground">
+      <p className="pr-8 text-[13px] leading-relaxed text-muted-foreground">
         Every month, the same messy export and the same 40 minutes fixing it by
         hand. Describe that cleanup once, save it as a recipe, and never do it
         manually again. If anything feels off, the Feedback button up top
