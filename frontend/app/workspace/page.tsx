@@ -33,7 +33,7 @@ import { type SchemaColumn } from "@/components/SchemaPanel";
 const SchemaPanel = dynamic(() => import("@/components/SchemaPanel"));
 const ChartPanel = dynamic(() => import("@/components/ChartPanel"));
 const CommandPalette = dynamic(() => import("@/components/CommandPalette"));
-import GettingStarted, { markOnboardingStep, ONBOARDING_FLAGS } from "@/components/GettingStarted";
+import GettingStarted, { markOnboardingStep, ONBOARDING_FLAGS, type OnboardingStep } from "@/components/GettingStarted";
 import OnboardingIntent, { INTENT_LABELS, loadIntents, type Intent } from "@/components/OnboardingIntent";
 const KeyboardShortcuts = dynamic(() => import("@/components/KeyboardShortcuts"));
 import ErrorBoundary from "@/components/ErrorBoundary";
@@ -800,6 +800,7 @@ function WorkspaceContent() {
   // A recipe apply is a transform too: same change-bar treatment, wherever
   // it was applied from (the drawer, or the hint over the grid).
   const handleRecipeApplied = useCallback((result: RecipeApplyResult, appliedTo?: string) => {
+    markOnboardingStep("rerun");
     const prev = prevGridRef.current;
     setLastChange({
       label: `Recipe applied: ${result.steps_added} step${result.steps_added === 1 ? "" : "s"}`,
@@ -988,7 +989,34 @@ function WorkspaceContent() {
     }
   };
 
-  // Recipes for the upload screen's re-run card
+  // The checklist's last step, as one click: November's orders through the
+  // recipe saved from October's, or the first recipe there is
+  const runMonthTwo = async () => {
+    const sample = SAMPLE_DATASETS.find((s) => s.id === "orders");
+    if (!sample?.next || loading) return;
+    const recipe = recipes.find((r) => r.source_file_name === sample.uploadName) ?? recipes[0];
+    if (!recipe) {
+      toast("Save a recipe first. Open Monthly orders, fix it, and save the steps.");
+      await loadSample("orders");
+      return;
+    }
+    setArmedId(recipe.id);
+    try {
+      const res = await fetch(sample.next.file);
+      if (!res.ok) throw new Error(String(res.status));
+      const file = new File([await res.blob()], sample.next.uploadName, { type: "text/csv" });
+      handleRerun(file, recipe);
+    } catch {
+      toast.error(`Couldn't load ${sample.next.label}. Try again.`);
+    }
+  };
+
+  const actOnChecklist = (step: OnboardingStep) => {
+    if (step === "upload") void loadSample("orders");
+    else if (step === "rerun") void runMonthTwo();
+  };
+
+  // Recipes for the start screen's rail
   useEffect(() => {
     if (fileReady) return;
     let alive = true;
@@ -1223,7 +1251,7 @@ function WorkspaceContent() {
                       </ul>
                     </section>
                   )}
-                  <GettingStarted />
+                  <GettingStarted onAct={actOnChecklist} />
                   <section>
                     <h2 className="flex items-center gap-2 text-[13px] font-medium">
                       <Lightbulb className="h-4 w-4 text-primary-accent" aria-hidden /> Things you can say
