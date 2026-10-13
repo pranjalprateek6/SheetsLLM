@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
-import { History as HistoryIcon, RotateCcw, ChevronRight, Code } from "lucide-react";
+import { History as HistoryIcon, RotateCcw, Trash2, ChevronRight, Code } from "lucide-react";
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
 import { sentSummary, type SentReceipt } from "@/components/SentDisclosure";
 import EmptyState from "@/components/EmptyState";
@@ -42,12 +42,15 @@ export default function HistoryDrawer({
   fileId,
   onRevert,
   onPreviewStep,
+  onRemove,
 }: {
   open: boolean;
   onClose: () => void;
   fileId?: string;
   onRevert: (stepNum: number) => void;
   onPreviewStep?: (stepNum: number) => void;
+  /** Take this one step out; the ones after it run again without it. */
+  onRemove?: (stepNum: number) => void;
 }) {
   const [steps, setSteps] = useState<TransformStep[]>([]);
   const [loading, setLoading] = useState(false);
@@ -185,6 +188,19 @@ export default function HistoryDrawer({
                           onClick={() => onPreviewStep(step.step_number)}
                         >
                           Preview
+                        </Button>
+                      )}
+
+                      {onRemove && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive-text"
+                          onClick={() => onRemove(step.step_number)}
+                          aria-label={`Remove step ${step.step_number}`}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          Remove
                         </Button>
                       )}
 

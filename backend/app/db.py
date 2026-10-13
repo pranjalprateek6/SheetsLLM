@@ -314,6 +314,28 @@ def delete_transformations_after(file_id: str, step_number: int) -> int:
     return len(resp.data)
 
 
+def delete_transformation(file_id: str, step_number: int) -> int:
+    """Delete one step of a file. Returns how many rows went (0 or 1)."""
+    resp = (
+        get_client()
+        .table("transformations")
+        .delete()
+        .eq("file_id", file_id)
+        .eq("step_number", step_number)
+        .execute()
+    )
+    return len(resp.data)
+
+
+def renumber_transformations_after(file_id: str, step_number: int) -> int:
+    """Close the gap a removed step left: every later step moves up one.
+    Lowest first, so no two rows ever share a number on the way."""
+    later = [s for s in get_transformations(file_id) if s["step_number"] > step_number]
+    for s in sorted(later, key=lambda s: s["step_number"]):
+        get_client().table("transformations").update({"step_number": s["step_number"] - 1}).eq("id", s["id"]).execute()
+    return len(later)
+
+
 def delete_all_transformations(file_id: str) -> int:
     resp = (
         get_client()
