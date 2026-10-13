@@ -18,6 +18,7 @@ from fastapi import APIRouter, Query, Request, Response
 from fastapi.responses import FileResponse
 from starlette.background import BackgroundTask
 
+from app import lookups
 from app import db, events
 from app.cache import get_local_parquet
 from app.engine import (
@@ -133,6 +134,7 @@ def shared(token: str):
     file_rec = db.get_file(file_id, user_id)
     if not file_rec:
         return _json_response(404, "LINK_NOT_FOUND", "This link has expired or never existed.")
+    lookups.use(file_id, user_id)
     steps = db.get_transformations(file_id)
     return _stream_export(user_id, file_id, file_rec, steps, "csv", via="share_link")
 
@@ -169,6 +171,7 @@ def download(
         return _json_response(404, "FILE_NOT_FOUND", "File not found")
 
     r2_key = file_rec["r2_key"]
+    lookups_now = lookups.use(file_id, user_id)
     base_name = file_rec.get("name", "data").rsplit(".", 1)[0]
 
     steps = db.get_transformations(file_id)

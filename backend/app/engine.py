@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import concurrent.futures
+import contextvars
 import io
 import logging
 import re
@@ -47,6 +48,9 @@ def get_connection(
     COPY into. Every other file, directory listing, ATTACH, extension install
     and network read is refused, and the lock itself cannot be undone from SQL.
     """
+    from app import lookups as _lookups
+
+    attached = _lookups.current()
     con = duckdb.connect(":memory:")
     con.execute(f"SET threads={DUCKDB_THREADS}")
     con.execute(f"SET max_memory='{DUCKDB_MEMORY_LIMIT}'")
@@ -55,7 +59,12 @@ def get_connection(
     # twice and end the turn with an error.
     for name in _TITLE_CASE_NAMES:
         con.execute(f"CREATE OR REPLACE TEMP MACRO {name}(s) AS {_TITLE_CASE_SQL}")
-    _lock_to_files(con, read, write)
+    # The open file's lookup tables, each a view under its alias, as its
+    # own steps have left it. Their files join the read list, nothing else.
+    _lock_to_files(con, (*read, *(lv.local_path for lv in attached.values())), write)
+    for alias, lv in attached.items():
+        con.execute(f"CREATE VIEW raw__{alias} AS SELECT * FROM read_parquet('{_sql_path(lv.local_path)}')")
+        con.execute(f"CREATE VIEW {alias} AS {_retarget_from_data(build_replay_sql(lv.steps), 'raw__' + alias)}")
     # Inside _run_with_timeout, remember it so the limit can interrupt it
     tracked = getattr(_opened, "cons", None)
     if tracked is not None:
@@ -115,6 +124,8 @@ def _run_with_timeout(func, *args, timeout: int = DUCKDB_QUERY_TIMEOUT, interrup
     the limit, and nothing waits on it.
     """
     opened: list[duckdb.DuckDBPyConnection] = list(interrupt)
+    # The worker thread gets this request's context (its lookups among it)
+    ctx = contextvars.copy_context()
 
     def run():
         _opened.cons = opened
@@ -125,7 +136,7 @@ def _run_with_timeout(func, *args, timeout: int = DUCKDB_QUERY_TIMEOUT, interrup
 
     pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
     try:
-        return pool.submit(run).result(timeout=timeout)
+        return pool.submit(ctx.run, run).result(timeout=timeout)
     except concurrent.futures.TimeoutError:
         for con in opened:
             con.interrupt()
@@ -280,6 +291,18 @@ def values_lost_by(
             f"SELECT DISTINCT CAST({q} AS VARCHAR) FROM data WHERE {lost} ORDER BY 1 LIMIT {int(examples)}"
         ).fetchall()
         return {"count": int(count), "examples": [str(r[0]) for r in sample]}
+
+    return _run_with_timeout(_inner, timeout=timeout if timeout is not None else DUCKDB_QUERY_TIMEOUT)
+
+
+def count_on_current(local_path: str | Path, steps: list[dict], count_sql: str, *, timeout: int | None = None) -> int:
+    """One COUNT query over the table data as the steps have left it."""
+
+    def _inner():
+        con = get_connection(read=(local_path,))
+        con.execute(f"CREATE VIEW raw AS SELECT * FROM read_parquet('{_sql_path(local_path)}')")
+        con.execute(f"CREATE VIEW data AS {_retarget_from_data(build_replay_sql(steps), 'raw')}")
+        return int(con.execute(count_sql).fetchone()[0] or 0)
 
     return _run_with_timeout(_inner, timeout=timeout if timeout is not None else DUCKDB_QUERY_TIMEOUT)
 

@@ -23,7 +23,7 @@ from app.cache import invalidate_file
 logger = logging.getLogger("sheetsllm.account")
 
 # Tables with a user_id column, beyond files (whose children cascade)
-USER_TABLES = ("recipes", "audit_log", "events", "usage", "user_settings", "subscriptions")
+USER_TABLES = ("file_links", "recipes", "audit_log", "events", "usage", "user_settings", "subscriptions")
 
 # Subscription states that can still charge the card
 _CHARGING = _ACTIVE_STATUSES | {"pending", "halted"}

@@ -335,6 +335,64 @@ def _filter_rows(cols, column, args):
     return f"SELECT * FROM data WHERE {where}", f"{verb} rows where {c} {phrase}"
 
 
+def _key_expr(table_alias: str, col: str) -> str:
+    """A key as text, trimmed, case folded: "North " matches "north"."""
+    return f"lower(TRIM(CAST({table_alias}.{quote_ident(col)} AS VARCHAR)))"
+
+
+def join_lookup_sql(cols: dict[str, str], lookup_cols: list[str], alias: str, data_key: str, lookup_key: str, take: list[str]) -> str:
+    """One row of data, with columns from the lookup row whose key matches.
+    A LEFT JOIN, so every row of data stays; the lookup is reduced to one
+    row per key first, so the file cannot grow. A taken column whose name
+    the file already has comes in as "name (alias)"."""
+    lk = _key_expr("l", lookup_key)
+    dedup = (
+        f"SELECT * EXCLUDE (__rn) FROM (SELECT *, ROW_NUMBER() OVER (PARTITION BY {_key_expr(alias, lookup_key)}) AS __rn "
+        f"FROM {alias} AS {alias}) WHERE __rn = 1"
+    )
+    taken = []
+    for c in take:
+        name = c if c not in cols else f"{c} ({alias})"
+        taken.append(f"l.{quote_ident(c)} AS {quote_ident(name)}")
+    return (
+        f"SELECT d.*, {', '.join(taken)} FROM data AS d LEFT JOIN ({dedup}) AS l "
+        f"ON {_key_expr('d', data_key)} = {lk}"
+    )
+
+
+def unmatched_sql(data_key: str, alias: str, lookup_key: str) -> str:
+    """How many rows of data have no lookup row for their key."""
+    # NOT EXISTS, so an empty key counts as unmatched too (NOT IN would skip it)
+    return (
+        f"SELECT COUNT(*) FROM data AS d WHERE NOT EXISTS ("
+        f"SELECT 1 FROM {alias} AS {alias} WHERE {_key_expr(alias, lookup_key)} = {_key_expr('d', data_key)})"
+    )
+
+
+def _join_lookup(cols, column, args, lookups):
+    """Bring columns from a lookup table into the file, matched on a key."""
+    alias = str(args.get("alias") or "")
+    if alias not in (lookups or {}):
+        raise OpError("UNKNOWN_LOOKUP", "Pick a lookup table linked to this file.")
+    lookup_cols = [c["name"] for c in lookups[alias]]
+    data_key = _column(cols, column or args.get("on"))
+    lookup_key = str(args.get("lookup_on") or data_key)
+    if lookup_key not in lookup_cols:
+        raise OpError("UNKNOWN_COLUMN", f"There is no column named {lookup_key!r} in {alias}.")
+    take = args.get("take")
+    if take in (None, [], ""):
+        take = [c for c in lookup_cols if c != lookup_key]
+    if not isinstance(take, list) or not take:
+        raise OpError("INVALID_ARGS", "Pick at least one column to bring in.")
+    for c in take:
+        if c not in lookup_cols:
+            raise OpError("UNKNOWN_COLUMN", f"There is no column named {c!r} in {alias}.")
+    sql = join_lookup_sql(cols, lookup_cols, alias, data_key, lookup_key, [str(c) for c in take])
+    what = ", ".join(str(c) for c in take[:3]) + (f" and {len(take) - 3} more" if len(take) > 3 else "")
+    on = data_key if data_key == lookup_key else f"{data_key} to {lookup_key}"
+    return sql, f"Add {what} from {alias}, matched on {on}"
+
+
 def _contains_any(cols, column, args):
     needle = _text(args.get("needle"), "Text to look for", MAX_VALUE)
     targets = _columns(cols, args.get("columns")) or [n for n, t in cols.items() if is_string(t)]
@@ -364,12 +422,18 @@ OPS: dict[str, Callable[[dict[str, str], Any, dict], tuple[str, str]]] = {
 }
 
 
-def build_op(op: str, schema_columns: list[dict], column: Any = None, args: dict | None = None) -> tuple[str, str]:
-    """(sql, instruction) for an op against the current schema. Raises OpError."""
-    builder = OPS.get(op)
-    if builder is None:
-        raise OpError("UNKNOWN_OP", f"Unknown operation {op!r}.")
+def build_op(
+    op: str, schema_columns: list[dict], column: Any = None, args: dict | None = None,
+    lookups: dict[str, list[dict]] | None = None,
+) -> tuple[str, str]:
+    """(sql, instruction) for an op against the current schema. Raises OpError.
+    ``lookups`` is {alias: [{name, dtype}]} for the file's lookup tables."""
     if args is not None and not isinstance(args, dict):
         raise OpError("INVALID_ARGS", "args must be an object.")
     cols = {str(c["name"]): str(c.get("dtype") or "") for c in schema_columns}
+    if op == "join_lookup":
+        return _join_lookup(cols, column, args or {}, lookups or {})
+    builder = OPS.get(op)
+    if builder is None:
+        raise OpError("UNKNOWN_OP", f"Unknown operation {op!r}.")
     return builder(cols, column, args or {})

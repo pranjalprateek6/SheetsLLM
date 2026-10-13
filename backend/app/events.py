@@ -48,6 +48,8 @@ EVENTS = frozenset({
     "recipe_columns_matched", "recipe_run_flagged", "recipe_check_failed", "recipe_checks_saved",
     # a sort whose column mixes date formats, so it came out in text order
     "sort_mixed_dates",
+    # a lookup linked to a file, and a join that left rows unmatched
+    "lookup_linked", "join_unmatched",
     # a step taken out of the middle of a file's history
     "step_removed",
     # a link that serves the cleaned file to anyone for a week

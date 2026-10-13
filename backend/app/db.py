@@ -478,6 +478,38 @@ def upsert_subscription(user_id: str, **fields) -> dict:
     return resp.data[0]
 
 
+# ── Lookup tables beside a file ──────────────────────────────────────
+
+
+def list_lookups(file_id: str) -> list[dict]:
+    if not is_uuid(file_id):
+        return []
+    resp = (
+        get_client()
+        .table("file_links")
+        .select("id,alias,lookup_file_id,created_at")
+        .eq("file_id", file_id)
+        .order("created_at", desc=False)
+        .execute()
+    )
+    return resp.data or []
+
+
+def add_lookup(*, user_id: str, file_id: str, lookup_file_id: str, alias: str) -> dict:
+    resp = (
+        get_client()
+        .table("file_links")
+        .upsert({"user_id": user_id, "file_id": file_id, "lookup_file_id": lookup_file_id, "alias": alias}, on_conflict="file_id,alias")
+        .execute()
+    )
+    return resp.data[0]
+
+
+def remove_lookup(file_id: str, alias: str) -> bool:
+    resp = get_client().table("file_links").delete().eq("file_id", file_id).eq("alias", alias).execute()
+    return bool(resp.data)
+
+
 # ── Account deletion ─────────────────────────────────────────────────
 
 
@@ -553,6 +585,7 @@ def create_recipe(
     required_columns: list[dict],
     description: str | None = None,
     source_file_id: str | None = None,
+    required_lookups: list[dict] | None = None,
 ) -> dict:
     row = {
         "user_id": user_id,
@@ -562,7 +595,17 @@ def create_recipe(
         "steps": steps,
         "required_columns": required_columns,
     }
-    resp = get_client().table("recipes").insert(row).execute()
+    if required_lookups:
+        row["required_lookups"] = required_lookups
+    try:
+        resp = get_client().table("recipes").insert(row).execute()
+    except Exception as exc:
+        # Before migration 015 the column is missing; the recipe still saves
+        if "required_lookups" not in row or "required_lookups" not in str(exc):
+            raise
+        logger.warning("recipes.required_lookups missing (apply migration 015); saving without it")
+        row.pop("required_lookups")
+        resp = get_client().table("recipes").insert(row).execute()
     return resp.data[0]
 
 
