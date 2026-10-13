@@ -3,12 +3,11 @@ import dynamic from "next/dynamic";
 import { Suspense, useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import {
-  AlertTriangle, BarChart3, BookMarked, CalendarClock, Check, ChevronDown, Columns3, FileSpreadsheet, History, Lightbulb, MessageSquare, Pencil, Redo2, Undo2, Upload,
+  AlertTriangle, ArrowRight, BarChart3, BookMarked, CalendarClock, Check, ChevronDown, Columns3, FileSpreadsheet, History, Lightbulb, MessageSquare, Pencil, Redo2, Undo2, Upload,
 } from "lucide-react";
 import ColumnHealth, { type HealthColumn } from "@/components/ColumnHealth";
 import PipelineSpine from "@/components/PipelineSpine";
 import DropZone from "@/components/DropZone";
-import UploadMore from "@/components/UploadMore";
 import DataGrid from "@/components/DataGrid";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import SheetSelector from "@/components/SheetSelector";
@@ -16,7 +15,8 @@ const HistoryDrawer = dynamic(() => import("@/components/HistoryDrawer"));
 import { type Recipe, type RecipeApplyResult } from "@/components/RecipesDrawer";
 import ExportMenu from "@/components/ExportMenu";
 import ExportClosingStrip, { shouldOfferRecipe } from "@/components/ExportClosingStrip";
-import RerunCard from "@/components/RerunCard";
+import FileIntake from "@/components/FileIntake";
+import { cn } from "@/lib/utils";
 import CommandBarMeter from "@/components/CommandBarMeter";
 import { applyOp, OpFailure, type OpRequest, type OpWarning } from "@/lib/ops";
 import { explainError } from "@/lib/errors";
@@ -33,7 +33,6 @@ import { type SchemaColumn } from "@/components/SchemaPanel";
 const SchemaPanel = dynamic(() => import("@/components/SchemaPanel"));
 const ChartPanel = dynamic(() => import("@/components/ChartPanel"));
 const CommandPalette = dynamic(() => import("@/components/CommandPalette"));
-import FounderNote from "@/components/FounderNote";
 import GettingStarted, { markOnboardingStep, ONBOARDING_FLAGS } from "@/components/GettingStarted";
 import OnboardingIntent, { INTENT_LABELS, loadIntents, type Intent } from "@/components/OnboardingIntent";
 const KeyboardShortcuts = dynamic(() => import("@/components/KeyboardShortcuts"));
@@ -106,10 +105,14 @@ function WorkspaceContent() {
   const [exportOpen, setExportOpen] = useState(false);
   // After an export with steps: offer to keep them as a recipe
   const [exportStrip, setExportStrip] = useState<{ name: string; steps: number } | null>(null);
-  // Saved recipes, for the upload screen's re-run card
+  // Saved recipes, for the start screen's rail
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const armedRecipeId = useSearchParams().get("recipe_id");
-  // A recipe to run as soon as the next upload lands (the re-run card)
+  // The recipe the next file runs: armed from the Recipes page's link, or
+  // picked in the rail; the one intake says so and the file runs it
+  const [armedId, setArmedId] = useState<string | null>(armedRecipeId);
+  const armedRecipe = recipes.find((r) => r.id === armedId) ?? null;
+  // A recipe to run as soon as the next upload lands
   const pendingRecipeRef = useRef<Recipe | null>(null);
   // Bumped after every step change; the health strip refetches null counts
   const [healthNonce, setHealthNonce] = useState(0);
@@ -1087,13 +1090,21 @@ function WorkspaceContent() {
               </span>
               <span className="text-xs text-muted-foreground">No file open</span>
             </div>
-            <div className="max-w-5xl space-y-5 px-4 pb-12 pt-8 sm:px-6">
-              {intentsLoaded && intents === null && (
-                <OnboardingIntent onDone={handleIntentsDone} />
-              )}
+            <div className="mx-auto max-w-6xl px-4 pb-16 pt-8 sm:px-6">
+              {/* The title says what this screen is for; the three ways in sit
+                  under it in one column, the things that help in a rail. */}
+              <div className="flex flex-wrap items-end justify-between gap-4">
+                <div>
+                  <h1 className="text-2xl font-semibold tracking-[-0.02em]">Start with a file</h1>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Drop this month&apos;s export, paste cells, or fetch a link. Nothing goes to the AI until you ask Chef.
+                  </p>
+                </div>
+              </div>
+
               {justAnswered && intents && intents.length > 0 && (
-                <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-primary/30 bg-primary/5 px-5 py-3.5">
-                  <p className="text-sm">
+                <div className="mt-6 flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-muted/40 px-4 py-3">
+                  <p className="text-[13px]">
                     <span className="font-medium">
                       Set up for {intents.map((i) => INTENT_LABELS[i]).join(" + ")}.
                     </span>{" "}
@@ -1105,82 +1116,129 @@ function WorkspaceContent() {
                   </p>
                   <button
                     onClick={() => setJustAnswered(false)}
-                    className="text-xs text-muted-foreground underline-offset-2 hover:underline"
+                    className="text-[12px] text-muted-foreground underline-offset-2 hover:underline"
                     aria-label="Dismiss confirmation"
                   >
                     Got it
                   </button>
                 </div>
               )}
-              <div className="grid gap-5 md:grid-cols-2">
-                <div className="space-y-5">
-                <RerunCard recipes={recipes} armedId={armedRecipeId} disabled={loading} onRun={handleRerun} />
-                <div className="rounded-xl border bg-card p-6 shadow-sm">
-                  <h2 className="mb-4 text-lg font-semibold tracking-tight">Upload a spreadsheet</h2>
-                  <DropZone disabled={loading} onDropFile={onUpload} />
-                  <UploadMore disabled={loading} onPaste={(f) => onUpload(f)} onLink={onUploadFromUrl} />
+
+              <div className="mt-8 grid gap-10 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:gap-14">
+                <div>
+                  <FileIntake
+                    disabled={loading}
+                    armed={armedRecipe}
+                    onDisarm={() => setArmedId(null)}
+                    onDropFile={(f) => (armedRecipe ? handleRerun(f, armedRecipe) : onUpload(f))}
+                    onLink={(u) => {
+                      if (armedRecipe) pendingRecipeRef.current = armedRecipe;
+                      return onUploadFromUrl(u);
+                    }}
+                  />
                   {uploadError && (
-                    <div className="mt-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm text-destructive-text">
+                    <div className="mt-3 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-[13px] text-destructive-text">
                       {uploadError}
                     </div>
                   )}
-                  <div className="mt-5 border-t pt-4">
-                    <p className="mb-2 text-xs font-medium text-muted-foreground">
-                      No file handy? Try a sample
-                    </p>
+
+                  <div className="mt-10">
+                    {intentsLoaded && intents === null ? (
+                      <OnboardingIntent onDone={handleIntentsDone} />
+                    ) : (
+                      <div className="border-b pb-3">
+                        <h2 className="text-[13px] font-medium">No file handy? Try a sample</h2>
+                      </div>
+                    )}
                     {/* One-frame gate: render the list only after saved intents
                         are read, so returning users never see it reorder */}
-                    <div className="space-y-1.5">
+                    <ul className="divide-y">
                       {intentsLoaded && orderedSamples.map((sample) => {
                         const picked = matchedSampleIds.includes(sample.id);
                         return (
-                          <button
-                            key={sample.id}
-                            onClick={() => loadSample(sample.id)}
-                            disabled={loading}
-                            className={`w-full rounded-lg border px-3 py-2 text-left transition-colors hover:border-primary/40 hover:bg-primary/[0.03] disabled:opacity-50 ${
-                              picked ? "border-primary/40 bg-primary/[0.04]" : "bg-background"
-                            }`}
-                          >
-                            <span className="flex items-center gap-2 text-sm font-medium">
-                              {sample.name}
-                              {picked && (
-                                <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
-                                  Picked for you
+                          <li key={sample.id}>
+                            <button
+                              onClick={() => loadSample(sample.id)}
+                              disabled={loading}
+                              className="group flex w-full items-center justify-between gap-4 py-3 text-left transition-colors duration-150 hover:bg-accent/40 disabled:opacity-50 sm:-mx-2 sm:w-[calc(100%+1rem)] sm:rounded-lg sm:px-2"
+                            >
+                              <span className="min-w-0">
+                                <span className="flex items-center gap-2 text-[14px] font-medium">
+                                  {sample.name}
+                                  {picked && (
+                                    <span className="rounded-full border border-primary/30 bg-primary/10 px-1.5 py-px text-[11px] font-medium text-primary-accent">
+                                      Picked for you
+                                    </span>
+                                  )}
                                 </span>
-                              )}
-                            </span>
-                            <span className="mt-0.5 block text-xs text-muted-foreground">{sample.description}</span>
-                          </button>
+                                <span className="mt-0.5 block text-[12px] leading-relaxed text-muted-foreground">{sample.description}</span>
+                              </span>
+                              <span className="inline-flex flex-shrink-0 items-center gap-1 text-[12px] font-medium text-muted-foreground transition-colors group-hover:text-foreground">
+                                Open <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+                              </span>
+                            </button>
+                          </li>
                         );
                       })}
-                    </div>
+                    </ul>
                   </div>
                 </div>
-                </div>
-                <div className="space-y-4">
+
+                <aside className="space-y-6" aria-label="Where to start">
+                  {recipes.length > 0 && (
+                    <section className="rounded-xl border bg-card p-4 shadow-xs">
+                      <h2 className="flex items-center gap-2 text-[13px] font-medium">
+                        <BookMarked className="h-4 w-4 text-primary-accent" aria-hidden /> Your recipes
+                      </h2>
+                      <p className="mt-0.5 text-[12px] leading-relaxed text-muted-foreground">
+                        Pick one and the next file runs it, with no AI call. Or open a file first and choose then.
+                      </p>
+                      <ul className="mt-2 divide-y">
+                        {recipes.slice(0, 5).map((r) => {
+                          const chosen = r.id === armedId;
+                          return (
+                            <li key={r.id} className="flex items-center justify-between gap-3 py-2">
+                              <span className="min-w-0">
+                                <span className="block truncate text-[13px] font-medium">{r.name}</span>
+                                <span className="block text-[12px] tabular-nums text-muted-foreground">
+                                  {r.steps} step{r.steps === 1 ? "" : "s"}
+                                  {r.source_file_name ? ` · from ${r.source_file_name}` : ""}
+                                </span>
+                              </span>
+                              <button
+                                type="button"
+                                aria-pressed={chosen}
+                                disabled={loading}
+                                onClick={() => setArmedId(chosen ? null : r.id)}
+                                className={cn(
+                                  "flex-shrink-0 rounded-full border px-2.5 py-1 text-[12px] font-medium transition-colors duration-150 disabled:opacity-50",
+                                  chosen ? "border-primary bg-primary text-primary-foreground" : "bg-background text-muted-foreground hover:border-input hover:text-foreground",
+                                )}
+                              >
+                                {chosen ? "Runs on the next file" : "Use on the next file"}
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </section>
+                  )}
                   <GettingStarted />
-                  <div className="rounded-xl border bg-card p-5 shadow-sm">
-                    <div className="flex items-start gap-3">
-                      <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-primary/10">
-                        <Lightbulb className="h-4 w-4 text-primary" />
-                      </div>
-                      <div>
-                        <h3 className="mb-2 text-sm font-medium">Things you can say</h3>
-                        <ul className="space-y-1.5 text-sm text-muted-foreground">
-                          {personalizedPrompts.map((p) => (
-                            <li key={p}>&ldquo;{p}&rdquo;</li>
-                          ))}
-                        </ul>
-                      </div>
-                    </div>
-                  </div>
+                  <section>
+                    <h2 className="flex items-center gap-2 text-[13px] font-medium">
+                      <Lightbulb className="h-4 w-4 text-primary-accent" aria-hidden /> Things you can say
+                    </h2>
+                    <ul className="mt-2 divide-y">
+                      {personalizedPrompts.map((p) => (
+                        <li key={p} className="py-2 text-[13px] text-muted-foreground">&ldquo;{p}&rdquo;</li>
+                      ))}
+                    </ul>
+                  </section>
                   {/* Keyboard-shortcuts card lives in the transform view via the
-                      command palette — every shortcut it listed only works after
+                      command palette: every shortcut it listed only works after
                       a file is loaded, so it earned no place on this screen. */}
-                </div>
+                </aside>
               </div>
-              <FounderNote />
             </div>
           </div>
         )}

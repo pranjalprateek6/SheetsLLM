@@ -75,9 +75,9 @@ export default function GettingStarted() {
   }
 
   return (
-    <div className="rounded-md border bg-card p-5">
+    <div className="rounded-xl border bg-card p-4 shadow-xs">
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-sm font-medium">Getting started</h3>
+        <h3 className="text-[13px] font-medium">Getting started</h3>
         <button
           onClick={dismiss}
           className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
