@@ -12,6 +12,7 @@ from time import perf_counter
 from fastapi import APIRouter, Request, Response
 
 from app import db, jobs
+from app.answers import answer_text, extract_query, run_question
 from app.cache import (
     get_local_parquet,
     schema_fingerprint,
@@ -227,6 +228,14 @@ async def chat(request: Request):
             "strict": privacy_mode,
         }
 
+    # A question about the values: run the query, show the result, save no step
+    question_sql = extract_query(raw)
+    if question_sql is not None:
+        return await _answer_question(
+            file_id=file_id, user_id=user_id, message=message, raw_sql=question_sql,
+            local_path=local_path, steps=steps, llm=llm, privacy_mode=privacy_mode, sent=sent,
+        )
+
     # It's SQL — validate and execute
     try:
         sql = validate_sql(raw)
@@ -318,6 +327,50 @@ async def chat(request: Request):
     }
 
 
+async def _answer_question(
+    *, file_id: str, user_id: str, message: str, raw_sql: str,
+    local_path, steps: list[dict], llm, privacy_mode: bool, sent: dict,
+) -> Response | dict:
+    """Run the model's read-only query on the current data and reply with the
+    result. One retry with the error when the first query fails, as for a
+    step. The file is not changed and nothing is saved but the message."""
+    try:
+        sql = validate_sql(raw_sql)
+    except SQLValidationError:
+        events.record(user_id, "chat_sent", kind="error")
+        _save_error(file_id, "I couldn't write a safe query for that. Try naming the column.", "INVALID_SQL")
+        return _json_response(400, "INVALID_SQL", "Generated SQL failed validation")
+
+    try:
+        result = await asyncio.to_thread(run_question, local_path, steps, sql)
+    except Exception as first_error:
+        logger.warning("Question query failed, attempting retry: %s", first_error)
+        try:
+            safe_error = sanitize_error_for_llm(str(first_error), privacy_mode=privacy_mode)
+            raw_retry = await asyncio.to_thread(
+                llm.generate_sql, CHAT_SYSTEM_PROMPT, build_retry_message(message, sql, safe_error)
+            )
+            sql = validate_sql(extract_query(raw_retry) or raw_retry)
+            result = await asyncio.to_thread(run_question, local_path, steps, sql)
+        except Exception as retry_error:
+            logger.error("Question retry also failed: %s", retry_error)
+            text = "I couldn't get an answer to that from the data. Try naming the column, or ask it another way."
+            _save_error(file_id, text, "ANSWER_FAILED")
+            events.record(user_id, "chat_sent", kind="error")
+            return _json_response(400, "ANSWER_FAILED", text, sql=sql)
+
+    text = answer_text(result["columns"], result["rows"], result["total_rows"])
+    metadata = {
+        "sql": sql, "columns": result["columns"], "rows": result["rows"],
+        "total_rows": result["total_rows"], "strict": privacy_mode, "sent": sent,
+    }
+    db.create_chat_message(
+        file_id=file_id, role="assistant", content=text, message_type="answer", metadata=metadata,
+    )
+    events.record(user_id, "chat_sent", kind="answer")
+    return {"type": "answer", "message": text, "file_id": file_id, **metadata}
+
+
 def _build_conversation_context(messages: list[dict]) -> str:
     """Build a summary of recent messages for LLM context."""
     if not messages:
@@ -330,7 +383,9 @@ def _build_conversation_context(messages: list[dict]) -> str:
         if role == "user":
             lines.append(f"User: {content}")
         elif role == "assistant":
-            if meta.get("sql"):
+            if msg.get("message_type") == "answer" and meta.get("sql"):
+                lines.append(f"Assistant: [answered by running: {meta['sql']}] {content}")
+            elif meta.get("sql"):
                 lines.append(f"Assistant: [executed SQL: {meta['sql']}]")
             else:
                 lines.append(f"Assistant: {content}")

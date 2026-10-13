@@ -20,6 +20,14 @@
     "reply": "SELECT * FROM data ORDER BY \"Order Date\" DESC"
   },
   {
+    "match": "which region sold the most",
+    "reply": "{\"query\": \"SELECT \\\"Region\\\" AS region, SUM(\\\"MRP\\\") AS total_mrp, COUNT(*) AS orders FROM data WHERE \\\"Region\\\" <> '' GROUP BY 1 ORDER BY 2 DESC LIMIT 5\"}"
+  },
+  {
+    "match": "how many rows",
+    "reply": "{\"query\": \"SELECT COUNT(*) AS rows FROM data\"}"
+  },
+  {
     "match": "which column has the most nulls",
     "reply": "{\"insight\": \"Region has the most empty cells, 23% of rows.\"}"
   },
