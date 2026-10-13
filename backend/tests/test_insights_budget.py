@@ -17,7 +17,7 @@ from app.routes import insights as route
 def parquet(tmp_path):
     path = tmp_path / "data.parquet"
     duckdb.connect().execute(
-        "COPY (SELECT * FROM (VALUES (1, 'x', '2026-10-01'), (1, 'x', '28/10/2026'), (2, NULL, '2026-10-03'), (3, 'z', '10/10/2026')) t(a, b, d)) "
+        "COPY (SELECT * FROM (VALUES (1, 'x', '2026-10-01'), (1, 'x', '2026-10-01'), (2, NULL, '28/10/2026'), (3, 'z', '10/10/2026')) t(a, b, d)) "
         f"TO '{str(path).replace(chr(92), '/')}' (FORMAT PARQUET)"
     )
     return str(path)
