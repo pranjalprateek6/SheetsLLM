@@ -10,6 +10,7 @@ import DeleteAccount from "@/components/DeleteAccount";
 import { ONBOARDING_DISMISSED_KEY } from "@/components/GettingStarted";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
+import { DEFAULT_PLANS, planSummary, readPlans, type Plans } from "@/lib/plans";
 import { Button } from "@/components/ui/button";
 import UpgradeCta from "@/components/UpgradeCta";
 import { Switch } from "@/components/ui/switch";
@@ -43,6 +44,7 @@ function AccountContent() {
   const { user, signOut } = useAuth();
   const router = useRouter();
   const [tier, setTier] = useState<string | null>(null);
+  const [plans, setPlans] = useState<Plans>(DEFAULT_PLANS);
   const [tierFailed, setTierFailed] = useState(false);
   const [privacyMode, setPrivacyMode] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
@@ -65,6 +67,7 @@ function AccountContent() {
       .then((d) => {
         if (typeof d?.tier !== "string") throw new Error("no tier");
         setTier(d.tier);
+        setPlans(readPlans(d));
       })
       .catch(() => setTierFailed(true));
   }, []);
@@ -163,9 +166,7 @@ function AccountContent() {
           description={
             tier === null
               ? undefined
-              : isPro
-              ? "1,000 uploads and 5,000 AI requests a month, and unlimited saved recipes."
-              : "50 uploads and 200 AI requests a month, and 1 saved recipe."
+              : planSummary(plans, isPro ? "pro" : "free")
           }
         >
           {tier === null && tierFailed ? (

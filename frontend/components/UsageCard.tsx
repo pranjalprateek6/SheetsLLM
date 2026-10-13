@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { Gauge, Sparkles } from "lucide-react";
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
+import { planNudge, readPlans } from "@/lib/plans";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import UpgradeCta from "@/components/UpgradeCta";
@@ -184,7 +185,7 @@ export default function UsageCard({ embedded = false }: { embedded?: boolean }) 
             {capped
               ? "You've hit a monthly limit on the Free plan."
               : "You're close to a monthly limit on the Free plan."}{" "}
-            Pro raises caps to 1,000 uploads and 5,000 AI requests a month.
+            {planNudge(readPlans(usage))}
           </p>
           <UpgradeCta reason={tightest.reason} className="whitespace-nowrap" />
         </div>

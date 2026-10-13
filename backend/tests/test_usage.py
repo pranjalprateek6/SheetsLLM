@@ -151,3 +151,30 @@ def test_summary_recipes_count_fails_open(monkeypatch):
 
     monkeypatch.setattr(usage.db, "list_recipes", _boom)
     assert usage.summary("u1")["recipes"]["saved"] is None
+
+
+# ── The plans, as the pages describe them ────────────────────────────
+
+
+def test_plans_come_from_config(monkeypatch):
+    from app import usage
+
+    assert usage.plans() == {
+        "free": {"uploads": usage.TIER_LIMITS["free"]["uploads"], "ai_requests": usage.TIER_LIMITS["free"]["chat_requests"], "recipes": usage.RECIPE_LIMITS["free"]},
+        "pro": {"uploads": usage.TIER_LIMITS["pro"]["uploads"], "ai_requests": usage.TIER_LIMITS["pro"]["chat_requests"], "recipes": usage.RECIPE_LIMITS["pro"]},
+    }
+
+
+def test_summary_and_billing_status_carry_the_plans(monkeypatch):
+    from app import db, usage
+    from app.routes import billing as billing_route
+    import types
+
+    monkeypatch.setattr(db, "get_usage", lambda uid, month: None)
+    monkeypatch.setattr(db, "count_audit_actions", lambda *a, **kw: 0)
+    monkeypatch.setattr(db, "list_recipes", lambda uid: [])
+    monkeypatch.setattr(usage, "get_user_tier", lambda uid: "free")
+    assert usage.summary("u1")["plans"] == usage.plans()
+    status = billing_route.billing_status(types.SimpleNamespace(state=types.SimpleNamespace(user_id="u1")))
+    assert status["plans"] == usage.plans()
+

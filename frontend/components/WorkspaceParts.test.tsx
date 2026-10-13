@@ -79,6 +79,32 @@ describe("ExportMenu", () => {
     expect(onExport).toHaveBeenCalledWith("parquet");
   });
 
+  it("copies the cleaned CSV to the clipboard, and a share link with the IMPORTDATA hint", async () => {
+    const written: string[] = [];
+    Object.assign(navigator, { clipboard: { writeText: async (t: string) => { written.push(t); } } });
+    server.use(
+      http.get("/api/files/:id/history", () => HttpResponse.json(HISTORY)),
+      http.get("/api/download", () => new HttpResponse("a,b\n1,2\n", { headers: { "content-type": "text/csv" } })),
+      http.post("/api/files/:id/share", () => HttpResponse.json({ token: "tok.sig", expires_at: "2026-10-20T00:00:00Z", days: 7 })),
+    );
+    render(<ExportMenu fileId="f1" localSteps={2} rowCount={0} columnCount={0} open onOpenChange={() => {}} onExport={vi.fn()} onReload={() => {}} />);
+    const menu = await screen.findByRole("menu");
+    await within(menu).findByText("Step 2 of 2");
+    await userEvent.click(within(menu).getByRole("menuitem", { name: "Copy as CSV to clipboard" }));
+    await waitFor(() => expect(written).toContain("a,b\n1,2\n"));
+    await userEvent.click(within(menu).getByRole("menuitem", { name: "Copy a link that works for 7 days" }));
+    await waitFor(() => expect(written.at(-1)).toBe(`${window.location.origin}/api/shared/tok.sig`));
+  });
+
+  it("keeps a file over 50,000 rows off the clipboard", async () => {
+    server.use(http.get("/api/files/:id/history", () => HttpResponse.json({ ...HISTORY, steps: [{ step_number: 1, row_count_after: 80000, columns_after: ["a"] }] })));
+    render(<ExportMenu fileId="f1" localSteps={1} rowCount={0} columnCount={0} open onOpenChange={() => {}} onExport={vi.fn()} onReload={() => {}} />);
+    const menu = await screen.findByRole("menu");
+    await within(menu).findByText("Step 1 of 1");
+    expect(within(menu).getByRole("menuitem", { name: /Copy as CSV to clipboard/ })).toHaveAttribute("data-disabled");
+    expect(menu).toHaveTextContent("up to 50,000 rows");
+  });
+
   it("disables the formats when the server has steps this screen hasn't seen", async () => {
     server.use(http.get("/api/files/:id/history", () => HttpResponse.json(HISTORY)));
     const onReload = vi.fn();

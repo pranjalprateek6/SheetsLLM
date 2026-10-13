@@ -11,7 +11,7 @@ from time import perf_counter
 
 from fastapi import APIRouter, Request, Response
 
-from app import db, jobs
+from app import db
 from app.answers import answer_text, extract_query, run_question
 from app.cache import (
     get_local_parquet,

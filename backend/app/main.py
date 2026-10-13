@@ -12,8 +12,8 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import JSONResponse
 
-from app.auth import PUBLIC_PATHS, verify_token
-from app import cache, jobs
+from app.auth import PUBLIC_PATHS, PUBLIC_PREFIXES, verify_token
+from app import cache
 from app.config import ALLOW_ANONYMOUS, ALLOWED_ORIGINS, IS_PRODUCTION
 from app.routes import register_routes
 
@@ -35,6 +35,7 @@ _ROUTE_TIMEOUTS = {
     "/transform/op": 90,  # one-click fixes replay every step on big files
     "/download": 60,
     "/chat": 90,
+    "/insights": 30,  # a budgeted pass over the file as its steps left it
 }
 _DEFAULT_TIMEOUT = 10
 
@@ -44,20 +45,12 @@ _DEFAULT_TIMEOUT = 10
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Run periodic cache/job cleanup while the app is alive."""
-    # Any persisted job still "processing" belonged to the previous
-    # (dead) process — fail it so pollers stop waiting.
-    try:
-        await asyncio.to_thread(jobs.sweep_orphaned)
-    except Exception:
-        pass
-
+    """Run periodic cache cleanup while the app is alive."""
     async def _eviction_loop():
         while True:
             await asyncio.sleep(300)
             try:
                 await asyncio.to_thread(cache.evict_expired)
-                await asyncio.to_thread(jobs.evict_expired)
             except Exception:
                 pass
 
@@ -145,7 +138,7 @@ async def auth_middleware(request: Request, call_next):
     """Verify Supabase JWT for protected routes."""
     path = request.url.path.rstrip("/")
 
-    if request.method == "OPTIONS" or path in PUBLIC_PATHS:
+    if request.method == "OPTIONS" or path in PUBLIC_PATHS or path.startswith(PUBLIC_PREFIXES):
         return await call_next(request)
 
     try:

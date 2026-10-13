@@ -7,6 +7,8 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { toast } from "sonner";
+
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
 
 const FORMATS: { value: string; label: string }[] = [
@@ -19,6 +21,8 @@ const FORMATS: { value: string; label: string }[] = [
 
 // The backend refuses Excel past this (download.py _XLSX_MAX_ROWS); say so here
 const XLSX_MAX_ROWS = 250_000;
+// Past this the clipboard is the wrong place for it
+export const CLIPBOARD_MAX_ROWS = 50_000;
 
 type HistoryStep = { step_number: number; row_count_after?: number | null; columns_after?: string[] | null };
 
@@ -74,6 +78,44 @@ export default function ExportMenu({
   const iconRef = useRef<DownloadIconHandle>(null);
   const [summary, setSummary] = useState<ExportSummary | null>(null);
   const [failed, setFailed] = useState(false);
+  const [busy, setBusy] = useState<"copy" | "link" | null>(null);
+
+  // The cleaned file as CSV text, straight to the clipboard: paste into any
+  // spreadsheet, no download in between
+  const copyCsv = async () => {
+    if (!fileId || busy) return;
+    setBusy("copy");
+    try {
+      const r = await fetchWithAuth(`/api/download?file_id=${encodeURIComponent(fileId)}&format=csv`);
+      if (!r.ok) throw new Error(String(r.status));
+      const text = await r.text();
+      await navigator.clipboard.writeText(text);
+      toast.success(`Copied ${rows.toLocaleString()} rows as CSV. Paste into any spreadsheet.`);
+    } catch {
+      toast.error("Couldn't copy the file. Try an export instead.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  // A link that serves the cleaned CSV to anyone for a week: a colleague,
+  // or a Google Sheet through IMPORTDATA
+  const copyLink = async () => {
+    if (!fileId || busy) return;
+    setBusy("link");
+    try {
+      const r = await fetchWithAuth(`/api/files/${encodeURIComponent(fileId)}/share`, { method: "POST" });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok || !d.token) throw new Error(String(r.status));
+      const link = `${window.location.origin}/api/shared/${d.token}`;
+      await navigator.clipboard.writeText(link);
+      toast.success(`Link copied. It serves the cleaned CSV for ${d.days ?? 7} days. In Google Sheets: =IMPORTDATA("${link}")`, { duration: 8000 });
+    } catch {
+      toast.error("Couldn't make a link. Try again in a moment.");
+    } finally {
+      setBusy(null);
+    }
+  };
 
   useEffect(() => {
     if (!open || !fileId) return;
@@ -146,6 +188,15 @@ export default function ExportMenu({
             </DropdownMenuItem>
           );
         })}
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel className="text-[11px] font-medium text-muted-foreground">Without a download</DropdownMenuLabel>
+        <DropdownMenuItem disabled={mismatch || rows > CLIPBOARD_MAX_ROWS || busy !== null} onSelect={(e) => { e.preventDefault(); void copyCsv(); }}>
+          {busy === "copy" ? "Copying…" : "Copy as CSV to clipboard"}
+          {rows > CLIPBOARD_MAX_ROWS && <span className="ml-auto pl-3 text-[11px] text-muted-foreground">up to 50,000 rows</span>}
+        </DropdownMenuItem>
+        <DropdownMenuItem disabled={mismatch || busy !== null} onSelect={(e) => { e.preventDefault(); void copyLink(); }}>
+          {busy === "link" ? "Making a link…" : "Copy a link that works for 7 days"}
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );

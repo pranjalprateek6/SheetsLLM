@@ -147,3 +147,5 @@ async def verify_token(request: Request) -> dict:
 PUBLIC_PATHS = frozenset(
     {"/health", "/docs", "/openapi.json", "/billing/webhook", "/reminders/run"}
 )
+# Paths whose token is in the URL itself: a share link carries its own proof
+PUBLIC_PREFIXES = ("/shared/",)

@@ -357,6 +357,9 @@ export default function Header() {
                 <DropdownMenuItem asChild>
                   <Link href="/account">Account &amp; billing</Link>
                 </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/help">Help</Link>
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={handleSignOut} className="text-destructive-text focus:text-destructive-text">
                   <LogOut className="mr-2 h-4 w-4" />
                   Sign out
