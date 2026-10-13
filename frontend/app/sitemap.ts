@@ -16,5 +16,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${BASE}/tools`, changeFrequency: "monthly", priority: 0.9 },
     ...TOOLS.map((t) => ({ url: `${BASE}${t.href}`, changeFrequency: "monthly" as const, priority: 0.9 })),
     ...LEGAL_DOCS.map((d) => ({ url: `${BASE}${d.href}`, changeFrequency: "yearly" as const, priority: 0.3 })),
+    { url: `${BASE}/help`, changeFrequency: "monthly", priority: 0.6 },
+    { url: `${BASE}/changelog`, changeFrequency: "weekly", priority: 0.5 },
   ];
 }
