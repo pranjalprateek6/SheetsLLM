@@ -214,18 +214,25 @@ export default function RecipesDrawer({
     setSaving(true);
     setError(null);
     try {
-      const del = await fetchWithAuth(`/api/recipes/${old.id}`, { method: "DELETE" });
-      if (!del.ok) throw new Error(`HTTP ${del.status}`);
-      const res = await fetchWithAuth("/api/recipes", {
-        method: "POST",
+      // Same recipe, new steps: its checks and last run stay with it
+      const res = await fetchWithAuth(`/api/recipes/${old.id}/steps`, {
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ file_id: fileId, name: newName, from: saveFrom }),
+        body: JSON.stringify({ file_id: fileId }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || `HTTP ${res.status}`);
+      if (name.trim() && newName !== old.name) {
+        await fetchWithAuth(`/api/recipes/${old.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: newName }),
+        });
+      }
+      const count = Array.isArray(data.steps) ? data.steps.length : 0;
       setUpgradeWall(null);
       setName("");
-      setNotice(`Replaced "${old.name}" with "${data.name}" (${data.steps} step${data.steps === 1 ? "" : "s"}).`);
+      setNotice(`Replaced the steps of "${old.name}" (${count} step${count === 1 ? "" : "s"}).`);
       markOnboardingStep("recipe");
       fetchRecipes();
     } catch (e) {

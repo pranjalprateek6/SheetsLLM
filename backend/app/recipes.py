@@ -59,6 +59,28 @@ def validate_recipe_steps(recipe_steps: list[dict]) -> list[dict[str, Any]]:
     return cleaned
 
 
+def reorder_steps(recipe_steps: list[dict], keep: Any) -> list[dict[str, Any]]:
+    """The steps numbered in ``keep``, in that order, renumbered from 1.
+
+    Editing a recipe means removing steps and moving them; the SQL itself is
+    never taken from the client. ``keep`` must name existing steps, each once,
+    and at least one of them. Raises RecipeError otherwise.
+    """
+    if not isinstance(keep, list) or not keep:
+        raise RecipeError("Keep at least one step, or delete the recipe instead")
+    by_number = {int(s.get("step_number", 0)): s for s in recipe_steps}
+    chosen: list[dict[str, Any]] = []
+    seen: set[int] = set()
+    for n in keep:
+        if isinstance(n, bool) or not isinstance(n, int) or n not in by_number:
+            raise RecipeError(f"There is no step {n!r} in this recipe")
+        if n in seen:
+            raise RecipeError(f"Step {n} is listed twice")
+        seen.add(n)
+        chosen.append(by_number[n])
+    return [{**s, "step_number": i + 1} for i, s in enumerate(chosen)]
+
+
 def renumber_after(recipe_steps: list[dict], existing_count: int) -> list[dict[str, Any]]:
     """Renumber recipe steps to append after a target file's existing steps."""
     return [
