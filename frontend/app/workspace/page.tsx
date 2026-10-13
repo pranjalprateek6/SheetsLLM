@@ -33,7 +33,6 @@ import { type SchemaColumn } from "@/components/SchemaPanel";
 const SchemaPanel = dynamic(() => import("@/components/SchemaPanel"));
 const ChartPanel = dynamic(() => import("@/components/ChartPanel"));
 const CommandPalette = dynamic(() => import("@/components/CommandPalette"));
-import FounderNote from "@/components/FounderNote";
 import GettingStarted, { markOnboardingStep, ONBOARDING_FLAGS } from "@/components/GettingStarted";
 import OnboardingIntent, { INTENT_LABELS, loadIntents, type Intent } from "@/components/OnboardingIntent";
 const KeyboardShortcuts = dynamic(() => import("@/components/KeyboardShortcuts"));
@@ -1238,7 +1237,6 @@ function WorkspaceContent() {
                   {/* Keyboard-shortcuts card lives in the transform view via the
                       command palette: every shortcut it listed only works after
                       a file is loaded, so it earned no place on this screen. */}
-                  <FounderNote />
                 </aside>
               </div>
             </div>
