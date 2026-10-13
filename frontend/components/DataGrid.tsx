@@ -444,6 +444,11 @@ export default function DataGrid({
                                   <CalendarDays className="mr-2 h-3.5 w-3.5" /> Standardise dates…
                                 </DropdownMenuItem>
                               )}
+                              {(isTextType(meta?.dtype) || (!meta?.dtype && typeof rows[0]?.[h] === "string")) && (
+                                <DropdownMenuItem onClick={() => onOp({ op: "clean_number", column: h })}>
+                                  <Hash className="mr-2 h-3.5 w-3.5" /> Clean numbers
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuSub>
                                 <DropdownMenuSubTrigger>
                                   <Replace className="mr-2 h-3.5 w-3.5" /> Change type to

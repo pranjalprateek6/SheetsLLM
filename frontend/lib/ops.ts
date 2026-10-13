@@ -11,7 +11,8 @@ export type OpName =
   | "cast"
   | "standardise_date"
   | "sort"
-  | "contains_any";
+  | "contains_any"
+  | "clean_number";
 
 export type OpRequest = {
   op: OpName;
@@ -20,15 +21,20 @@ export type OpRequest = {
 };
 
 /** Said after a step that ran but may not have done what was meant: a sort
- *  of a text column with dates written two ways comes out in text order. */
+ *  of a text column with dates written two ways comes out in text order
+ *  (MIXED_DATES), or cleaning numbers emptied cells it could not read
+ *  (VALUES_LOST). */
 export type OpWarning = {
-  code: "MIXED_DATES";
+  code: "MIXED_DATES" | "VALUES_LOST";
   column: string;
   message: string;
   /** The one-click fix, when the data shows the day/month order; else null */
   fix: OpRequest | null;
-  /** What to ask Chef when there is no one-click fix */
+  /** What to ask Chef when there is no one-click fix; empty when undo is the answer */
   instruction: string;
+  /** VALUES_LOST: how many cells, and a few of the values that were in them */
+  count?: number;
+  examples?: string[];
 };
 
 export type OpResult = {
