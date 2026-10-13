@@ -55,7 +55,7 @@ function barColor(pct: number) {
   return "bg-primary";
 }
 
-export default function UsageCard({ embedded = false }: { embedded?: boolean }) {
+export default function UsageCard({ embedded = false, compact = false }: { embedded?: boolean; compact?: boolean }) {
   const [usage, setUsage] = useState<UsageSummary | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
 
@@ -108,6 +108,51 @@ export default function UsageCard({ embedded = false }: { embedded?: boolean }) 
   // Deep-link the pricing page to the cap that triggered the nudge, so it
   // opens mid-conversation instead of cold.
   const tightest = meters.reduce((a, b) => (b.pct > a.pct ? b : a), meters[0]);
+
+  // On the Files page the month is one line under the title, not a panel
+  // above the list: the numbers, the reset, and the nudge when it is due
+  if (compact) {
+    return (
+      <div className="mb-5 border-b pb-4">
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-[13px]">
+          <span className="font-medium">This month</span>
+          {meters.map((m) => (
+            <span key={m.key} className="flex items-center gap-2 tabular-nums text-muted-foreground">
+              <span className="text-foreground">{m.used.toLocaleString()}</span>
+              {m.limit > 0 ? ` of ${m.limit.toLocaleString()}` : ""} {m.label.toLowerCase()}
+              {m.limit > 0 && m.pct >= NUDGE_THRESHOLD && (
+                <span className="h-1.5 w-12 overflow-hidden rounded-full bg-muted" aria-hidden>
+                  <span className={cn("block h-full rounded-full", barColor(m.pct))} style={{ width: `${m.pct * 100}%` }} />
+                </span>
+              )}
+            </span>
+          ))}
+          {typeof usage.recipes?.saved === "number" && (
+            <span className="tabular-nums text-muted-foreground">
+              <span className="text-foreground">{usage.recipes.saved.toLocaleString()}</span>
+              {usage.recipes.limit > 0 ? ` of ${usage.recipes.limit.toLocaleString()}` : ""} saved recipe{usage.recipes.saved === 1 ? "" : "s"}
+            </span>
+          )}
+          <span className="ml-auto text-[12px] text-muted-foreground">Resets {resetDate(usage.month)}</span>
+        </div>
+        {(usage.used.rows_processed > 0 || (usage.recipe_applies ?? 0) > 0) && (
+          <p className="mt-1.5 text-[12px] text-muted-foreground">
+            {usage.used.rows_processed.toLocaleString()} rows cleaned
+            {(usage.recipe_applies ?? 0) > 0 && `, ${usage.recipe_applies} manual cleanup${usage.recipe_applies === 1 ? "" : "s"} skipped with recipes`}.
+          </p>
+        )}
+        {showNudge && (
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-[13px] text-muted-foreground">
+              {capped ? "You've hit a monthly limit on the Free plan." : "You're close to a monthly limit on the Free plan."}{" "}
+              {planNudge(readPlans(usage))}
+            </p>
+            <UpgradeCta reason={tightest.reason} className="whitespace-nowrap" />
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className={cn(!embedded && "mb-6 rounded-xl border bg-card p-5 shadow-xs")}>

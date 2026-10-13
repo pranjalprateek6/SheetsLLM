@@ -106,7 +106,7 @@ function RecipesContent() {
       <DueRecipes className="mb-5" />
 
       {failed && (
-        <div className="rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm">
+        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm">
           Couldn&apos;t load your recipes.{" "}
           <button className="font-medium text-primary hover:underline" onClick={load}>Retry</button>
         </div>
@@ -211,7 +211,7 @@ function RecipesContent() {
                 type="button"
                 disabled={!!applying}
                 onClick={() => applyFor && apply(applyFor, f)}
-                className="flex w-full items-center gap-2 rounded-md border px-3 py-2 text-left text-sm transition-colors hover:border-primary/40 hover:bg-primary/[0.03] disabled:opacity-60"
+                className="flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-left text-sm transition-colors hover:border-primary/40 hover:bg-primary/[0.03] disabled:opacity-60"
               >
                 <FileSpreadsheet className="h-4 w-4 flex-shrink-0 text-primary" aria-hidden />
                 <span className="min-w-0 flex-1 truncate">{f.name}</span>
