@@ -71,6 +71,14 @@ if (process.argv.includes("--samples")) {
   const samples = join(here, "..", "..", "public", "samples");
   writeFileSync(join(samples, "orders_oct.csv"), csv(HEADERS, oct));
   writeFileSync(join(samples, "orders_nov.csv"), csv(HEADERS, nov));
+  // The lookup the orders sample opens with: one manager per region. The
+  // orders write regions in mixed case, which the join matches anyway.
+  writeFileSync(
+    join(samples, "regions.csv"),
+    csv(["Region", "Manager", "Monthly Target"], [
+      ["North", "Ann Kapoor", 42000], ["South", "Ben Iyer", 38000], ["East", "Cyrus Mehta", 45000], ["West", "Dee Nair", 40000],
+    ]),
+  );
 }
 
 const empty = oct.filter((r) => r[2] === "").length;
