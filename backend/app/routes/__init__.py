@@ -22,6 +22,7 @@ from .billing import router as billing_router
 from .feedback import router as feedback_router
 from .client_events import router as client_events_router
 from .admin import router as admin_router
+from .account import router as account_router
 
 
 def register_routes(app: FastAPI) -> None:
@@ -43,6 +44,7 @@ def register_routes(app: FastAPI) -> None:
     app.include_router(client_events_router)
     app.include_router(admin_router)
     app.include_router(feedback_router)
+    app.include_router(account_router)
     if LLM_PROVIDER == "fake":
         from .fake_llm import router as fake_llm_router
         app.include_router(fake_llm_router)

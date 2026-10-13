@@ -47,6 +47,12 @@ def delete_object(key: str) -> None:
     logger.info("Deleted storage key=%s", key)
 
 
+def delete_objects(keys: list[str]) -> None:
+    """Remove several objects in one call."""
+    if keys:
+        _bucket().remove(keys)
+
+
 def copy_object(source_key: str, dest_key: str) -> str:
     """Copy an object within the bucket. Returns the dest key."""
     # Supabase storage copy expects "bucket/path" format for source

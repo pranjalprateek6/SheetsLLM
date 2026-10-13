@@ -314,6 +314,15 @@ function AuthContent() {
                     : "Send reset link"}
                 </Button>
 
+                {mode !== "forgot" && (
+                  <p className="text-center text-xs leading-relaxed text-muted-foreground">
+                    By continuing you agree to the{" "}
+                    <Link href="/legal/terms" className="underline underline-offset-2 hover:text-foreground">Terms</Link>
+                    {" "}and the{" "}
+                    <Link href="/legal/privacy" className="underline underline-offset-2 hover:text-foreground">Privacy policy</Link>.
+                  </p>
+                )}
+
                 {mode === "forgot" && (
                   <button
                     type="button"
