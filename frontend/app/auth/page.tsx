@@ -164,7 +164,7 @@ function AuthContent() {
   const passwordLongEnough = password.length >= 6;
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-4">
+    <div className="flex min-h-[100dvh] items-center justify-center px-4">
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
@@ -198,14 +198,14 @@ function AuthContent() {
                 {mode === "signin" ? (
                   <>
                     New to SheetsLLM?{" "}
-                    <button onClick={() => switchMode("signup")} className="font-medium text-primary-accent hover:underline">
+                    <button onClick={() => switchMode("signup")} className="font-medium text-primary-accent hover:underline coarse:inline-block coarse:py-2">
                       Create an account
                     </button>
                   </>
                 ) : mode === "signup" ? (
                   <>
                     Describe a cleanup once, keep it forever.{" "}
-                    <button onClick={() => switchMode("signin")} className="font-medium text-primary-accent hover:underline">
+                    <button onClick={() => switchMode("signin")} className="font-medium text-primary-accent hover:underline coarse:inline-block coarse:py-2">
                       I have an account
                     </button>
                   </>
@@ -260,7 +260,7 @@ function AuthContent() {
                         <button
                           type="button"
                           onClick={() => switchMode("forgot")}
-                          className="text-xs font-medium text-primary-accent hover:underline"
+                          className="text-xs font-medium text-primary-accent hover:underline coarse:inline-block coarse:py-2"
                         >
                           Forgot password?
                         </button>

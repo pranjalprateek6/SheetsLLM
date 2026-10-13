@@ -556,7 +556,7 @@ export default function ChatPanel({
                             <ChevronDown className={cn("h-3 w-3 transition-transform", expandedSql === String(i) && "rotate-180")} />
                           </button>
                           {expandedSql !== String(i) && (
-                            <CopyButton text={String(msg.metadata.sql)} label="Copy SQL" className="ml-auto opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100" />
+                            <CopyButton text={String(msg.metadata.sql)} label="Copy SQL" className="ml-auto opacity-0 transition-opacity focus-visible:opacity-100 group-hover:opacity-100 coarse:opacity-100" />
                           )}
                         </div>
                         {expandedSql === String(i) && <SqlBlock sql={String(msg.metadata.sql)} id={`sql-${i}`} />}
@@ -611,7 +611,7 @@ export default function ChatPanel({
                         ))}
                       </div>
                     )}
-                    <div className="mt-1 flex h-6 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+                    <div className="mt-1 flex h-6 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100 coarse:opacity-100">
                       <CopyButton text={msg.content} className="-ml-1.5" />
                     </div>
                   </div>

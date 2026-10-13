@@ -1092,14 +1092,14 @@ function WorkspaceContent() {
 
         {/* Loading state when file_id present */}
         {loading && urlFileId && !fileReady && (
-          <div className="flex min-h-[calc(100vh-56px)] items-center justify-center">
+          <div className="flex min-h-[calc(100dvh-56px)] items-center justify-center">
             <TextShimmer className="text-sm" duration={1.2}>Loading file…</TextShimmer>
           </div>
         )}
 
         {/* Bad ?file_id= — dead-end recovery */}
         {fileLoadError && !fileReady && (
-          <div className="flex min-h-[calc(100vh-56px)] items-center justify-center px-4">
+          <div className="flex min-h-[calc(100dvh-56px)] items-center justify-center px-4">
             <div className="w-full max-w-md rounded-xl border bg-card p-8 text-center shadow-sm">
               {/* eslint-disable-next-line @next/next/no-img-element -- static SVG */}
               <img src="/logo.svg" className="mx-auto mb-3 h-10 w-10 opacity-50" alt="" />
@@ -1121,7 +1121,7 @@ function WorkspaceContent() {
 
         {/* Phase 1: Upload */}
         {showUpload && !fileReady && !fileLoadError && !(loading && urlFileId) && (
-          <div className="min-h-[calc(100vh-56px)] animate-fade-in-up">
+          <div className="min-h-[calc(100dvh-56px)] animate-fade-in-up">
             {/* The header runs full width here, so a centered island below it
                 shares no edge with anything. The same status bar the loaded
                 workspace uses gives this phase the left edge instead, and says
@@ -1313,7 +1313,7 @@ function WorkspaceContent() {
                     <DropdownMenuTrigger asChild>
                       <button
                         title={fileName || "Untitled"}
-                        className="flex min-w-0 items-center gap-2 rounded-md px-1.5 py-1 transition-colors hover:bg-accent"
+                        className="flex min-w-0 items-center gap-2 rounded-md px-1.5 py-1 transition-colors hover:bg-accent coarse:min-h-9"
                       >
                         <FileSpreadsheet className="h-4 w-4 flex-shrink-0 text-primary" aria-hidden />
                         {/* Clip the stem, never the extension: the format is the
