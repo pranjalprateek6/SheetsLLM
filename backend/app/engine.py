@@ -277,7 +277,7 @@ def values_lost_by(
         lost = f"{q} IS NOT NULL AND TRIM(CAST({q} AS VARCHAR)) <> '' AND ({expr}) IS NULL"
         count = con.execute(f"SELECT COUNT(*) FROM data WHERE {lost}").fetchone()[0]
         sample = con.execute(
-            f"SELECT DISTINCT CAST({q} AS VARCHAR) FROM data WHERE {lost} LIMIT {int(examples)}"
+            f"SELECT DISTINCT CAST({q} AS VARCHAR) FROM data WHERE {lost} ORDER BY 1 LIMIT {int(examples)}"
         ).fetchall()
         return {"count": int(count), "examples": [str(r[0]) for r in sample]}
 
