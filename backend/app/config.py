@@ -87,6 +87,10 @@ ALLOW_ANONYMOUS: bool = (
     os.getenv("ALLOW_ANONYMOUS", "false").strip().lower() in ("1", "true", "yes")
 )
 
+# Signs share links. Optional: without it one is derived from the service
+# key, so links stay valid across restarts of the same deployment.
+SHARE_SECRET: str = os.getenv("SHARE_SECRET", "")
+
 # ── CORS ─────────────────────────────────────────────────────────────
 ALLOWED_ORIGINS: list[str] = [
     o.strip()
