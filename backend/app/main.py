@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import JSONResponse
 
 from app.auth import PUBLIC_PATHS, verify_token
-from app import cache, jobs
+from app import cache
 from app.config import ALLOW_ANONYMOUS, ALLOWED_ORIGINS, IS_PRODUCTION
 from app.routes import register_routes
 
@@ -44,20 +44,12 @@ _DEFAULT_TIMEOUT = 10
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Run periodic cache/job cleanup while the app is alive."""
-    # Any persisted job still "processing" belonged to the previous
-    # (dead) process — fail it so pollers stop waiting.
-    try:
-        await asyncio.to_thread(jobs.sweep_orphaned)
-    except Exception:
-        pass
-
+    """Run periodic cache cleanup while the app is alive."""
     async def _eviction_loop():
         while True:
             await asyncio.sleep(300)
             try:
                 await asyncio.to_thread(cache.evict_expired)
-                await asyncio.to_thread(jobs.evict_expired)
             except Exception:
                 pass
 

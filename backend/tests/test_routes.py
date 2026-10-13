@@ -1,7 +1,7 @@
 """Route-level tests through the real ASGI app (TestClient) with the db,
 storage, and LLM seams monkeypatched — covers the wiring the unit suites
 can't: middleware, request parsing, the transform sync/async split, chat
-branching, upload sheet-selection + pending redeem, and jobs polling.
+branching, and upload sheet-selection + pending redeem.
 
 The bare TestClient (no context manager) deliberately skips lifespan, so
 no startup sweep / eviction loop / Supabase calls happen here.
@@ -17,7 +17,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 import app.main as main_module
-from app import cache, db, jobs
+from app import cache, db
 from app.main import app
 from app.routes import chat as chat_module
 from app.routes import transform as transform_module
@@ -58,23 +58,6 @@ def _no_usage(monkeypatch):
     monkeypatch.setattr(usage, "enforce", lambda *a, **kw: None)
     monkeypatch.setattr(usage, "record", lambda *a, **kw: None)
     monkeypatch.setattr(events, "record", lambda *a, **kw: None)
-
-
-@pytest.fixture(autouse=True)
-def _clean_caches():
-    with jobs._lock:
-        jobs._jobs.clear()
-    yield
-    with jobs._lock:
-        jobs._jobs.clear()
-
-
-@pytest.fixture(autouse=True)
-def _jobs_no_db(monkeypatch):
-    """Job persistence fails open (no Supabase in tests)."""
-    def _boom():
-        raise RuntimeError("no supabase in tests")
-    monkeypatch.setattr(jobs, "_table", _boom)
 
 
 @pytest.fixture
@@ -281,21 +264,6 @@ class TestChat:
 
     def test_get_history_requires_ownership(self, client, transform_seams):
         resp = client.get("/chat/ghost")
-        assert resp.status_code == 404
-
-
-# ── /jobs ─────────────────────────────────────────────────────────────
-
-
-class TestJobs:
-    def test_unknown_job_404(self, client):
-        resp = client.get("/jobs/does-not-exist")
-        assert resp.status_code == 404
-        assert resp.json()["code"] == "JOB_NOT_FOUND"
-
-    def test_foreign_job_hidden(self, client):
-        job_id = jobs.create_job("someone-else", "transform")
-        resp = client.get(f"/jobs/{job_id}")
         assert resp.status_code == 404
 
 
