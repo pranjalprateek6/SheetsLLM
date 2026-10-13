@@ -62,6 +62,8 @@ EVENTS = frozenset({
     "account_deleted",
     # a recipe's steps removed, reordered or replaced from a file
     "recipe_steps_edited",
+    # the week's numbers mailed to the owner
+    "digest_sent",
 })
 
 

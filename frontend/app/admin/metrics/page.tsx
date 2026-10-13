@@ -51,6 +51,14 @@ export default function AdminMetricsPage() {
 function MetricsContent() {
   const [data, setData] = useState<Metrics | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // The email the owner gets on Monday, as it would read today
+  const [digest, setDigest] = useState<{ subject: string; text: string } | null>(null);
+
+  useEffect(() => {
+    fetchWithAuth("/api/admin/digest")
+      .then(async (r) => (r.ok ? setDigest(await r.json()) : null))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     fetchWithAuth("/api/admin/metrics")
@@ -172,6 +180,17 @@ function MetricsContent() {
           )}
         </dl>
       </section>
+
+      {digest && (
+        <section className="mt-10" aria-labelledby="digest">
+          <h2 id="digest" className="text-lg font-semibold tracking-tight">This week&apos;s email</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            What goes to every owner address on Monday morning, as it would read right now.
+          </p>
+          <p className="mt-3 text-sm font-medium">{digest.subject}</p>
+          <pre className="mt-2 overflow-x-auto whitespace-pre-wrap rounded-lg border bg-muted/30 p-4 font-mono text-xs leading-relaxed">{digest.text}</pre>
+        </section>
+      )}
     </main>
   );
 }

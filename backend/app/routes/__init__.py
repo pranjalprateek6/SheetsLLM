@@ -22,6 +22,7 @@ from .feedback import router as feedback_router
 from .client_events import router as client_events_router
 from .admin import router as admin_router
 from .reminders import router as reminders_router
+from .digest import router as digest_router
 from .account import router as account_router
 
 
@@ -44,6 +45,7 @@ def register_routes(app: FastAPI) -> None:
     app.include_router(admin_router)
     app.include_router(feedback_router)
     app.include_router(reminders_router)
+    app.include_router(digest_router)
     app.include_router(account_router)
     if LLM_PROVIDER == "fake":
         from .fake_llm import router as fake_llm_router
