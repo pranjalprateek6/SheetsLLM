@@ -645,8 +645,8 @@ export default function DataGrid({
             {/* Spacer after header */}
             <tr className="h-2" />
           </tbody>
-          <tbody className="[&_tr:hover]:bg-accent">
-            {loading ? (
+          <tbody className={`[&_tr:hover]:bg-accent transition-opacity duration-200 ${loading && rows.length > 0 ? "opacity-50" : ""}`} aria-busy={loading || undefined}>
+            {loading && rows.length === 0 ? (
               <tr>
                 <td className="px-3 py-8 text-center" colSpan={head.length + 1}>
                   <TextShimmer className="text-sm" duration={1.2}>Loading data...</TextShimmer>

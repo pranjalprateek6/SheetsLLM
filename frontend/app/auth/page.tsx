@@ -80,8 +80,15 @@ function AuthContent() {
   useEffect(() => {
     if (!user || routedRef.current) return;
     routedRef.current = true;
+    // Back to where the session ran out, when the page said so. Only a
+    // path on this site: never an absolute or protocol-relative URL.
+    const next = searchParams.get("next");
+    if (next && next.startsWith("/") && !next.startsWith("//")) {
+      router.replace(next);
+      return;
+    }
     destinationAfterAuth().then((dest) => router.replace(dest));
-  }, [user, router]);
+  }, [user, router, searchParams]);
 
   const switchMode = (next: Mode) => {
     setMode(next);

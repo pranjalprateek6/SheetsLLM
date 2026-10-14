@@ -46,6 +46,8 @@ function AccountContent() {
   const [tier, setTier] = useState<string | null>(null);
   const [plans, setPlans] = useState<Plans>(DEFAULT_PLANS);
   const [tierFailed, setTierFailed] = useState(false);
+  const [graceUntil, setGraceUntil] = useState<string | null>(null);
+  const [emailReminders, setEmailReminders] = useState<boolean | null>(null);
   const [privacyMode, setPrivacyMode] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
@@ -67,6 +69,7 @@ function AccountContent() {
       .then((d) => {
         if (typeof d?.tier !== "string") throw new Error("no tier");
         setTier(d.tier);
+        setGraceUntil(d.grace_until ?? null);
         setPlans(readPlans(d));
       })
       .catch(() => setTierFailed(true));
@@ -77,7 +80,10 @@ function AccountContent() {
     // A failed load leaves the switch unknown, never "off"
     fetchWithAuth("/api/settings")
       .then((r) => (r.ok ? r.json() : null))
-      .then((d) => setPrivacyMode(typeof d?.privacy_mode === "boolean" ? d.privacy_mode : null))
+      .then((d) => {
+        setPrivacyMode(typeof d?.privacy_mode === "boolean" ? d.privacy_mode : null);
+        setEmailReminders(typeof d?.email_reminders === "boolean" ? d.email_reminders : true);
+      })
       .catch(() => setPrivacyMode(null));
   }, [loadTier]);
 
@@ -161,6 +167,11 @@ function AccountContent() {
           <p className="text-sm font-medium">{user?.email}</p>
         </Row>
 
+        {graceUntil && (
+          <div role="status" className="rounded-lg border border-warning/40 bg-warning/10 px-4 py-3 text-sm">
+            Your last payment didn&apos;t go through. Pro stays on until {new Date(graceUntil).toLocaleDateString()}. Razorpay has emailed you a link to retry; once it goes through, nothing changes.
+          </div>
+        )}
         <Row
           title="Plan & usage"
           description={
@@ -218,6 +229,31 @@ function AccountContent() {
               onCheckedChange={togglePrivacy}
               disabled={privacyMode === null}
               aria-label="Toggle strict privacy mode"
+            />
+          </div>
+        </Row>
+
+        <Row title="Email" description="One email when a recipe has not run in a month, with a link to run it. Nothing else.">
+          <div className="flex items-center justify-between gap-4">
+            <p className="text-sm font-medium">Recipe reminders</p>
+            <Switch
+              checked={!!emailReminders}
+              onCheckedChange={async (next) => {
+                setEmailReminders(next);
+                try {
+                  const r = await fetchWithAuth("/api/settings", {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ email_reminders: next }),
+                  });
+                  if (!r.ok) throw new Error();
+                } catch {
+                  setEmailReminders(!next);
+                  setError("Couldn't save that. Try again.");
+                }
+              }}
+              disabled={emailReminders === null}
+              aria-label="Email me when a recipe is due"
             />
           </div>
         </Row>

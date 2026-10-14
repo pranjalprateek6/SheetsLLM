@@ -25,7 +25,7 @@ def _json_response(status: int, code: str, message: str, **extra) -> Response:
 def get_settings(request: Request):
     user_id = getattr(request.state, "user_id", "anonymous")
     row = db.get_user_settings(user_id)
-    return {"privacy_mode": db.privacy_mode_from_row(row)}
+    return {"privacy_mode": db.privacy_mode_from_row(row), "email_reminders": (row or {}).get("email_reminders") is not False}
 
 
 @router.patch("/settings")
@@ -37,13 +37,15 @@ async def update_settings(request: Request):
     except Exception:
         return _json_response(400, "INVALID_JSON", "Request body must be JSON")
 
-    if "privacy_mode" not in body:
+    changes = {k: body[k] for k in ("privacy_mode", "email_reminders") if k in body}
+    if not changes:
         return _json_response(400, "NO_SETTINGS", "No recognized settings in body")
-    privacy_mode = body["privacy_mode"]
-    if not isinstance(privacy_mode, bool):
-        return _json_response(400, "INVALID_VALUE", "privacy_mode must be a boolean")
+    for key, value in changes.items():
+        if not isinstance(value, bool):
+            return _json_response(400, "INVALID_VALUE", f"{key} must be a boolean")
 
-    row = db.upsert_user_settings(user_id, privacy_mode=privacy_mode)
-    logger.info("settings updated user=%s privacy_mode=%s", user_id, privacy_mode)
-    events.record(user_id, "privacy_mode_changed", strict=privacy_mode)
-    return {"privacy_mode": db.privacy_mode_from_row(row)}
+    row = db.upsert_user_settings(user_id, **changes)
+    logger.info("settings updated user=%s %s", user_id, changes)
+    if "privacy_mode" in changes:
+        events.record(user_id, "privacy_mode_changed", strict=changes["privacy_mode"])
+    return {"privacy_mode": db.privacy_mode_from_row(row), "email_reminders": (row or {}).get("email_reminders") is not False}

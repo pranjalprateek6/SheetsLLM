@@ -12,6 +12,8 @@ twice inside a window.
 from __future__ import annotations
 
 import datetime as _dt
+import hashlib
+import hmac
 import logging
 
 from app import db, events, mail
@@ -69,7 +71,42 @@ def _already_reminded(now: _dt.datetime) -> set[str]:
     return {str((r.get("properties") or {}).get("recipe_id")) for r in rows}
 
 
-def email_text(name_list: list[dict]) -> tuple[str, str]:
+def unsubscribe_token(user_id: str) -> str:
+    """A token that only this server can mint, naming the user it is for."""
+    from app.share import _b64, _secret
+
+    body = _b64(user_id.encode("utf-8"))
+    sig = _b64(hmac.new(_secret(), body.encode("ascii"), hashlib.sha256).digest())
+    return f"{body}.{sig}"
+
+
+def user_from_unsubscribe_token(token: str) -> str | None:
+    from app.share import _b64, _secret, _unb64
+
+    try:
+        body, sig = token.split(".", 1)
+        expected = _b64(hmac.new(_secret(), body.encode("ascii"), hashlib.sha256).digest())
+        if not hmac.compare_digest(sig, expected):
+            return None
+        return _unb64(body).decode("utf-8") or None
+    except Exception:
+        return None
+
+
+def unsubscribe_url(user_id: str) -> str:
+    return f"{PUBLIC_APP_URL}/unsubscribe?t={unsubscribe_token(user_id)}"
+
+
+def wants_reminders(user_id: str) -> bool:
+    """False only when the user switched reminders off."""
+    try:
+        row = db.get_user_settings(user_id) or {}
+    except Exception:
+        return True
+    return row.get("email_reminders") is not False
+
+
+def email_text(name_list: list[dict], *, user_id: str | None = None) -> tuple[str, str]:
     """Subject and body for one owner's due recipes."""
     first = name_list[0]
     subject = (
@@ -89,6 +126,8 @@ def email_text(name_list: list[dict]) -> tuple[str, str]:
         "",
         "SheetsLLM",
     ]
+    if user_id:
+        lines += ["", f"Stop these emails: {unsubscribe_url(user_id)}"]
     return subject, "\n".join(lines)
 
 
@@ -114,11 +153,15 @@ def run_daily(*, now: _dt.datetime | None = None) -> dict:
         except Exception as exc:
             logger.warning("reminders: no email for %s: %s", user_id, exc)
             email = None
-        if not email:
+        if not email or not wants_reminders(user_id):
             skipped += len(due)
             continue
-        subject, body = email_text(due)
-        if mail.send(email, subject, body):
+        subject, body = email_text(due, user_id=user_id)
+        headers = {
+            "List-Unsubscribe": f"<{unsubscribe_url(user_id)}>",
+            "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+        }
+        if mail.send(email, subject, body, headers=headers):
             sent += len(due)
             for r in due:
                 events.record(user_id, "reminder_sent", recipe_id=r["recipe_id"], days_since=r["days_since"])

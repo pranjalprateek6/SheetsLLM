@@ -100,8 +100,10 @@ def get_user_tier(user_id: str) -> str:
     a paying user's request path (worst case a Pro user is briefly capped at
     the generous free limits, not blocked)."""
     try:
-        row = db.get_subscription(user_id)
-        tier = (row or {}).get("tier") or "free"
+        row = db.get_subscription(user_id) or {}
+        from app.billing import tier_for
+
+        tier = tier_for(row.get("status"), row.get("current_period_end")) if row.get("status") else (row.get("tier") or "free")
         return tier if tier in TIER_LIMITS else "free"
     except Exception as exc:
         logger.warning("tier lookup failed for %s: %s", user_id, exc)

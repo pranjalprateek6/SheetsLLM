@@ -76,6 +76,8 @@ function PricingContent() {
   const COMPARISON = planComparison(plans);
 
   const [tier, setTier] = useState<string | null>(null);
+  const [tierFailed, setTierFailed] = useState(false);
+  const [graceUntil, setGraceUntil] = useState<string | null>(null);
   const [billingConfigured, setBillingConfigured] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -88,14 +90,20 @@ function PricingContent() {
       setTier(null); // signed-out visitors just see the plans
       return;
     }
+    setTierFailed(false);
     fetchWithAuth("/api/billing/status")
-      .then((r) => r.json())
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
       .then((d) => {
         setTier(d.tier ?? "free");
+        setGraceUntil(d.grace_until ?? null);
         setBillingConfigured(d.billing_configured ?? false);
         setPlans(readPlans(d));
       })
-      .catch(() => setTier(null));
+      .catch(() => {
+        // Unknown is shown as unknown: never "Upgrade" to someone who may already pay
+        setTier(null);
+        setTierFailed(true);
+      });
   }, [user, authLoading]);
 
   // Razorpay's hosted subscription page has no return redirect, so checkout
@@ -223,6 +231,11 @@ function PricingContent() {
           {error}
         </div>
       )}
+      {graceUntil && (
+        <div role="status" className="mx-auto mb-6 max-w-3xl rounded-lg border border-warning/40 bg-warning/10 px-4 py-3 text-sm">
+          Your last payment didn&apos;t go through. Pro stays on until {new Date(graceUntil).toLocaleDateString()}. Razorpay has emailed you a link to retry; once it goes through, nothing changes.
+        </div>
+      )}
       {notice && (
         <div className="mb-6 rounded-lg border border-success/30 bg-success/5 p-3 text-center text-sm text-success-text">
           {notice}
@@ -323,6 +336,10 @@ function PricingContent() {
                   Start with Pro <ArrowRight className="ml-1 h-4 w-4" />
                 </Link>
               </Button>
+            ) : tierFailed ? (
+              <p className="rounded-lg border bg-muted/30 px-3 py-2 text-center text-xs text-muted-foreground">
+                Couldn&apos;t load your plan. Refresh to try again.
+              </p>
             ) : !billingConfigured ? (
               // Checkout is not open yet: a waitlist, never a dead button
               <UpgradeCta reason={reasonKey || "pricing"} size="default" className="w-full" />

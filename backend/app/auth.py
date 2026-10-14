@@ -145,7 +145,7 @@ async def verify_token(request: Request) -> dict:
 # own HMAC signature header, not a JWT. /docs and /openapi.json only exist
 # outside production (gated in main.py).
 PUBLIC_PATHS = frozenset(
-    {"/health", "/docs", "/openapi.json", "/billing/webhook", "/reminders/run"}
+    {"/health", "/docs", "/openapi.json", "/billing/webhook", "/reminders/run", "/reminders/unsubscribe"}
 )
 # Paths whose token is in the URL itself: a share link carries its own proof
 PUBLIC_PREFIXES = ("/shared/",)

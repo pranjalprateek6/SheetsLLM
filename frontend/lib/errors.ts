@@ -21,6 +21,7 @@ export type ErrorPayload = {
   resets_at?: string;   // YYYY-MM-01
   retry_after?: number; // seconds
   missing?: string[];
+  request_id?: string;  // the backend's reference for this request
 };
 
 export type ExplainedError = {
@@ -97,7 +98,19 @@ export function explainError(payload: ErrorPayload | null | undefined): Explaine
       }
       return { code, text: "Chef didn't answer. Try again in a moment.", actions: ["retry"] };
     case "REQUEST_TIMEOUT":
-      return { code, text: "That took too long and was stopped. Try again, or ask something more specific.", actions: ["edit_retry"] };
+      return {
+        code,
+        text: p.message && /took more than/.test(p.message) ? `${p.message} Try again, or ask something more specific.` : "That took too long and was stopped. Try again, or ask something more specific.",
+        actions: ["edit_retry"],
+        details: p.request_id ? `Reference ${p.request_id}` : undefined,
+      };
+    case "INTERNAL":
+      return {
+        code,
+        text: "Something went wrong on our side. Try again in a moment.",
+        actions: ["retry"],
+        details: p.request_id ? `Reference ${p.request_id}` : undefined,
+      };
     case "RECIPE_NEEDS_LOOKUP":
       return { code, text: p.message ?? "This recipe uses a lookup table that is no longer in your files.", actions: [] };
     case "RECIPE_INCOMPATIBLE": {
@@ -121,11 +134,11 @@ export function explainError(payload: ErrorPayload | null | undefined): Explaine
     default:
       return {
         code,
-        text: p.message && !/Traceback|Error:|Exception/.test(p.message)
+        text: p.message && !/Traceback|Error:|Exception|Internal Server Error/.test(p.message)
           ? p.message
           : "Something went wrong. Try again.",
         actions: ["retry"],
-        details: p.message,
+        details: p.request_id ? `Reference ${p.request_id}` : p.message,
       };
   }
 }

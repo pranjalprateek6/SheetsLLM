@@ -64,11 +64,16 @@ export async function forwardJson(
   }
   const resp = await fetch(`${BACKEND_URL()}${path}`, init);
   const text = await resp.text();
+  const requestId = resp.headers.get("x-request-id") ?? undefined;
   try {
     return NextResponse.json(JSON.parse(text), { status: resp.status });
   } catch {
     return NextResponse.json(
-      { code: "BACKEND_ERROR", message: text.slice(0, 200) || `Backend answered ${resp.status}` },
+      {
+        code: "BACKEND_ERROR",
+        message: /^<|Internal Server Error/.test(text) ? "Something went wrong on our side." : text.slice(0, 200) || `Backend answered ${resp.status}`,
+        ...(requestId ? { request_id: requestId } : {}),
+      },
       { status: resp.status >= 400 ? resp.status : 502 },
     );
   }

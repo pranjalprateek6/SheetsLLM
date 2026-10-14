@@ -88,6 +88,23 @@ export default function ChatPanel({
 }) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
+  // A message being typed outlives a session expiry and a reload
+  const draftKey = fileId ? `sllm_chat_draft:${fileId}` : null;
+  useEffect(() => {
+    if (!draftKey) return;
+    try {
+      const saved = sessionStorage.getItem(draftKey);
+      if (saved) setInput(saved);
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftKey]);
+  useEffect(() => {
+    if (!draftKey) return;
+    try {
+      if (input) sessionStorage.setItem(draftKey, input);
+      else sessionStorage.removeItem(draftKey);
+    } catch {}
+  }, [draftKey, input]);
   const [sending, setSending] = useState(false);
   const [expandedSql, setExpandedSql] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);

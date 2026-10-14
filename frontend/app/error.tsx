@@ -21,6 +21,9 @@ export default function GlobalError({
         <p className="mt-2 text-sm text-muted-foreground">
           The page hit an unexpected error. Your files and data are safe.
         </p>
+        {error.digest && (
+          <p className="mt-2 font-mono text-[11px] text-muted-foreground">Reference {error.digest}</p>
+        )}
         <div className="mt-5 flex justify-center gap-2">
           <Button variant="outline" onClick={() => reset()}>
             Try again

@@ -64,6 +64,8 @@ EVENTS = frozenset({
     "recipe_steps_edited",
     # the week's numbers mailed to the owner
     "digest_sent",
+    # a renewal failed and the owner was told; reminders switched off by email link
+    "payment_failed_notified", "reminders_unsubscribed",
 })
 
 

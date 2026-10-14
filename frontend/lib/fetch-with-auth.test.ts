@@ -2,8 +2,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { loading, dismiss } = vi.hoisted(() => ({ loading: vi.fn(), dismiss: vi.fn() }));
 vi.mock("sonner", () => ({ toast: { loading, dismiss } }));
+const auth = vi.hoisted(() => ({
+  session: null as null | { access_token: string },
+  refreshed: null as null | { access_token: string },
+  signOut: vi.fn(async () => {}),
+}));
 vi.mock("@/lib/supabase", () => ({
-  supabase: { auth: { getSession: async () => ({ data: { session: null } }), signOut: async () => {} } },
+  supabase: {
+    auth: {
+      getSession: async () => ({ data: { session: auth.session } }),
+      refreshSession: async () => ({ data: { session: auth.refreshed }, error: auth.refreshed ? null : new Error("no") }),
+      signOut: auth.signOut,
+    },
+  },
 }));
 
 import { fetchWithAuth, WAKING_AFTER_MS } from "./fetch-with-auth";
@@ -74,5 +85,36 @@ describe("fetchWithAuth and the sleeping server", () => {
     expect(await call).toBeInstanceOf(Error);
     expect(loading).toHaveBeenCalledTimes(1);
     expect(dismiss).toHaveBeenCalledWith("waking");
+  });
+
+  it("refreshes the session once on a 401 and retries with the new token", async () => {
+    vi.useRealTimers();
+    auth.session = { access_token: "stale" };
+    auth.refreshed = { access_token: "fresh" };
+    const seen: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (_url: string, init: RequestInit) => {
+      const token = new Headers(init.headers).get("Authorization") ?? "";
+      seen.push(token);
+      return token === "Bearer fresh" ? new Response("{}", { status: 200 }) : new Response("{}", { status: 401 });
+    }));
+    const r = await fetchWithAuth("/api/files");
+    expect(r.status).toBe(200);
+    expect(seen).toEqual(["Bearer stale", "Bearer fresh"]);
+    expect(auth.signOut).not.toHaveBeenCalled();
+    auth.session = null;
+    auth.refreshed = null;
+  });
+
+  it("signs out with a way back when the refresh does not help", async () => {
+    vi.useRealTimers();
+    auth.session = { access_token: "stale" };
+    auth.refreshed = null;
+    const assign = vi.fn();
+    vi.stubGlobal("location", { ...window.location, pathname: "/workspace", search: "?file_id=f1", assign });
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 401 })));
+    await fetchWithAuth("/api/files");
+    expect(auth.signOut).toHaveBeenCalled();
+    expect(assign).toHaveBeenCalledWith("/auth?expired=1&next=%2Fworkspace%3Ffile_id%3Df1");
+    auth.session = null;
   });
 });
