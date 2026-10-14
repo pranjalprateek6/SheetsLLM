@@ -125,3 +125,11 @@ def test_the_preview_is_for_the_owner_only(monkeypatch, world):
     body = client.get("/admin/digest").json()
     assert body["subject"].startswith("SheetsLLM this week:") and "People" in body["text"]
     assert set(body["summary"]) >= {"from", "to", "active_users", "new_users", "activity", "trouble", "money"}
+
+
+def test_the_cron_route_is_reached_without_a_sign_in(monkeypatch):
+    """pg_cron has no session: the route must be public and gated by the secret alone."""
+    monkeypatch.setattr(main_module, "ALLOW_ANONYMOUS", False)
+    monkeypatch.setattr(digest_route, "CRON_SECRET", "s3cret")
+    r = TestClient(app, raise_server_exceptions=False).post("/admin/digest/run", headers={"X-Cron-Secret": "wrong"})
+    assert r.status_code == 401 and r.json()["code"] == "UNAUTHORIZED" and "bearer" not in r.text.lower()

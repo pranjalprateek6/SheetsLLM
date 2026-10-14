@@ -3,7 +3,7 @@ import dynamic from "next/dynamic";
 import { Suspense, useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import {
-  AlertTriangle, ArrowRight, BarChart3, BookMarked, CalendarClock, Check, ChefHat, ChevronDown, ChevronRight, Columns3, FileSpreadsheet, History, Link2, MessageSquare, Pencil, Redo2, Undo2, Upload,
+  AlertTriangle, ArrowRight, BarChart3, BookMarked, CalendarClock, Check, ChefHat, ChevronDown, ChevronRight, Columns3, FileSpreadsheet, History, Link2, MessageSquare, Pencil, Redo2, Undo2, Upload, X,
 } from "lucide-react";
 import ColumnHealth, { type HealthColumn } from "@/components/ColumnHealth";
 import PipelineSpine from "@/components/PipelineSpine";
@@ -235,10 +235,9 @@ function WorkspaceContent() {
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       setFileName(name);
       rememberLastFile(fileId, name);
-      toast.success("File renamed");
     } catch (e) {
       console.error("Rename failed:", e);
-      toast.error("Couldn't rename the file. Please try again.");
+      toast.error("Couldn't rename the file. Try again.");
     }
   };
 
@@ -292,6 +291,13 @@ function WorkspaceContent() {
   // October, a lookup, and November waiting for the recipe
   const startSample = SAMPLE_DATASETS.find((d) => d.id === "orders") ?? SAMPLE_DATASETS[0];
   const moreSamples = SAMPLE_DATASETS.filter((d) => d.id !== startSample.id);
+
+  useEffect(() => {
+    document.body.dataset.workspacePalette = "1";
+    return () => {
+      delete document.body.dataset.workspacePalette;
+    };
+  }, []);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -461,7 +467,7 @@ function WorkspaceContent() {
       const data = await r.json();
 
       if (!r.ok) {
-        setUploadError(data.message || "Upload failed. Please try again.");
+        setUploadError(data.message || "Upload failed. Try again.");
         return false;
       }
 
@@ -539,8 +545,8 @@ function WorkspaceContent() {
         setExportStrip({ name, steps: steps.length });
       }
     } catch (e) {
-      console.error("Download failed", e);
-      toast.error("Download failed. Please try again.");
+      console.error("Export failed", e);
+      toast.error("Couldn't export the file. Try again.");
     }
   }, [fileId, fileName, steps.length]);
 
@@ -587,7 +593,7 @@ function WorkspaceContent() {
       } else if (data.code === "NOTHING_TO_UNDO") {
         toast.info("Nothing to undo. You're at the original file.");
       } else {
-        toast.error(data.message || "Undo failed. Please try again.");
+        toast.error(data.message || "Undo failed. Try again.");
       }
     } catch (e) {
       console.error("Undo failed:", e);
@@ -617,7 +623,7 @@ function WorkspaceContent() {
         setHealthNonce((n) => n + 1);
         toast.success("Back at the original file");
       } else {
-        toast.error(data.message || "Reset failed. Please try again.");
+        toast.error(data.message || "Reset failed. Try again.");
       }
     } catch (error) {
       console.error("Reset failed", error);
@@ -1147,9 +1153,10 @@ function WorkspaceContent() {
           <KeyboardShortcuts
             onDownload={() => setExportOpen(true)}
             onUndo={handleUndo}
+            onRedo={() => { if (lastChange?.redo) void handleRedo(lastChange.redo); }}
             onFocusInput={() => {
-              const input = document.querySelector<HTMLTextAreaElement>('textarea[placeholder*="Chef"]');
-              input?.focus();
+              setChatOpen(true);
+              setTimeout(() => document.querySelector<HTMLTextAreaElement>('textarea[aria-label="Ask Chef anything"]')?.focus(), 50);
             }}
             onEscape={() => { setHistoryOpen(false); setChartOpen(false); }}
           />
@@ -1606,7 +1613,7 @@ function WorkspaceContent() {
                             setLastChange(null);
                             handleRedo(redo);
                           }}
-                          className="inline-flex items-center gap-1 font-medium text-primary underline-offset-2 hover:underline"
+                          className="inline-flex items-center gap-1 font-medium text-primary-accent underline-offset-2 hover:underline"
                         >
                           <Redo2 className="h-3 w-3" /> Redo
                         </button>
@@ -1614,7 +1621,7 @@ function WorkspaceContent() {
                     ) : (
                       <button
                         onClick={handleUndo}
-                        className="inline-flex items-center gap-1 font-medium text-primary underline-offset-2 hover:underline"
+                        className="inline-flex items-center gap-1 font-medium text-primary-accent underline-offset-2 hover:underline"
                       >
                         <Undo2 className="h-3 w-3" /> Undo
                       </button>
@@ -1624,7 +1631,7 @@ function WorkspaceContent() {
                       className="text-muted-foreground hover:text-foreground"
                       aria-label="Dismiss change summary"
                     >
-                      ✕
+                      <X className="h-3.5 w-3.5" aria-hidden />
                     </button>
                   </div>
                 </div>
@@ -1681,7 +1688,7 @@ function WorkspaceContent() {
                       className="text-muted-foreground hover:text-foreground"
                       aria-label="Dismiss the date warning"
                     >
-                      ✕
+                      <X className="h-3.5 w-3.5" aria-hidden />
                     </button>
                   </div>
                 </div>
@@ -1705,7 +1712,7 @@ function WorkspaceContent() {
                       className="text-muted-foreground hover:text-foreground"
                       aria-label="Not now"
                     >
-                      ✕
+                      <X className="h-3.5 w-3.5" aria-hidden />
                     </button>
                   </div>
                 </div>
@@ -1758,6 +1765,7 @@ function WorkspaceContent() {
                   onViewChange={changeView}
                   onLoadMore={loadMore}
                   hasMore={rows.length < gridTotal}
+                  onUndoStep={handleUndo}
                   onAskColumn={(col) => {
                     setChatOpen(true);
                     setChatPrefill({ text: `Tell me about the "${col}" column`, nonce: Date.now() });
@@ -1942,6 +1950,10 @@ function WorkspaceContent() {
             setRenameValue(fileName);
             setRenameOpen(true);
           }}
+          onRedo={lastChange?.redo ? () => void handleRedo(lastChange.redo!) : undefined}
+          onChart={() => setChartOpen(true)}
+          onSchema={() => setSchemaOpen(true)}
+          onLookups={() => setLookupsOpen(true)}
           fileId={fileId}
         />
       </div>

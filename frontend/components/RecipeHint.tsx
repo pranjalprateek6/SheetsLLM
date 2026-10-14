@@ -139,7 +139,7 @@ export default function RecipeHint({
         <button
           onClick={apply}
           disabled={applying}
-          className="font-medium text-primary underline-offset-2 hover:underline disabled:opacity-50"
+          className="font-medium text-primary-accent underline-offset-2 hover:underline disabled:opacity-50"
         >
           {applying ? "Applying…" : "Apply"}
         </button>
