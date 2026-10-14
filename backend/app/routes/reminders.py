@@ -30,7 +30,14 @@ def reminders_run(x_cron_secret: str = Header(default="")):
         return _json_response(503, "NOT_CONFIGURED", "CRON_SECRET is not set")
     if not secrets.compare_digest(x_cron_secret or "", CRON_SECRET):
         return _json_response(401, "UNAUTHORIZED", "Wrong or missing secret")
-    return run_daily()
+    out = run_daily()
+    from app import lifecycle
+
+    try:
+        out["lifecycle"] = lifecycle.run_daily()
+    except Exception as exc:
+        logger.warning("lifecycle pass failed: %s", exc)
+    return out
 
 
 @router.post("/reminders/unsubscribe")

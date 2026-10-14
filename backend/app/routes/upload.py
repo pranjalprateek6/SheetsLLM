@@ -111,6 +111,7 @@ async def upload(
 async def _ingest(
     *, user_id: str, file_id: str, filename: str, file_bytes: bytes,
     sheet_name: str | None, pending_id: str | None, source: str | None, start_time: float,
+    source_url: str | None = None,
 ):
     """Everything after the bytes are in hand: checks, the sheet question,
     Parquet, storage, the record, the preview and the insights. Shared by a
@@ -201,6 +202,7 @@ async def _ingest(
             column_count=col_count,
             schema_json=schema,
             size_bytes=len(file_bytes),
+            source_url=source_url,
         )
     except Exception as exc:
         logger.error("Supabase file record creation failed: %s", exc)
@@ -300,5 +302,5 @@ async def upload_from_url(request: Request):
         return _json_response(400, exc.code, str(exc))
     return await _ingest(
         user_id=user_id, file_id=str(uuid.uuid4()), filename=filename, file_bytes=file_bytes,
-        sheet_name=sheet_name, pending_id=None, source="url", start_time=start_time,
+        sheet_name=sheet_name, pending_id=None, source="url", start_time=start_time, source_url=url,
     )

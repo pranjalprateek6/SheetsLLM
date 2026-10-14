@@ -92,7 +92,7 @@ describe("ExportMenu", () => {
     await userEvent.click(within(menu).getByRole("menuitem", { name: "Copy as CSV to clipboard" }));
     await waitFor(() => expect(written).toContain("a,b\n1,2\n"));
     await userEvent.click(within(menu).getByRole("menuitem", { name: "Copy a link that works for 7 days" }));
-    await waitFor(() => expect(written.at(-1)).toBe(`${window.location.origin}/api/shared/tok.sig`));
+    await waitFor(() => expect(written.at(-1)).toBe(`${window.location.origin}/s/tok.sig`));
   });
 
   it("keeps a file over 50,000 rows off the clipboard", async () => {

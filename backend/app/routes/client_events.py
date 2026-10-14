@@ -21,6 +21,9 @@ CLIENT_EVENTS: dict[str, tuple[str, ...]] = {
     "recipe_hint_shown": ("recipe_id",),
     "checklist_dismissed": ("next",),
     "sample_opened": ("sample_id",),
+    "signed_up_from": ("from",),
+    "tool_cta_clicked": ("tool",),
+    "tool_run": ("tool",),
 }
 
 _MAX_VALUE = 120

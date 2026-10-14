@@ -74,6 +74,7 @@ def create_file(
     column_count: int,
     schema_json: dict,
     size_bytes: int,
+    source_url: str | None = None,
 ) -> dict:
     row = {
         "id": file_id,
@@ -86,7 +87,17 @@ def create_file(
         "schema_json": schema_json,
         "size_bytes": size_bytes,
     }
-    resp = get_client().table("files").insert(row).execute()
+    if source_url:
+        row["source_url"] = source_url
+    try:
+        resp = get_client().table("files").insert(row).execute()
+    except Exception as exc:
+        # Before migration 018 the column is missing; the file still saves
+        if "source_url" not in row or "source_url" not in str(exc):
+            raise
+        logger.warning("files.source_url missing (apply migration 018); saving without it")
+        row.pop("source_url")
+        resp = get_client().table("files").insert(row).execute()
     return resp.data[0]
 
 
@@ -215,7 +226,11 @@ def file_rows(file_ids: list[str]) -> dict[str, dict]:
     ids = [f for f in file_ids if is_uuid(f)]
     if not ids:
         return {}
-    resp = get_client().table("files").select("id,name,row_count,schema_json").in_("id", ids).execute()
+    try:
+        resp = get_client().table("files").select("id,name,row_count,schema_json,source_url").in_("id", ids).execute()
+    except Exception:
+        # before migration 018
+        resp = get_client().table("files").select("id,name,row_count,schema_json").in_("id", ids).execute()
     return {r["id"]: r for r in resp.data or []}
 
 
@@ -643,6 +658,14 @@ def list_recipes(user_id: str) -> list[dict]:
         .execute()
     )
     return resp.data
+
+
+def list_scheduled_recipes(user_id: str | None = None) -> list[dict]:
+    """Recipes with a schedule, one user's or everyone's."""
+    q = get_client().table("recipes").select("id,user_id,name,schedule").not_.is_("schedule", "null")
+    if user_id:
+        q = q.eq("user_id", user_id)
+    return q.execute().data or []
 
 
 def list_all_recipes() -> list[dict]:

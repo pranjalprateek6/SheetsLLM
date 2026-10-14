@@ -75,6 +75,8 @@ export const HELP_SECTIONS: HelpSection[] = [
       "The report: each step's rows in and out beside the last run's. A step whose effect moved a lot, or left no rows, is flagged.",
       "Checks: rules the recipe runs on the cleaned rows every time, such as a column being unique, never empty, at least a number, or one of a list. A failing check warns; it does not undo the run.",
       "Edit: rename the recipe, move steps, remove steps, or replace them with another file's steps. A reorder is planned on the file first, so a step moved ahead of one it needs is refused by name.",
+      "On a schedule: give the recipe a link (a Google Sheet shared with anyone who has the link, or a CSV on a server) and a day of the month. On that day it fetches the link, runs with no AI call, and emails you the cleaned file.",
+      "Share: a recipe's link shows its steps and the columns it needs, never any data, for 90 days. Whoever opens it can add it to their own account.",
       `The Free plan holds ${limitText(DEFAULT_PLANS.free.recipes)} saved recipe${DEFAULT_PLANS.free.recipes === 1 ? "" : "s"}; Pro is unlimited.`,
     ],
   },
@@ -105,7 +107,7 @@ export const HELP_SECTIONS: HelpSection[] = [
     title: "Plans and limits",
     intro: "Free for the monthly file; Pro for the volume.",
     items: [
-      `Free: ${limitText(DEFAULT_PLANS.free.uploads)} uploads and ${limitText(DEFAULT_PLANS.free.ai_requests)} AI requests a month, ${limitText(DEFAULT_PLANS.free.recipes)} saved recipe.`,
+      `Free: ${limitText(DEFAULT_PLANS.free.uploads)} uploads and ${limitText(DEFAULT_PLANS.free.ai_requests)} AI requests a month, ${limitText(DEFAULT_PLANS.free.recipes)} saved recipe${DEFAULT_PLANS.free.recipes === 1 ? "" : "s"}, one on a schedule.`,
       `Pro: ${limitText(DEFAULT_PLANS.pro.uploads)} uploads and ${limitText(DEFAULT_PLANS.pro.ai_requests)} AI requests a month, ${limitText(DEFAULT_PLANS.pro.recipes).toLowerCase()} saved recipes.`,
       "Files up to 1,000,000 rows and 500 columns, 400 MB. Excel export stops at 250,000 rows; CSV and Parquet have no cap.",
       "Counters reset on the first of each month. At a cap, uploads and AI requests pause; files, recipes and history stay.",

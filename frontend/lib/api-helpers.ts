@@ -53,13 +53,13 @@ export function backendHeaders(req: NextRequest, extra?: Record<string, string>)
 export async function forwardJson(
   req: NextRequest,
   path: string,
-  method: "GET" | "POST" | "PATCH" | "DELETE" = "POST",
+  method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE" = "POST",
 ): Promise<NextResponse> {
   const init: RequestInit = {
     method,
     headers: backendHeaders(req, method === "GET" || method === "DELETE" ? {} : { "Content-Type": "application/json" }),
   };
-  if (method === "POST" || method === "PATCH") {
+  if (method === "POST" || method === "PATCH" || method === "PUT") {
     init.body = JSON.stringify(await req.json().catch(() => ({})));
   }
   const resp = await fetch(`${BACKEND_URL()}${path}`, init);

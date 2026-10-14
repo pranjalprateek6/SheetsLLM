@@ -35,6 +35,10 @@ export type Recipe = {
   source_file_id?: string | null;
   source_file_name?: string | null;
   required_columns?: string[];
+  /** A link and a day of the month the recipe runs itself on */
+  schedule?: { url: string; day: number } | null;
+  /** The link the recipe's source file was fetched from, if it was */
+  source_url?: string | null;
 };
 
 export type { RecipeApplyResult } from "@/lib/recipe-run";

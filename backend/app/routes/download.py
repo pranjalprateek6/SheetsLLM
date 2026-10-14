@@ -118,6 +118,36 @@ def _stream_export(user_id: str, file_id: str, file_rec: dict, steps: list[dict]
     )
 
 
+@router.get("/shared/{token}/info")
+def shared_info(token: str):
+    """What a share link holds, for its page: the name, the size, the
+    steps and when it stops working. No values."""
+    import base64
+    import json as _json
+    import time
+
+    ids = read_token(token)
+    if not ids:
+        return _json_response(404, "LINK_NOT_FOUND", "This link has expired or never existed.")
+    file_id, user_id = ids
+    file_rec = db.get_file(file_id, user_id)
+    if not file_rec:
+        return _json_response(404, "LINK_NOT_FOUND", "This link has expired or never existed.")
+    steps = db.get_transformations(file_id)
+    try:
+        payload = token.split(".", 1)[0]
+        expires = int(_json.loads(base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4)))["e"])
+    except Exception:
+        expires = int(time.time())
+    return {
+        "name": file_rec.get("name"),
+        "rows": file_rec.get("row_count"),
+        "columns": file_rec.get("column_count"),
+        "steps": [s.get("instruction") for s in steps],
+        "expires_at": expires,
+    }
+
+
 @router.get("/shared/{token}")
 def shared(token: str):
     """A share link: the file's cleaned CSV for anyone with the token, no

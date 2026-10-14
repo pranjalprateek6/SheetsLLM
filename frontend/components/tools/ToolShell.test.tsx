@@ -9,7 +9,10 @@ describe("RecipeHook under a free tool", () => {
     render(<RecipeHook href="/tools/csv-deduplicate" />);
     expect(screen.getByText("Doing this every month?")).toBeInTheDocument();
     expect(screen.getByText(/removing duplicates is a one-click step/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Start free" })).toHaveAttribute("href", "/auth?mode=signup&from=tool-csv-deduplicate");
+    expect(screen.getByRole("link", { name: "Open the result in SheetsLLM" })).toHaveAttribute(
+      "href",
+      `/auth?mode=signup&from=tool-csv-deduplicate&next=${encodeURIComponent("/workspace?import=tool")}`,
+    );
     expect(screen.getByRole("link", { name: /How recipes work/ })).toHaveAttribute("href", "/product/recipes");
   });
 

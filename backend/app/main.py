@@ -43,6 +43,7 @@ _ROUTE_TIMEOUTS = {
     "/reset": 90,
     "/files": 90,
     "/shared": 60,
+    "/schedules": 300,  # fetches and runs every recipe due today
 }
 _DEFAULT_TIMEOUT = 10
 
@@ -59,6 +60,7 @@ _TIMEOUT_WHAT = {
     "/reset": "Going back",
     "/files": "That step",
     "/shared": "The shared file",
+    "/schedules": "The scheduled runs",
 }
 
 

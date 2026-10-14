@@ -8,6 +8,8 @@ import AuthGuard from "@/components/AuthGuard";
 import EmptyState from "@/components/EmptyState";
 import DueRecipes from "@/components/DueRecipes";
 import RecipeChecks from "@/components/RecipeChecks";
+import { RecipeSchedule, ShareRecipeButton } from "@/components/RecipeLoops";
+import { ordinal } from "@/lib/loops";
 import RecipeStepsEditor, { type RecipeStep } from "@/components/RecipeStepsEditor";
 import type { Recipe } from "@/components/RecipesDrawer";
 import { Button } from "@/components/ui/button";
@@ -146,12 +148,14 @@ function RecipesContent() {
                     {r.steps} step{r.steps === 1 ? "" : "s"}
                     {r.source_file_name ? ` · from ${r.source_file_name}` : ""}
                     {r.required_columns?.length ? ` · needs ${r.required_columns.length} columns` : ""}
+                    {r.schedule ? ` · runs on the ${ordinal(r.schedule.day)}` : ""}
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <Button variant="ghost" size="sm" onClick={() => toggle(r)} aria-expanded={open === r.id}>
                     Steps <ChevronDown className={cn("ml-1 h-3.5 w-3.5 transition-transform", open === r.id && "rotate-180")} />
                   </Button>
+                  <ShareRecipeButton recipeId={r.id} />
                   <Button variant="outline" size="sm" onClick={() => pickFile(r)}>
                     <Play className="mr-1.5 h-3.5 w-3.5" /> Apply to…
                   </Button>
@@ -177,6 +181,14 @@ function RecipesContent() {
                     }}
                   />
                 )}
+                <div className="border-t px-4 py-3">
+                  <RecipeSchedule
+                    recipeId={r.id}
+                    schedule={r.schedule}
+                    suggestedUrl={r.source_url}
+                    onChange={(next) => setRecipes((list) => list?.map((x) => (x.id === r.id ? { ...x, schedule: next } : x)) ?? list)}
+                  />
+                </div>
                 {steps[r.id] && (
                   <div className="border-t px-4 py-3">
                     <RecipeChecks recipeId={r.id} columns={r.required_columns ?? []} initial={checksOf[r.id] ?? []} />

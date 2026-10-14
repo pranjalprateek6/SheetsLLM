@@ -7,6 +7,7 @@ import { motion } from "framer-motion";
 import { AlertCircle, Check, CheckCircle2, MailCheck, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
+import { track } from "@/lib/track";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -77,6 +78,26 @@ function AuthContent() {
       );
     }
   }, [searchParams]);
+
+  // Where this visit came from (a free tool, the share page), kept across the
+  // email link in this browser, and counted once the person is signed in
+  useEffect(() => {
+    const from = searchParams.get("from");
+    if (!from) return;
+    try {
+      localStorage.setItem("sllm_from", from.slice(0, 60));
+    } catch {}
+  }, [searchParams]);
+  useEffect(() => {
+    if (!user) return;
+    try {
+      const from = localStorage.getItem("sllm_from");
+      if (from) {
+        localStorage.removeItem("sllm_from");
+        track("signed_up_from", { from });
+      }
+    } catch {}
+  }, [user]);
 
   // Covers every way a session can appear: password sign-in, the OAuth
   // redirect back to this page, or visiting /auth while already signed in.
