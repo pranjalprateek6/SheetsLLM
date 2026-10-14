@@ -6,13 +6,7 @@ import time
 
 from fastapi import APIRouter
 
-from app.config import (
-    GEMINI_API_KEY,
-    GEMINI_MODEL,
-    LLM_PROVIDER,
-    OPENAI_API_KEY,
-    OPENAI_MODEL,
-)
+from app.config import GEMINI_MODEL, LLM_PROVIDER, OPENAI_MODEL
 from app.llm import health as llm_health
 
 router = APIRouter()
@@ -34,18 +28,46 @@ def _database_ok() -> tuple[bool, int | None]:
     return True, int((time.perf_counter() - started) * 1000)
 
 
+INCIDENT_EVENTS = {"llm_quota_hit": "quota", "llm_unavailable": "unavailable"}
+
+
+def _recent_incidents(now) -> dict:
+    """The last day's AI trouble from the events table, which survives the
+    instance sleeping, unlike the in-memory state: how many times, and
+    the latest. Empty when the table cannot be read."""
+    import datetime as _dt
+
+    from app import db, metrics
+
+    try:
+        rows = db.list_events((now - _dt.timedelta(hours=24)).isoformat(), list(INCIDENT_EVENTS), limit=500)
+    except Exception:
+        return {"count": 0, "last_at": None, "last_kind": None}
+    # The anonymous account is local development and the end-to-end tests
+    rows = [r for r in rows if r.get("user_id") != "anonymous"]
+    if not rows:
+        return {"count": 0, "last_at": None, "last_kind": None}
+    last = max(rows, key=metrics.event_time)
+    return {"count": len(rows), "last_at": metrics.event_time(last).isoformat(), "last_kind": INCIDENT_EVENTS.get(last.get("event"))}
+
+
 @router.get("/health")
 def health():
-    if LLM_PROVIDER == "gemini":
-        model, has_key = GEMINI_MODEL, bool(GEMINI_API_KEY)
-    else:
-        model, has_key = OPENAI_MODEL, bool(OPENAI_API_KEY)
+    import datetime as _dt
+
+    model = GEMINI_MODEL if LLM_PROVIDER == "gemini" else OPENAI_MODEL
     db_ok, db_ms = _database_ok()
+    now = _dt.datetime.now(_dt.timezone.utc)
+    ai = llm_health.state(now)
+    incidents = _recent_incidents(now) if db_ok else {"count": 0, "last_at": None, "last_kind": None}
+    # A fresh instance remembers nothing; an incident in the last few minutes still counts
+    if ai["ok"] and incidents["last_at"] and not ai["last_ok"]:
+        at = _dt.datetime.fromisoformat(incidents["last_at"])
+        if (now - at).total_seconds() <= llm_health.STALE_AFTER_SECONDS:
+            ai = {**ai, "ok": False, "kind": incidents["last_kind"], "since": incidents["last_at"]}
     return {
         "ok": True,
-        "provider": LLM_PROVIDER,
         "model": model,
-        "has_key": has_key,
         "database": {"ok": db_ok, "ms": db_ms},
-        "ai": llm_health.state(),
+        "ai": {**ai, "incidents_24h": incidents["count"], "last_incident_at": incidents["last_at"]},
     }

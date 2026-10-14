@@ -17,7 +17,7 @@ vi.mock("@/lib/supabase", () => ({
   },
 }));
 
-import { fetchWithAuth, WAKING_AFTER_MS } from "./fetch-with-auth";
+import { fetchWithAuth, timeoutFor, WAKING_AFTER_MS } from "./fetch-with-auth";
 
 function deferred() {
   let resolve!: (r: Response) => void;
@@ -116,5 +116,14 @@ describe("fetchWithAuth and the sleeping server", () => {
     expect(auth.signOut).toHaveBeenCalled();
     expect(assign).toHaveBeenCalledWith("/auth?expired=1&next=%2Fworkspace%3Ffile_id%3Df1");
     auth.session = null;
+  });
+
+  it("ends a request that never answers with a message instead of spinning", async () => {
+    vi.useRealTimers();
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new DOMException("timed out", "TimeoutError"); }));
+    const r = await fetchWithAuth("/api/files");
+    expect(r.status).toBe(504);
+    expect((await r.json()).code).toBe("NETWORK_TIMEOUT");
+    expect(timeoutFor("/api/upload")).toBeGreaterThan(timeoutFor("/api/files") - 1);
   });
 });

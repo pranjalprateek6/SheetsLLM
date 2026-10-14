@@ -18,7 +18,7 @@ import {
 type SortDir = "asc" | "desc" | null;
 type Density = "compact" | "comfortable";
 /** A column fix that needs one value before it runs. */
-type FieldKind = "rename" | "fill" | "date" | "filter" | "join";
+type FieldKind = "rename" | "fill" | "date" | "filter" | "join" | "replace";
 
 const FIELD_LABEL: Record<FieldKind, string> = {
   rename: "New name",
@@ -26,6 +26,7 @@ const FIELD_LABEL: Record<FieldKind, string> = {
   date: "The dates look like",
   filter: "Keep rows where this column",
   join: "Add columns from a lookup, matched on this column",
+  replace: "Replace a value everywhere in this column",
 };
 
 export type ColumnMeta = {
@@ -154,12 +155,28 @@ export default function DataGrid({
   }, []);
 
   const [filterQ, setFilterQ] = useState("");
+  // Once per browser: a click copies, and changes are steps
+  const [cellHint, setCellHintState] = useState(false);
+  useEffect(() => {
+    try {
+      setCellHintState(window.localStorage.getItem("sllm_cell_hint") !== "1");
+    } catch {}
+  }, []);
+  const setCellHint = (v: boolean) => {
+    setCellHintState(v);
+    if (!v) {
+      try {
+        window.localStorage.setItem("sllm_cell_hint", "1");
+      } catch {}
+    }
+  };
   // The value a column fix is waiting for, shown under that column's header
-  const [field, setField] = useState<{ kind: FieldKind; column: string; value: string; compare?: string; alias?: string; take?: string[] } | null>(null);
+  const [field, setField] = useState<{ kind: FieldKind; column: string; value: string; compare?: string; alias?: string; take?: string[]; from?: string } | null>(null);
 
-  const openField = useCallback((kind: FieldKind, column: string) => {
+  const openField = useCallback((kind: FieldKind, column: string, from?: string) => {
     const first = lookups[0];
     setField({
+      ...(kind === "replace" ? { from: from ?? "" } : {}),
       kind, column, value: kind === "rename" ? column : kind === "date" ? "auto" : "",
       ...(kind === "filter" ? { compare: "eq" } : {}),
       ...(kind === "join" && first ? { alias: first.alias, value: first.columns.find((c) => c.name === column)?.name ?? first.columns[0]?.name ?? "", take: [] } : {}),
@@ -170,7 +187,7 @@ export default function DataGrid({
     if (!field || !onOp) return;
     const value = field.value.trim();
     const compare = COMPARES.find((c) => c.value === field.compare) ?? COMPARES[0];
-    const needsValue = field.kind !== "date" && field.kind !== "join" && !(field.kind === "filter" && !compare.needsValue);
+    const needsValue = field.kind !== "date" && field.kind !== "join" && field.kind !== "replace" && !(field.kind === "filter" && !compare.needsValue);
     if (needsValue && !value) return;
     if (field.kind === "rename") {
       if (value !== field.column) onOp({ op: "rename", column: field.column, args: { new_name: value } });
@@ -178,6 +195,9 @@ export default function DataGrid({
       onOp({ op: "fill_nulls", column: field.column, args: { value: field.value } });
     } else if (field.kind === "filter") {
       onOp({ op: "filter_rows", column: field.column, args: { compare: compare.value, ...(compare.needsValue ? { value } : {}), keep: true } });
+    } else if (field.kind === "replace") {
+      if ((field.from ?? "") === field.value) return;
+      onOp({ op: "replace_value", column: field.column, args: { from: field.from ?? "", to: field.value } });
     } else if (field.kind === "join") {
       if (!field.alias || !field.take?.length) return;
       onOp({ op: "join_lookup", column: field.column, args: { alias: field.alias, lookup_on: field.value, take: field.take } });
@@ -442,6 +462,8 @@ export default function DataGrid({
               {head.map((h) => {
                 const meta = columnMeta?.[h];
                 const nullPct = meta?.null_pct ?? 0;
+                // unknown counts as maybe: a column a step added has no stats yet
+                const mayBeEmpty = typeof meta?.null_pct !== "number" || meta.null_pct > 0;
                 const highlighted = freshCols.includes(h) || flashCol === h;
                 const numeric = numericCols.has(h);
                 return (
@@ -516,22 +538,13 @@ export default function DataGrid({
                                   <Scissors className="mr-2 h-3.5 w-3.5" /> Trim whitespace
                                 </DropdownMenuItem>
                               )}
-                              <DropdownMenuItem onClick={() => openField("fill", h)}>
-                                <PaintBucket className="mr-2 h-3.5 w-3.5" /> Fill empty cells…
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => onOp({ op: "drop_empty_rows", column: h })}>
-                                <Filter className="mr-2 h-3.5 w-3.5" /> Drop rows where empty
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => openField("filter", h)}>
-                                <Filter className="mr-2 h-3.5 w-3.5" /> Keep rows where…
-                              </DropdownMenuItem>
-                              {lookups.length > 0 && (
-                                <DropdownMenuItem onClick={() => openField("join", h)}>
-                                  <Link2 className="mr-2 h-3.5 w-3.5" /> Add columns from a lookup…
+                              {mayBeEmpty && (
+                                <DropdownMenuItem onClick={() => openField("fill", h)}>
+                                  <PaintBucket className="mr-2 h-3.5 w-3.5" /> Fill empty cells…
                                 </DropdownMenuItem>
                               )}
-                              <DropdownMenuItem onClick={() => onOp({ op: "dedupe", column: h })}>
-                                <Copy className="mr-2 h-3.5 w-3.5" /> Remove duplicate rows (this column)
+                              <DropdownMenuItem onClick={() => openField("replace", h)}>
+                                <Replace className="mr-2 h-3.5 w-3.5" /> Replace a value…
                               </DropdownMenuItem>
                               {looksLikeDates(h, meta?.dtype, rows.slice(0, 8).map((r) => r[h])) && (
                                 <DropdownMenuItem onClick={() => openField("date", h)}>
@@ -543,6 +556,30 @@ export default function DataGrid({
                                   <Hash className="mr-2 h-3.5 w-3.5" /> Clean numbers
                                 </DropdownMenuItem>
                               )}
+                              <DropdownMenuSeparator />
+                              <DropdownMenuLabel className="text-[11px] font-medium text-muted-foreground">Rows</DropdownMenuLabel>
+                              {mayBeEmpty && (
+                                <DropdownMenuItem onClick={() => onOp({ op: "drop_empty_rows", column: h })}>
+                                  <Filter className="mr-2 h-3.5 w-3.5" /> Drop rows where empty
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuItem onClick={() => openField("filter", h)}>
+                                <Filter className="mr-2 h-3.5 w-3.5" /> Keep rows where…
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => onOp({ op: "dedupe", column: h })}>
+                                <Copy className="mr-2 h-3.5 w-3.5" /> Remove duplicate rows (this column)
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => onOp({ op: "sort", column: h, args: { direction: "asc" } })}>
+                                <ArrowUpDown className="mr-2 h-3.5 w-3.5" /> Sort all rows ascending
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => onOp({ op: "sort", column: h, args: { direction: "desc" } })}>
+                                <ArrowUpDown className="mr-2 h-3.5 w-3.5" /> Sort all rows descending
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuLabel className="text-[11px] font-medium text-muted-foreground">Column</DropdownMenuLabel>
+                              <DropdownMenuItem onClick={() => openField("rename", h)}>
+                                <Pencil className="mr-2 h-3.5 w-3.5" /> Rename…
+                              </DropdownMenuItem>
                               <DropdownMenuSub>
                                 <DropdownMenuSubTrigger>
                                   <Replace className="mr-2 h-3.5 w-3.5" /> Change type to
@@ -555,15 +592,11 @@ export default function DataGrid({
                                   ))}
                                 </DropdownMenuSubContent>
                               </DropdownMenuSub>
-                              <DropdownMenuItem onClick={() => onOp({ op: "sort", column: h, args: { direction: "asc" } })}>
-                                <ArrowUpDown className="mr-2 h-3.5 w-3.5" /> Sort all rows ascending
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => onOp({ op: "sort", column: h, args: { direction: "desc" } })}>
-                                <ArrowUpDown className="mr-2 h-3.5 w-3.5" /> Sort all rows descending
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => openField("rename", h)}>
-                                <Pencil className="mr-2 h-3.5 w-3.5" /> Rename…
-                              </DropdownMenuItem>
+                              {lookups.length > 0 && (
+                                <DropdownMenuItem onClick={() => openField("join", h)}>
+                                  <Link2 className="mr-2 h-3.5 w-3.5" /> Add columns from a lookup…
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuItem onClick={() => onOp({ op: "drop_column", column: h })}>
                                 <Trash2 className="mr-2 h-3.5 w-3.5" /> Drop column
                               </DropdownMenuItem>
@@ -601,6 +634,26 @@ export default function DataGrid({
                               <option key={f.value} value={f.value}>{f.example}</option>
                             ))}
                           </select>
+                        ) : field.kind === "replace" ? (
+                          <div className="space-y-1.5">
+                            <input
+                              id={`field-${h}`}
+                              value={field.from ?? ""}
+                              onChange={(e) => setField({ ...field, from: e.target.value })}
+                              aria-label="Find"
+                              placeholder="Find (empty means empty cells)"
+                              className="h-8 w-full rounded-md border border-input bg-background px-1.5 text-base outline-none focus-visible:border-primary focus-visible:ring-[3px] focus-visible:ring-primary/20 sm:text-xs"
+                            />
+                            <input
+                              autoFocus
+                              value={field.value}
+                              onChange={(e) => setField({ ...field, value: e.target.value })}
+                              aria-label="Replace with"
+                              placeholder="Replace with (empty empties it)"
+                              className="h-8 w-full rounded-md border border-input bg-background px-1.5 text-base outline-none focus-visible:border-primary focus-visible:ring-[3px] focus-visible:ring-primary/20 sm:text-xs"
+                            />
+                            <p className="text-[11px] leading-snug text-muted-foreground">Saved as a step, so next month&apos;s file gets it too.</p>
+                          </div>
                         ) : field.kind === "join" ? (
                           (() => {
                             const lookup = lookups.find((l) => l.alias === field.alias) ?? lookups[0];
@@ -798,11 +851,12 @@ export default function DataGrid({
                         return (
                           <td
                             key={h}
-                            className={`px-2 ${density === "comfortable" ? "py-2" : "py-1"} align-middle text-xs text-foreground cursor-pointer relative border-r border-border/40 last:border-r-0 ${
+                            className={`px-2 ${density === "comfortable" ? "py-2" : "py-1"} align-middle text-xs text-foreground cursor-copy relative border-r border-border/40 last:border-r-0 ${
                               numeric ? "text-right" : "text-left"
                             } ${highlighted ? "bg-primary/[0.05]" : ""}`}
                             onClick={() => handleCopy(isNull ? "" : String(val), cellKey)}
-                            title={isNull ? "NULL" : String(val)}
+                            onDoubleClick={onOp ? () => { setCellHint(false); openField("replace", h, isNull ? "" : String(val)); } : undefined}
+                            title={`${isNull ? "NULL" : String(val)}\nClick to copy${onOp ? ". Double-click to replace this value in the whole column" : ""}`}
                           >
                             {isNull ? (
                               <span className="text-[11px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground font-mono">
@@ -836,6 +890,14 @@ export default function DataGrid({
           </tbody>
         </table>
       </div>
+      {cellHint && onOp && rows.length > 0 && (
+        <div className="flex flex-shrink-0 items-center justify-between gap-2 border-t bg-muted/40 px-3 py-1 text-[11px] text-muted-foreground">
+          <span>A click copies a cell. Changes are steps: a column&apos;s menu, Chef, or double-click a cell to replace its value everywhere.</span>
+          <button type="button" onClick={() => setCellHint(false)} aria-label="Dismiss the tip" className="flex h-6 w-6 items-center justify-center rounded hover:bg-accent hover:text-foreground">
+            <X className="h-3.5 w-3.5" aria-hidden />
+          </button>
+        </div>
+      )}
       {/* Status bar */}
       <div className="flex h-8 flex-shrink-0 items-center justify-between gap-2 border-t bg-card px-3 coarse:h-11">
         {serverView && (view?.empty || view?.sort || view?.q) ? (

@@ -73,6 +73,8 @@ EVENTS = frozenset({
     # loops: schedules, lifecycle email, shared recipes, where signups came from
     "schedule_set", "schedule_ran", "lifecycle_mail_sent", "recipe_shared", "recipe_imported",
     "signed_up_from", "tool_cta_clicked", "tool_run",
+    # a copy of the account taken from the account page
+    "account_exported",
 })
 
 

@@ -72,4 +72,10 @@ describe("resetDay", () => {
     expect(raw.text).toBe("Something went wrong. Try again.");
     expect(raw.details).toBe("Reference req-3");
   });
+
+  it("says the database is not answering, with the reference", () => {
+    const out = explainError({ code: "DB_UNAVAILABLE", message: "x", request_id: "r9" });
+    expect(out.text).toMatch(/database isn't answering/);
+    expect(out.details).toBe("Reference r9");
+  });
 });

@@ -13,7 +13,11 @@ let slowInFlight = 0;
 function slowStarted() {
   slowInFlight += 1;
   if (slowInFlight === 1) {
-    toast.loading(WAKING_TEXT, { id: WAKING_TOAST_ID, duration: Infinity });
+    toast.loading(WAKING_TEXT, {
+      id: WAKING_TOAST_ID,
+      duration: Infinity,
+      action: { label: "Status", onClick: () => window.location.assign("/status") },
+    });
   }
 }
 
@@ -37,6 +41,15 @@ function slowEnded() {
  * server is starting (the free instance sleeps when idle), and takes it
  * away when the request answers.
  */
+/** How long a request may take before it is called stalled. Uploads and
+ *  Chef get the room their server routes have; everything else a little
+ *  more than the longest route. */
+export function timeoutFor(url: string): number {
+  if (url.startsWith("/api/upload")) return 180_000;
+  if (url.startsWith("/api/chat")) return 100_000;
+  return 100_000;
+}
+
 export async function fetchWithAuth(
   url: string,
   options: RequestInit = {}
@@ -55,9 +68,24 @@ export async function fetchWithAuth(
     slowStarted();
   }, WAKING_AFTER_MS);
 
+  // A request that never answers ends, with a message, rather than spinning
+  const limitMs = timeoutFor(url);
+  const signal = options.signal ?? (typeof AbortSignal !== "undefined" && "timeout" in AbortSignal ? AbortSignal.timeout(limitMs) : undefined);
+
   let response: Response;
   try {
-    response = await fetch(url, { ...options, headers });
+    response = await fetch(url, { ...options, headers, ...(signal ? { signal } : {}) });
+  } catch (e) {
+    if (!options.signal && e instanceof DOMException && e.name === "TimeoutError") {
+      return new Response(
+        JSON.stringify({
+          code: "NETWORK_TIMEOUT",
+          message: `No answer after ${Math.round(limitMs / 1000)} seconds. Check your connection, or the status page.`,
+        }),
+        { status: 504, headers: { "Content-Type": "application/json" } },
+      );
+    }
+    throw e;
   } finally {
     clearTimeout(timer);
     if (slow) slowEnded();

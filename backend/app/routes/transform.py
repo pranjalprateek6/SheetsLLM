@@ -147,7 +147,7 @@ async def _lost_values_warning(r2_key: str, steps: list[dict], column: str, deci
 
 
 # Fixes that rewrite one column's cells in place
-_CELL_OPS = {"trim", "fill_nulls", "standardise_date", "clean_number", "cast"}
+_CELL_OPS = {"trim", "fill_nulls", "standardise_date", "clean_number", "cast", "replace_value"}
 
 
 @router.post("/transform/op")

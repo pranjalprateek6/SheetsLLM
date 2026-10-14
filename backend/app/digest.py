@@ -39,12 +39,14 @@ TROUBLE = [
     ("account_deleted", "accounts deleted"),
     ("feedback", "feedback messages"),
 ]
+# Read for the loop numbers, not listed as lines of their own
+LOOP_EVENTS = ["reminder_sent", "signed_up_from", "tool_cta_clicked"]
 MONEY = [
     ("checkout_started", "checkouts started"),
     ("subscription_activated", "subscriptions activated"),
     ("waitlist_joined", "waitlist joins"),
 ]
-EVENT_NAMES = [name for name, _ in ACTIVITY + TROUBLE + MONEY]
+EVENT_NAMES = [name for name, _ in ACTIVITY + TROUBLE + MONEY] + LOOP_EVENTS
 # Enough history to tell a new user from a returning one
 LOOKBACK_DAYS = 60
 
@@ -101,7 +103,40 @@ def summarise(rows: list[dict], now: _dt.datetime, *, recipes_total: int | None 
         if any(first_upload[u] <= t <= first_upload[u] + _dt.timedelta(days=7) for t in first_run.get(u, []))
     ]
 
+    # The habit: recipes run on two or more files, reminders that led to a
+    # run within a week, and signups that came from a free tool
+    runs_per_recipe: dict[str, int] = {}
+    for r in rows:
+        if r.get("event") == "recipe_applied":
+            rid = str((r.get("properties") or {}).get("recipe_id") or "")
+            if rid:
+                runs_per_recipe[rid] = runs_per_recipe.get(rid, 0) + 1
+    reminders = [r for r in this_week + last_week if r.get("event") == "reminder_sent"]
+    converted = 0
+    for rem in reminders:
+        rid = (rem.get("properties") or {}).get("recipe_id")
+        at = metrics.event_time(rem)
+        if any(
+            r.get("event") == "recipe_applied" and (r.get("properties") or {}).get("recipe_id") == rid
+            and at <= metrics.event_time(r) <= at + _dt.timedelta(days=7)
+            for r in rows
+        ):
+            converted += 1
+    tool_signups = sum(
+        1 for r in this_week
+        if r.get("event") == "signed_up_from" and str((r.get("properties") or {}).get("from") or "").startswith("tool-")
+    )
+    tool_clicks = sum(1 for r in this_week if r.get("event") == "tool_cta_clicked")
+
     return {
+        "loop": {
+            "recipes_run_twice": sum(1 for n in runs_per_recipe.values() if n >= 2),
+            "recipes_run": len(runs_per_recipe),
+            "reminders": len(reminders),
+            "reminders_converted": converted,
+            "tool_clicks": tool_clicks,
+            "tool_signups": tool_signups,
+        },
         "activation": {"cohort": len(cohort), "activated": len(activated)},
         "from": this_start.date().isoformat(),
         "to": (now - _dt.timedelta(days=1)).date().isoformat(),
@@ -150,6 +185,14 @@ def email_text(summary: dict) -> tuple[str, str]:
     ]
     if summary.get("recipes_total") is not None:
         lines.append(f"  {summary['recipes_total']} recipes exist in all.")
+    loop = summary.get("loop") or {}
+    if loop:
+        lines += ["", "The habit"]
+        lines.append(f"  {loop.get('recipes_run_twice', 0)} of {loop.get('recipes_run', 0)} recipes run in the last 60 days ran on two or more files.")
+        if loop.get("reminders"):
+            lines.append(f"  {loop.get('reminders_converted', 0)} of {loop.get('reminders')} reminders in the last two weeks led to a run within 7 days.")
+        if loop.get("tool_clicks") or loop.get("tool_signups"):
+            lines.append(f"  The free tools: {loop.get('tool_clicks', 0)} clicks to the app, {loop.get('tool_signups', 0)} signups this week.")
     trouble = [p for p in summary["trouble"] if p["this"] or p["last"]]
     lines += ["", "Trouble"]
     lines += [_line(p["label"], p["this"], p["last"]) for p in trouble] if trouble else ["- nothing this week or last"]

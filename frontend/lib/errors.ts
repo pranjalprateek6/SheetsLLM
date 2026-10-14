@@ -104,6 +104,15 @@ export function explainError(payload: ErrorPayload | null | undefined): Explaine
         actions: ["edit_retry"],
         details: p.request_id ? `Reference ${p.request_id}` : undefined,
       };
+    case "DB_UNAVAILABLE":
+      return {
+        code,
+        text: "The database isn't answering right now. It may be waking up; try again in a minute.",
+        actions: ["retry"],
+        details: p.request_id ? `Reference ${p.request_id}` : undefined,
+      };
+    case "NETWORK_TIMEOUT":
+      return { code, text: p.message ?? "No answer from the server. Check your connection or the status page.", actions: ["retry"] };
     case "INTERNAL":
       return {
         code,

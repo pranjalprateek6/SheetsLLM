@@ -47,6 +47,7 @@ function AccountContent() {
   const [plans, setPlans] = useState<Plans>(DEFAULT_PLANS);
   const [tierFailed, setTierFailed] = useState(false);
   const [graceUntil, setGraceUntil] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
   const [emailReminders, setEmailReminders] = useState<boolean | null>(null);
   const [privacyMode, setPrivacyMode] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
@@ -255,6 +256,37 @@ function AccountContent() {
               disabled={emailReminders === null}
               aria-label="Email me when a recipe is due"
             />
+          </div>
+        </Row>
+
+        <Row title="Your data" description="Every recipe with its steps, every file with its size and steps, and your settings, as one JSON file. The files themselves export from the workspace.">
+          <div className="flex items-center justify-between gap-4">
+            <p className="text-sm font-medium">Download a copy</p>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={exporting}
+              onClick={async () => {
+                setExporting(true);
+                try {
+                  const r = await fetchWithAuth("/api/account/export");
+                  if (!r.ok) throw new Error();
+                  const blob = new Blob([JSON.stringify(await r.json(), null, 2)], { type: "application/json" });
+                  const a = document.createElement("a");
+                  a.href = URL.createObjectURL(blob);
+                  a.download = `sheetsllm-export-${new Date().toISOString().slice(0, 10)}.json`;
+                  document.body.appendChild(a);
+                  a.click();
+                  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+                } catch {
+                  setError("Couldn't make the copy. Try again.");
+                } finally {
+                  setExporting(false);
+                }
+              }}
+            >
+              {exporting ? "Preparing…" : "Download my data"}
+            </Button>
           </div>
         </Row>
 

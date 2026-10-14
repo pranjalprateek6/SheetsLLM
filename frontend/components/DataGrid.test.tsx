@@ -198,4 +198,27 @@ describe("DataGrid preview sort", () => {
     await userEvent.click(screen.getByRole("button", { name: "Stats" }));
     expect(screen.getByText(/50% empty/)).toBeInTheDocument();
   });
+
+  it("replaces a value everywhere in its column from a double-click, as a step", async () => {
+    const onOp = grid();
+    const cell = screen.getByRole("table").querySelector("td[title^=\"10\"]") as HTMLElement | null;
+    // jsdom paints no virtual rows, so open the field from the menu instead when there is no cell
+    if (cell) {
+      await userEvent.dblClick(cell);
+    } else {
+      const menu = await openMenu("Email");
+      await userEvent.click(within(menu).getByRole("menuitem", { name: "Replace a value…" }));
+      await userEvent.type(screen.getByLabelText("Find"), "N/A");
+    }
+    await userEvent.type(screen.getByLabelText("Replace with"), "unknown{Enter}");
+    expect(onOp).toHaveBeenCalledWith(expect.objectContaining({ op: "replace_value", args: expect.objectContaining({ to: "unknown" }) }));
+  });
+
+  it("offers no empty-cell fixes on a column known to have none", async () => {
+    grid({ columnMeta: { Email: { dtype: "VARCHAR", null_pct: 0 }, Amount: { dtype: "BIGINT" }, "Order Date": { dtype: "VARCHAR" } } });
+    const menu = await openMenu("Email");
+    expect(within(menu).queryByRole("menuitem", { name: "Fill empty cells…" })).not.toBeInTheDocument();
+    expect(within(menu).queryByRole("menuitem", { name: "Drop rows where empty" })).not.toBeInTheDocument();
+    expect(within(menu).getByRole("menuitem", { name: "Replace a value…" })).toBeInTheDocument();
+  });
 });

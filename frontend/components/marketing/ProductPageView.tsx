@@ -16,12 +16,18 @@ export default function ProductPageView({ page }: { page: ProductPage }) {
   return (
     <div className="overflow-x-clip">
       <section className="relative border-b">
-        {/* The product, out of focus, behind the headline */}
+        {/* The product, alive behind the headline: a violet glow, the visual
+            tilted and drifting, and a scrim only where the words sit, so the
+            picture reads on the right and the headline stays crisp on the left */}
         <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-          <div className="absolute right-[-6%] top-[8%] w-[62%] origin-top-right rotate-[-4deg] scale-110 opacity-40 blur-[2px] [mask-image:radial-gradient(70%_70%_at_60%_40%,black,transparent)]">
-            <Visual name={first.visual} />
+          <div className="absolute right-[4%] top-[6%] h-[70%] w-[52%] rounded-full bg-primary/30 blur-[120px] dark:bg-primary/40" />
+          <div className="absolute right-[-4%] top-[10%] w-[64%] origin-top-right rotate-[-4deg] scale-105 opacity-30 [mask-image:radial-gradient(95%_90%_at_60%_45%,black_65%,transparent_100%)] sm:opacity-100">
+            <div className="animate-hero-drift drop-shadow-[0_30px_60px_rgba(0,0,0,0.35)]">
+              <Visual name={first.visual} />
+            </div>
           </div>
-          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/70 to-background/10" />
+          <div className="absolute inset-0 bg-gradient-to-r from-background from-[8%] via-background/70 via-[34%] to-transparent to-[62%] max-sm:via-background/85" />
+          <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-background to-transparent" />
         </div>
         <Container className="relative flex min-h-[460px] flex-col justify-end pb-14 pt-28 sm:min-h-[540px]">
           <p className="text-[13px] text-muted-foreground">{page.label}</p>

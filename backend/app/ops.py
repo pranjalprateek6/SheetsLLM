@@ -406,6 +406,43 @@ def _contains_any(cols, column, args):
     return f"SELECT * FROM data WHERE {cond}", f"Keep rows where {where} contains {needle}"
 
 
+def _replace_value(cols, column, args):
+    """Every cell of a column holding one value, rewritten to another, as a
+    step that replays next month. An empty "from" means the empty cells;
+    an empty "to" empties them."""
+    c = _column(cols, column)
+    q = quote_ident(c)
+    old = "" if args.get("from") is None else str(args.get("from"))
+    new = "" if args.get("to") is None else str(args.get("to"))
+    if len(old) > MAX_VALUE or len(new) > MAX_VALUE:
+        raise OpError("INVALID_ARGS", f"A value can be at most {MAX_VALUE} characters.")
+    if old == new:
+        raise OpError("INVALID_ARGS", "The new value is the same as the old one.")
+    match = (
+        f"({q} IS NULL OR TRIM(CAST({q} AS VARCHAR)) = '')" if not old.strip()
+        else f"CAST({q} AS VARCHAR) = {quote_literal(old)}"
+    )
+    if is_numeric(cols[c]):
+        if not new.strip():
+            value = "NULL"
+        else:
+            try:
+                number = float(new)
+            except ValueError:
+                raise OpError("WRONG_TYPE", f"{c} holds numbers, so the new value must be a number. Change its type to text first to write words.")
+            if not math.isfinite(number):
+                raise OpError("WRONG_TYPE", f"{c} holds numbers, so the new value must be a number.")
+            value = f"CAST({quote_literal(new.strip())} AS {cols[c]})"
+    elif is_string(cols[c]):
+        value = "NULL" if new == "" else quote_literal(new)
+    else:
+        value = "NULL" if not new.strip() else f"TRY_CAST({quote_literal(new)} AS {cols[c]})"
+    expr = f"CASE WHEN {match} THEN {value} ELSE {q} END"
+    shown_old = f"\u201c{old}\u201d" if old.strip() else "empty cells"
+    shown_new = f"\u201c{new}\u201d" if new != "" else "empty"
+    return _select_replacing(cols, c, expr), f"Replace {shown_old} with {shown_new} in {c}"
+
+
 OPS: dict[str, Callable[[dict[str, str], Any, dict], tuple[str, str]]] = {
     "trim": _trim,
     "drop_column": _drop_column,
@@ -419,6 +456,7 @@ OPS: dict[str, Callable[[dict[str, str], Any, dict], tuple[str, str]]] = {
     "sort": _sort,
     "contains_any": _contains_any,
     "filter_rows": _filter_rows,
+    "replace_value": _replace_value,
 }
 
 
