@@ -31,10 +31,33 @@ def test_milestones_survive_an_unreadable_table(monkeypatch):
     assert onboarding.milestones("u1") == {"upload": False, "transform": False, "recipe": False, "rerun": False}
 
 
-def test_a_recipe_from_a_sample_does_not_count(monkeypatch):
-    recipes = [{"id": "r1", "source_file_id": "f1"}, {"id": "r2", "source_file_id": "f2"}, {"id": "r3"}]
-    monkeypatch.setattr(db, "file_names", lambda ids: {"f1": "orders_oct.csv", "f2": "my_export.csv"})
-    assert [r["id"] for r in onboarding.counted_recipes(recipes)] == ["r2", "r3"]
+ORDERS_HEADER = ["Order ID", "Customer Email", "Region", "Order Date", "MRP", "Landing Cost", "Status"]
+
+
+def _file(name, header, rows):
+    return {"name": name, "row_count": rows, "schema_json": {"columns": [{"name": c} for c in header]}}
+
+
+def test_only_one_recipe_from_a_real_sample_goes_uncounted(monkeypatch):
+    recipes = [
+        {"id": "r1", "source_file_id": "f1", "created_at": "2026-10-01"},
+        {"id": "r2", "source_file_id": "f2", "created_at": "2026-10-02"},
+        {"id": "r3", "source_file_id": "f3", "created_at": "2026-10-03"},
+        {"id": "r4", "created_at": "2026-10-04"},
+    ]
+    monkeypatch.setattr(db, "file_rows", lambda ids: {
+        "f1": _file("orders_oct.csv", ORDERS_HEADER, 1012),   # the real sample: practice
+        "f2": _file("orders_oct.csv", ORDERS_HEADER, 1012),   # a second one: counts
+        "f3": _file("my_export.csv", ORDERS_HEADER, 1012),
+    })
+    assert [r["id"] for r in onboarding.counted_recipes(recipes)] == ["r2", "r3", "r4"]
+
+
+def test_a_renamed_file_is_not_a_sample():
+    assert not onboarding.is_sample_file(_file("orders_oct.csv", ["a", "b"], 1012))
+    assert not onboarding.is_sample_file(_file("orders_oct.csv", ORDERS_HEADER, 999))
+    assert not onboarding.is_sample_file(None)
+    assert onboarding.is_sample_file(_file("orders_oct.csv", ORDERS_HEADER, 1012))
 
 
 def test_the_route_answers_for_the_signed_in_user(monkeypatch):

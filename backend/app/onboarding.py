@@ -16,11 +16,19 @@ from app import db
 
 logger = logging.getLogger("sheetsllm.onboarding")
 
-# The file names the bundled samples upload under (frontend/lib/samples.ts)
-SAMPLE_FILE_NAMES = frozenset({
-    "orders_oct.csv", "orders_nov.csv", "regions.csv",
-    "sample_sales.csv", "sample_employees.csv", "sample_survey.csv",
-})
+# The bundled samples (frontend/public/samples): the name each uploads
+# under, its exact header and its row count. A recipe is practice only
+# when its source file matches all three, so renaming a file is not enough.
+SAMPLE_SHAPES = {
+    "orders_oct.csv": (("Order ID", "Customer Email", "Region", "Order Date", "MRP", "Landing Cost", "Status"), 1012),
+    "orders_nov.csv": (("Order ID", "Customer Email", "Region", "Order Date", "MRP", "Landing Cost", "Status"), 1040),
+    "sample_sales.csv": (("order_id", "order_date", "product", "category", "region", "units", "unit_price", "revenue"), 1000),
+    "sample_employees.csv": (("employee_id", "name", "department", "city", "salary", "hire_date"), 500),
+    "sample_survey.csv": (("response_id", "age_group", "gender", "rating", "would_recommend", "submitted_at"), 200),
+}
+SAMPLE_FILE_NAMES = frozenset(SAMPLE_SHAPES)
+# At most this many practice recipes go uncounted
+MAX_PRACTICE_RECIPES = 1
 
 MILESTONE_EVENTS = (
     "upload_completed", "op_applied", "insight_fix_applied", "chat_sent",
@@ -47,15 +55,32 @@ def milestones(user_id: str) -> dict[str, bool]:
     }
 
 
-def is_sample_recipe(recipe: dict, names: dict[str, str]) -> bool:
-    return names.get(recipe.get("source_file_id") or "") in SAMPLE_FILE_NAMES
+def is_sample_file(file_row: dict | None) -> bool:
+    """True when a file is a bundled sample: its name, its header and its
+    row count all match. Read from the stored upload record, not the name."""
+    if not file_row:
+        return False
+    shape = SAMPLE_SHAPES.get(file_row.get("name") or "")
+    if not shape:
+        return False
+    header, rows = shape
+    schema = file_row.get("schema_json") or {}
+    columns = tuple(c.get("name") for c in schema.get("columns") or [] if isinstance(c, dict))
+    return columns == header and int(file_row.get("row_count") or -1) == rows
 
 
 def counted_recipes(recipes: list[dict]) -> list[dict]:
-    """The recipes that count against the plan: all but practice ones
-    saved from a bundled sample."""
+    """The recipes that count against the plan: all but one practice
+    recipe saved from a bundled sample."""
     try:
-        names = db.file_names([r["source_file_id"] for r in recipes if r.get("source_file_id")])
+        files = db.file_rows([r["source_file_id"] for r in recipes if r.get("source_file_id")])
     except Exception:
         return recipes
-    return [r for r in recipes if not is_sample_recipe(r, names)]
+    out, exempted = [], 0
+    # Oldest first, so the tutorial recipe is the one exempted
+    for r in sorted(recipes, key=lambda r: str(r.get("created_at") or "")):
+        if exempted < MAX_PRACTICE_RECIPES and is_sample_file(files.get(r.get("source_file_id") or "")):
+            exempted += 1
+            continue
+        out.append(r)
+    return out

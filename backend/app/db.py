@@ -210,6 +210,15 @@ def get_upload_row_count(file_id: str) -> int | None:
     return rows if isinstance(rows, int) else None
 
 
+def file_rows(file_ids: list[str]) -> dict[str, dict]:
+    """{id: {name, row_count, schema_json}} for the files that exist."""
+    ids = [f for f in file_ids if is_uuid(f)]
+    if not ids:
+        return {}
+    resp = get_client().table("files").select("id,name,row_count,schema_json").in_("id", ids).execute()
+    return {r["id"]: r for r in resp.data or []}
+
+
 def file_names(file_ids: list[str]) -> dict[str, str]:
     ids = [f for f in file_ids if is_uuid(f)]
     if not ids:
