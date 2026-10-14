@@ -14,7 +14,8 @@ export type OpName =
   | "contains_any"
   | "clean_number"
   | "filter_rows"
-  | "join_lookup";
+  | "join_lookup"
+  | "replace_value";
 
 export type OpRequest = {
   op: OpName;

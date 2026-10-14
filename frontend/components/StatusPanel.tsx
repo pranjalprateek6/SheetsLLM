@@ -12,7 +12,14 @@ export type Health = {
   provider?: string;
   model?: string;
   database?: { ok: boolean; ms: number | null };
-  ai?: { ok: boolean; kind: "quota" | "unavailable" | "other" | null; since: string | null; last_ok: string | null };
+  ai?: {
+    ok: boolean;
+    kind: "quota" | "unavailable" | "other" | null;
+    since: string | null;
+    last_ok: string | null;
+    incidents_24h?: number;
+    last_incident_at?: string | null;
+  };
 };
 
 type Row = { name: string; state: "ok" | "trouble" | "down" | "unknown"; detail: string };
@@ -33,7 +40,9 @@ export function rowsFor(h: Health | null, reachable: boolean, modelName?: string
   const ai = h?.ai;
   const aiDetail =
     !ai || ai.ok
-      ? `${model} is answering.`
+      ? ai?.incidents_24h
+        ? `${model} is answering. ${ai.incidents_24h} interruption${ai.incidents_24h === 1 ? "" : "s"} in the last 24 hours, the last at ${timeOf(ai.last_incident_at)}.`
+        : `${model} is answering.`
       : ai.kind === "quota"
         ? `${model} is out of capacity for today, since ${timeOf(ai.since)}. Recipes and one-click fixes still work.`
         : ai.kind === "unavailable"

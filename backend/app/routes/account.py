@@ -61,3 +61,52 @@ async def delete_account(request: Request):
     events.record("deleted", "account_deleted", files=counts.get("files", 0), recipes=counts.get("recipes", 0))
     logger.info("account %s deleted", user_id)
     return {"deleted": True, **counts}
+
+
+@router.get("/account/export")
+def export_account(request: Request):
+    """Everything the account holds that is not the files' bytes: the
+    settings, the plan, every recipe with its steps, and every file with
+    its size and its steps. The files themselves export from the app."""
+    import datetime as _dt
+
+    from app import billing
+
+    user_id = getattr(request.state, "user_id", "anonymous")
+    try:
+        files = db.list_files(user_id, page=1, page_size=500).get("items", [])
+    except Exception:
+        return _json_response(503, "DB_UNAVAILABLE", "The database isn't answering right now. Try again in a minute.")
+    out_files = []
+    for f in files:
+        try:
+            steps = db.get_transformations(f["id"])
+        except Exception:
+            steps = []
+        out_files.append({
+            "id": f.get("id"), "name": f.get("name"), "created_at": f.get("created_at"),
+            "rows": f.get("row_count"), "columns": f.get("column_count"),
+            "columns_at_upload": [c.get("name") for c in ((f.get("schema_json") or {}).get("columns") or []) if isinstance(c, dict)],
+            "steps": [{"step": s.get("step_number"), "instruction": s.get("instruction"), "sql": s.get("sql_query")} for s in steps],
+        })
+    recipes = []
+    for r in db.list_recipes(user_id):
+        recipes.append({
+            "id": r.get("id"), "name": r.get("name"), "description": r.get("description"), "created_at": r.get("created_at"),
+            "steps": [{"instruction": s.get("instruction"), "sql": s.get("sql_query")} for s in (r.get("steps") or []) if isinstance(s, dict)],
+            "required_columns": [c.get("name") for c in (r.get("required_columns") or []) if isinstance(c, dict)],
+        })
+    try:
+        settings = db.get_user_settings(user_id) or {}
+    except Exception:
+        settings = {}
+    events.record(user_id, "account_exported")
+    return {
+        "exported_at": _dt.datetime.now(_dt.timezone.utc).isoformat(),
+        "account": {"email": getattr(request.state, "email", "") or None},
+        "plan": billing.state_for(user_id),
+        "settings": {k: v for k, v in settings.items() if k in ("privacy_mode", "email_reminders")},
+        "recipes": recipes,
+        "files": out_files,
+    }
+

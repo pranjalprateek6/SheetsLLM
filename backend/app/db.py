@@ -17,6 +17,10 @@ logger = logging.getLogger("sheetsllm.db")
 _client: Client | None = None
 
 
+DB_TIMEOUT_SECONDS = 8
+STORAGE_TIMEOUT_SECONDS = 30
+
+
 def get_client() -> Client:
     """Lazy-initialised Supabase client (service-role key for backend use)."""
     global _client
@@ -25,7 +29,17 @@ def get_client() -> Client:
             raise RuntimeError(
                 "SUPABASE_URL and SUPABASE_SERVICE_KEY must be set"
             )
-        _client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+        # Short timeouts: a paused project should say so in seconds, not burn
+        # a route's whole budget first
+        try:
+            from supabase import ClientOptions
+
+            _client = create_client(
+                SUPABASE_URL, SUPABASE_SERVICE_KEY,
+                options=ClientOptions(postgrest_client_timeout=DB_TIMEOUT_SECONDS, storage_client_timeout=STORAGE_TIMEOUT_SECONDS),
+            )
+        except ImportError:
+            _client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
         _retry_closed_connections(_client.postgrest.session)
         _retry_closed_connections(_client.storage.session)
     return _client

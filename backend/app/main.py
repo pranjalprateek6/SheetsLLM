@@ -199,6 +199,19 @@ async def unhandled_error(request: Request, exc: Exception):
     the log. Starlette logs the traceback itself."""
     request_id = getattr(request.state, "request_id", "")
     logger.error("Unhandled error on %s %s [%s]: %s", request.method, request.url.path, request_id, exc)
+    import httpx
+
+    if isinstance(exc, (httpx.TimeoutException, httpx.ConnectError)):
+        # The database (or storage) did not answer: say so, the status page says the same
+        return JSONResponse(
+            status_code=503,
+            content={
+                "code": "DB_UNAVAILABLE",
+                "message": "The database isn't answering right now. It may be waking up; try again in a minute.",
+                "request_id": request_id,
+            },
+            headers={"x-request-id": request_id} if request_id else None,
+        )
     return JSONResponse(
         status_code=500,
         content={

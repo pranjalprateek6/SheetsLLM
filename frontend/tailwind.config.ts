@@ -104,6 +104,10 @@ const config: Config = {
           from: { opacity: "0" },
           to: { opacity: "1" },
         },
+        "hero-drift": {
+          "0%": { transform: "translate3d(0, 0, 0) rotate(0deg)" },
+          "100%": { transform: "translate3d(-14px, -10px, 0) rotate(0.6deg)" },
+        },
         "slide-up": {
           from: { transform: "translateY(100%)" },
           to: { transform: "translateY(0)" },
@@ -115,6 +119,7 @@ const config: Config = {
         "fade-in-up": "fade-in-up 0.4s cubic-bezier(0.22, 1, 0.36, 1) both",
         "ghost-press": "ghost-press 0.5s cubic-bezier(0.22, 1, 0.36, 1) both",
         "fade-in": "fade-in 0.2s ease-out both",
+        "hero-drift": "hero-drift 9s ease-in-out infinite alternate",
         "slide-up": "slide-up 0.3s cubic-bezier(0.22, 1, 0.36, 1) both",
       },
     },

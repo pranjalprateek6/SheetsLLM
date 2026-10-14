@@ -8,6 +8,7 @@ import { Toaster } from "@/components/ui/sonner";
 import WarmBackend from "@/components/WarmBackend";
 import GlobalCommandPalette from "@/components/GlobalCommandPalette";
 import ShortcutsDialog from "@/components/ShortcutsDialog";
+import OfflineBanner from "@/components/OfflineBanner";
 
 // Inter (variable, so the in-between 510 and 590 weights exist) for every
 // word of interface and prose; Geist Mono only for code: SQL and column types.
@@ -42,6 +43,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <WarmBackend />
             <GlobalCommandPalette />
             <ShortcutsDialog />
+            <OfflineBanner />
             <Header />
             <main id="main" tabIndex={-1}>{children}</main>
             {/* Bottom-left: the right edge of the workspace is Chef's composer,
