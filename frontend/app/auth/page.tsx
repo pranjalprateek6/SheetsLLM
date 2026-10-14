@@ -29,11 +29,12 @@ function GoogleIcon() {
  *  workspace onboarding is the right first screen; files mean this is a
  *  returning user who wants the dashboard. */
 async function destinationAfterAuth(): Promise<string> {
+  // Until the first recipe is saved the workspace is where the next step
+  // is; after that the Files list, with its due recipes, is home
   try {
-    const r = await fetchWithAuth("/api/files?page=1&page_size=1");
+    const r = await fetchWithAuth("/api/onboarding");
     const d = await r.json();
-    const total = d.total ?? (d.files?.length || d.items?.length || 0);
-    return total > 0 ? "/dashboard" : "/workspace";
+    return d?.recipe ? "/dashboard" : "/workspace";
   } catch {
     return "/workspace";
   }
@@ -52,7 +53,9 @@ function AuthContent() {
   );
   const [success, setSuccess] = useState<string | null>(null);
   const [confirmationSent, setConfirmationSent] = useState(false);
-  const { user, signIn, signInWithGoogle, signUp, resetPassword } = useAuth();
+  // "link" when the email that was sent is a sign-in link, not a confirmation
+  const [sentKind, setSentKind] = useState<"confirm" | "link">("confirm");
+  const { user, signIn, signInWithLink, signInWithGoogle, signUp, resetPassword } = useAuth();
   const router = useRouter();
   const routedRef = useRef(false);
 
@@ -119,6 +122,23 @@ function AuthContent() {
     // On success the browser navigates away — no state to reset.
   };
 
+  const handleLink = async () => {
+    setError(null);
+    setSuccess(null);
+    if (!email) {
+      setError("Enter your email first, and we'll send the link there.");
+      return;
+    }
+    setLoading(true);
+    const { error: err } = await signInWithLink(email);
+    setLoading(false);
+    if (err) setError(err);
+    else {
+      setSentKind("link");
+      setConfirmationSent(true);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -147,6 +167,7 @@ function AuthContent() {
         const { error: err, needsConfirmation } = await signUp(email, password);
         if (err) setError(err);
         else if (needsConfirmation) {
+          setSentKind("confirm");
           setConfirmationSent(true);
         } else {
           setSuccess("Account created. You can sign in now.");
@@ -198,8 +219,9 @@ function AuthContent() {
               <MailCheck className="mx-auto mb-3 h-8 w-8 text-success-text" />
               <h1 className="text-xl font-semibold tracking-tight">Check your email</h1>
               <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                We sent a confirmation link to <span className="font-medium text-foreground">{email}</span>.
-                Click it, then sign in here.
+                We sent {sentKind === "link" ? "a sign-in link" : "a confirmation link"} to{" "}
+                <span className="font-medium text-foreground">{email}</span>. Click it and you&apos;re in: it opens
+                your workspace, no password to type.
               </p>
               <Button variant="outline" className="mt-5 w-full" onClick={() => switchMode("signin")}>
                 Back to sign in
@@ -327,6 +349,17 @@ function AuthContent() {
                     ? "Create account"
                     : "Send reset link"}
                 </Button>
+
+                {mode !== "forgot" && (
+                  <button
+                    type="button"
+                    onClick={handleLink}
+                    disabled={loading}
+                    className="w-full text-center text-[13px] font-medium text-primary-accent hover:underline disabled:opacity-50 coarse:py-2"
+                  >
+                    Email me a sign-in link instead
+                  </button>
+                )}
 
                 {mode !== "forgot" && (
                   <p className="text-center text-xs leading-relaxed text-muted-foreground">

@@ -13,6 +13,8 @@ interface AuthState {
     password: string
   ) => Promise<{ error: string | null; needsConfirmation?: boolean }>;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
+  /** Email a one-time sign-in link; creates the account if there is none */
+  signInWithLink: (email: string) => Promise<{ error: string | null }>;
   signInWithGoogle: () => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: string | null }>;
@@ -48,7 +50,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signUp = useCallback(async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signUp({ email, password });
+    // The confirmation link signs the person in and lands on /auth, which
+    // routes on from there: no second trip through the sign-in form
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { emailRedirectTo: `${window.location.origin}/auth` },
+    });
     if (error) return { error: error.message };
     // A session means auto-confirm is on; no session means Supabase sent a
     // confirmation email and sign-in will fail until it's clicked.
@@ -59,6 +67,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) return { error: error.message };
     return { error: null };
+  }, []);
+
+  const signInWithLink = useCallback(async (email: string) => {
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: `${window.location.origin}/auth`, shouldCreateUser: true },
+    });
+    return { error: error ? error.message : null };
   }, []);
 
   const signInWithGoogle = useCallback(async () => {
@@ -112,7 +128,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, session, loading, signUp, signIn, signInWithGoogle, signOut, resetPassword, updatePassword, getAccessToken }}
+      value={{ user, session, loading, signUp, signIn, signInWithLink, signInWithGoogle, signOut, resetPassword, updatePassword, getAccessToken }}
     >
       {children}
     </AuthContext.Provider>

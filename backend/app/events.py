@@ -66,6 +66,8 @@ EVENTS = frozenset({
     "digest_sent",
     # a renewal failed and the owner was told; reminders switched off by email link
     "payment_failed_notified", "reminders_unsubscribed",
+    # the first-loop checklist dismissed, a bundled sample opened
+    "checklist_dismissed", "sample_opened",
 })
 
 

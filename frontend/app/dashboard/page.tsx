@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import AuthGuard from "@/components/AuthGuard";
 import DueRecipes from "@/components/DueRecipes";
+import GettingStarted from "@/components/GettingStarted";
 import EmptyState from "@/components/EmptyState";
 import UsageCard from "@/components/UsageCard";
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
@@ -322,6 +323,12 @@ export default function DashboardPage() {
         </div>
 
         <DueRecipes className="mb-5" />
+
+        <div className="mb-5 max-w-xl">
+          <GettingStarted
+            onAct={(step) => router.push(step === "upload" || step === "rerun" ? `/workspace?checklist=${step}` : "/workspace")}
+          />
+        </div>
 
         <UsageCard compact />
 

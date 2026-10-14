@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { server } from "@/test/handlers";
 
-import RecipeHint from "./RecipeHint";
+import RecipeHint, { bestRecipe } from "./RecipeHint";
 
 vi.mock("@/lib/supabase", () => ({
   supabase: { auth: { getSession: async () => ({ data: { session: null } }), signOut: async () => {} } },
@@ -185,5 +185,23 @@ describe("RecipeHint measurement", () => {
     await screen.findByRole("region", { name: "Recipe suggestion" });
     rerender(<RecipeHint fileId="f-measure" enabled onApplied={vi.fn()} />);
     await waitFor(() => expect(sent).toEqual([{ event: "recipe_hint_shown", properties: { recipe_id: "r-new" } }]));
+  });
+
+  it("picks the recipe whose columns the file has, and offers none that fits less than half", () => {
+    const list = [
+      { id: "new", name: "Payroll", steps: 2, required_columns: ["Employee", "Salary", "Month"] },
+      { id: "old", name: "Orders", steps: 4, required_columns: ["Order ID", "Region", "MRP", "Status"] },
+    ];
+    expect(bestRecipe(list, ["order id", "Region", "MRP", "Notes"])).toMatchObject({ id: "old", matched: 3, required: 4 });
+    expect(bestRecipe(list, ["Something", "Else"])).toBeNull();
+    expect(bestRecipe(list)).toMatchObject({ id: "new" });
+  });
+
+  it("says how well the offered recipe fits", async () => {
+    server.use(http.get("/api/recipes", () => HttpResponse.json({
+      recipes: [{ id: "r1", name: "Orders", steps: 4, required_columns: ["Order ID", "Region"] }], total: 1,
+    })));
+    render(<RecipeHint fileId="f-fit" enabled onApplied={vi.fn()} columns={["Order ID", "Region", "MRP"]} />);
+    expect(await screen.findByText(/matches 2 of 2 columns/)).toBeInTheDocument();
   });
 });

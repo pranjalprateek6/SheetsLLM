@@ -82,7 +82,27 @@ def summarise(rows: list[dict], now: _dt.datetime, *, recipes_total: int | None 
         return [{"event": name, "label": label, "this": count(this_week, name), "last": count(last_week, name)}
                 for name, label in spec]
 
+    # Activation: of the people whose first upload was 7 to 14 days ago,
+    # how many ran a recipe within 7 days of it
+    first_upload: dict[str, _dt.datetime] = {}
+    first_run: dict[str, list[_dt.datetime]] = {}
+    for r in rows:
+        uid = str(r.get("user_id") or "")
+        if not uid:
+            continue
+        t = metrics.event_time(r)
+        if r.get("event") == "upload_completed" and (uid not in first_upload or t < first_upload[uid]):
+            first_upload[uid] = t
+        elif r.get("event") == "recipe_applied":
+            first_run.setdefault(uid, []).append(t)
+    cohort = [u for u, t in first_upload.items() if last_start <= t < this_start]
+    activated = [
+        u for u in cohort
+        if any(first_upload[u] <= t <= first_upload[u] + _dt.timedelta(days=7) for t in first_run.get(u, []))
+    ]
+
     return {
+        "activation": {"cohort": len(cohort), "activated": len(activated)},
         "from": this_start.date().isoformat(),
         "to": (now - _dt.timedelta(days=1)).date().isoformat(),
         "active_users": {"this": len(users(this_week)), "last": len(users(last_week))},
@@ -122,6 +142,8 @@ def email_text(summary: dict) -> tuple[str, str]:
         "People",
         _line("people did something", au["this"], au["last"]),
         _line("were new", nu["this"], nu["last"]),
+        *([f"  {summary['activation']['activated']} of the {summary['activation']['cohort']} who started the week before ran a recipe within 7 days."]
+          if summary.get("activation", {}).get("cohort") else []),
         "",
         "Activity",
         *[_line(p["label"], p["this"], p["last"]) for p in summary["activity"]],

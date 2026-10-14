@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import { ArrowRight, Check, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { fetchWithAuth } from "@/lib/fetch-with-auth";
+import { track } from "@/lib/track";
 import { cn } from "@/lib/utils";
 
 /* The activation checklist, inline on the start screen. Five milestones
@@ -59,7 +61,7 @@ export const ITEMS: Item[] = [
   {
     key: "transform",
     label: "Clean something: your first step",
-    hint: "The chips above Chef are one click each, and every column header has a menu of fixes.",
+    hint: "Open a file first. Then the chips above Chef are one click each, and every column header has a menu of fixes.",
     done: () => flag("transform"),
   },
   {
@@ -77,19 +79,73 @@ export const ITEMS: Item[] = [
   },
 ];
 
+/** The milestones, from this browser's flags and the account together:
+ *  a new browser no longer starts the list over. */
+export function useOnboarding(refreshKey: unknown = 0) {
+  const [doneMap, setDoneMap] = useState<Record<string, boolean> | null>(null);
+  useEffect(() => {
+    let alive = true;
+    const local: Record<string, boolean> = {};
+    for (const item of ITEMS) local[item.key] = item.done();
+    setDoneMap((prev) => prev ?? local);
+    fetchWithAuth("/api/onboarding")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!alive || !d) return;
+        const merged = { ...local };
+        for (const key of Object.keys(ONBOARDING_FLAGS) as OnboardingStep[]) {
+          if (d[key]) {
+            merged[key] = true;
+            markOnboardingStep(key);
+          }
+        }
+        setDoneMap(merged);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [refreshKey]);
+  return doneMap;
+}
+
+/** The next step as a pill, for the workspace toolbar while a file is open:
+ *  the list follows you to where steps two to four happen. */
+export function NextStepPill({ onAct, refreshKey }: { onAct: (step: OnboardingStep) => void; refreshKey?: unknown }) {
+  const doneMap = useOnboarding(refreshKey);
+  if (!doneMap) return null;
+  const next = ITEMS.find((item) => !doneMap[item.key]);
+  if (!next || next.key === "account") return null;
+  const doneCount = ITEMS.filter((item) => doneMap[item.key]).length;
+  return (
+    <button
+      type="button"
+      onClick={() => onAct(next.key as OnboardingStep)}
+      title={next.hint}
+      className="hidden items-center gap-2 rounded-full border bg-card px-2.5 py-1 text-[12px] text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground md:inline-flex"
+    >
+      <span className="tabular-nums">{doneCount}/{ITEMS.length}</span>
+      <span className="h-3 w-px bg-border" aria-hidden />
+      <span className="font-medium text-foreground">Next: {next.label}</span>
+    </button>
+  );
+}
+
 export default function GettingStarted({ onAct }: { onAct?: (step: OnboardingStep) => void }) {
   const [state, setState] = useState<"hidden" | "open" | "collapsed">("hidden");
-  const [doneMap, setDoneMap] = useState<Record<string, boolean>>({});
+  const loaded = useOnboarding();
+  const doneMap = loaded ?? {};
 
   useEffect(() => {
+    if (!loaded) return;
     try {
-      const map: Record<string, boolean> = {};
-      for (const item of ITEMS) map[item.key] = item.done();
-      if (Object.values(map).every(Boolean)) return; // all done: nothing to show
-      setDoneMap(map);
+      if (ITEMS.every((item) => loaded[item.key])) {
+        setState("hidden"); // all done: nothing to show
+        return;
+      }
       setState(localStorage.getItem(ONBOARDING_DISMISSED_KEY) === "true" ? "collapsed" : "open");
     } catch {}
-  }, []);
+  }, [loaded]);
 
   if (state === "hidden") return null;
 
@@ -99,6 +155,7 @@ export default function GettingStarted({ onAct }: { onAct?: (step: OnboardingSte
 
   const dismiss = () => {
     try { localStorage.setItem(ONBOARDING_DISMISSED_KEY, "true"); } catch {}
+    track("checklist_dismissed", { next: next?.key ?? "none" });
     setState("collapsed");
   };
 

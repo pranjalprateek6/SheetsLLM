@@ -1,8 +1,11 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { http, HttpResponse } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import GettingStarted, { ITEMS, markOnboardingStep, ONBOARDING_DISMISSED_KEY } from "./GettingStarted";
+import { server } from "@/test/handlers";
+
+import GettingStarted, { ITEMS, markOnboardingStep, NextStepPill, ONBOARDING_DISMISSED_KEY } from "./GettingStarted";
 
 describe("GettingStarted", () => {
   beforeEach(() => localStorage.clear());
@@ -42,5 +45,22 @@ describe("GettingStarted", () => {
     localStorage.setItem(ONBOARDING_DISMISSED_KEY, "true");
     render(<GettingStarted />);
     expect(await screen.findByRole("button", { name: /Getting started · 1\/5/ })).toBeInTheDocument();
+  });
+
+  it("takes the account's milestones, so a new browser does not start over", async () => {
+    server.use(http.get("/api/onboarding", () => HttpResponse.json({ upload: true, transform: true, recipe: false, rerun: false })));
+    render(<GettingStarted />);
+    expect(await screen.findByText("3/5")).toBeInTheDocument();
+    expect(screen.getByText(/Name it for the file it cleans/)).toBeInTheDocument();
+    expect(localStorage.getItem("sllm_done_transform")).toBe("true");
+  });
+
+  it("follows into the workspace as a pill naming the next step", async () => {
+    server.use(http.get("/api/onboarding", () => HttpResponse.json({ upload: true, transform: true, recipe: false, rerun: false })));
+    const onAct = vi.fn();
+    render(<NextStepPill onAct={onAct} />);
+    const pill = await screen.findByRole("button", { name: /Next: Save the steps as a recipe/ });
+    await userEvent.click(pill);
+    expect(onAct).toHaveBeenCalledWith("recipe");
   });
 });

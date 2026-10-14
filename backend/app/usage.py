@@ -171,7 +171,9 @@ def summary(user_id: str) -> dict:
     # Saved recipes are a running total, not a monthly count. None when the
     # count is unavailable, so the UI can leave the line out rather than lie.
     try:
-        recipes_saved: int | None = len(db.list_recipes(user_id))
+        from app import onboarding
+
+        recipes_saved: int | None = len(onboarding.counted_recipes(db.list_recipes(user_id)))
     except Exception:
         recipes_saved = None
     return {
