@@ -60,4 +60,16 @@ describe("resetDay", () => {
     expect(resetDay("2026-11-01")).toBe("1 November");
     expect(resetDay(undefined)).toBe("the 1st of next month");
   });
+
+  it("carries the backend's reference into Details for a crash or a timeout", () => {
+    const crash = explainError({ code: "INTERNAL", message: "Something went wrong on our side.", request_id: "req-1" });
+    expect(crash.text).toMatch(/our side/);
+    expect(crash.details).toBe("Reference req-1");
+    const slow = explainError({ code: "REQUEST_TIMEOUT", message: "The recipe run took more than 90 seconds and was stopped.", request_id: "req-2" });
+    expect(slow.text).toMatch(/^The recipe run took more than 90 seconds and was stopped\. Try again/);
+    expect(slow.details).toBe("Reference req-2");
+    const raw = explainError({ code: "BACKEND_ERROR", message: "Internal Server Error", request_id: "req-3" });
+    expect(raw.text).toBe("Something went wrong. Try again.");
+    expect(raw.details).toBe("Reference req-3");
+  });
 });

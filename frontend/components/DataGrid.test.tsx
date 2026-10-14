@@ -148,4 +148,17 @@ describe("DataGrid preview sort", () => {
     await userEvent.keyboard("{Enter}");
     expect(onOp).toHaveBeenCalledWith({ op: "join_lookup", column: "Email", args: { alias: "people", lookup_on: "Email", take: ["Team"] } });
   });
+
+  it("keeps the rows on screen while a step runs, and only shimmers with nothing to show", () => {
+    // rows are virtualised, so jsdom paints none; what matters is that the
+    // body is still the rows' body, marked busy, not the shimmer
+    grid({ loading: true });
+    expect(screen.queryByText(/Loading data/)).not.toBeInTheDocument();
+    expect(screen.getByRole("table").querySelector("tbody[aria-busy='true']")).not.toBeNull();
+  });
+
+  it("shimmers when there is nothing loaded yet", () => {
+    grid({ loading: true, rows: [] });
+    expect(screen.getByText(/Loading data/)).toBeInTheDocument();
+  });
 });

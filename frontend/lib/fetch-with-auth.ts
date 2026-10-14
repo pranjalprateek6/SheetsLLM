@@ -64,13 +64,32 @@ export async function fetchWithAuth(
   }
 
   if (response.status === 401 && typeof window !== "undefined") {
-    // Only redirect if we THOUGHT we were signed in — anonymous 401s on
+    // Only act if we THOUGHT we were signed in: anonymous 401s on
     // public-ish calls shouldn't bounce the user around.
     if (token && !window.location.pathname.startsWith("/auth")) {
+      // A stale access token is the common case: refresh once and retry,
+      // so a half-typed message or an unsaved edit is not thrown away.
+      const fresh = await refreshedToken();
+      if (fresh && fresh !== token) {
+        headers.set("Authorization", `Bearer ${fresh}`);
+        const again = await fetch(url, { ...options, headers });
+        if (again.status !== 401) return again;
+      }
       await supabase.auth.signOut();
-      window.location.assign("/auth?expired=1");
+      const next = window.location.pathname + window.location.search;
+      window.location.assign(`/auth?expired=1&next=${encodeURIComponent(next)}`);
     }
   }
 
   return response;
+}
+
+async function refreshedToken(): Promise<string | null> {
+  try {
+    const { data, error } = await supabase.auth.refreshSession();
+    if (error) return null;
+    return data.session?.access_token ?? null;
+  } catch {
+    return null;
+  }
 }

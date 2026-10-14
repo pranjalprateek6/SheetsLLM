@@ -103,7 +103,7 @@ def world(monkeypatch):
     past: list[dict] = []
     monkeypatch.setattr(db, "list_events", lambda since, names, limit=20000: past)
     sent: list[tuple] = []
-    monkeypatch.setattr(mail, "send", lambda to, subject, text: (sent.append((to, subject, text)), True)[1])
+    monkeypatch.setattr(mail, "send", lambda to, subject, text, **kw: (sent.append((to, subject, text)), True)[1])
     monkeypatch.setattr(mail, "configured", lambda: True)
     recorded: list[tuple] = []
     monkeypatch.setattr(events, "record", lambda uid, ev, **props: recorded.append((uid, ev, props)))

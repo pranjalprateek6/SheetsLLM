@@ -9,6 +9,7 @@ import secrets
 from fastapi import APIRouter, Header, Response
 
 from app.config import CRON_SECRET
+from app import db
 from app.reminders import run_daily
 
 logger = logging.getLogger("sheetsllm.routes.reminders")
@@ -30,3 +31,23 @@ def reminders_run(x_cron_secret: str = Header(default="")):
     if not secrets.compare_digest(x_cron_secret or "", CRON_SECRET):
         return _json_response(401, "UNAUTHORIZED", "Wrong or missing secret")
     return run_daily()
+
+
+@router.post("/reminders/unsubscribe")
+def reminders_unsubscribe(t: str = ""):
+    """Switch recipe reminders off for the user a token names. Public, so
+    the link in the email and a mail client's one-click unsubscribe both
+    work without a sign-in; the token is the proof."""
+    from app import events
+    from app.reminders import user_from_unsubscribe_token
+
+    user_id = user_from_unsubscribe_token(t or "")
+    if not user_id:
+        return _json_response(400, "BAD_TOKEN", "This link is not valid.")
+    try:
+        db.upsert_user_settings(user_id, email_reminders=False)
+    except Exception as exc:
+        logger.warning("unsubscribe failed for %s: %s", user_id, exc)
+        return _json_response(503, "SETTINGS_UNAVAILABLE", "Couldn't save that right now. Try the link again later.")
+    events.record(user_id, "reminders_unsubscribed")
+    return {"ok": True}

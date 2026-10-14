@@ -47,12 +47,84 @@ def is_configured() -> bool:
 
 # Razorpay subscription statuses that grant the paid tier.
 _ACTIVE_STATUSES = {"active", "authenticated", "charged", "resumed"}
+# A renewal that did not go through: "pending" while Razorpay retries the
+# card, "halted" once it gives up. Pro stays on for a grace period past the
+# paid-up date, so one failed card does not cut someone off mid-month.
+_GRACE_STATUSES = {"pending", "halted"}
+GRACE_DAYS = 7
 
 
 def _period_end_iso(ts) -> str | None:
     if not ts:
         return None
     return _dt.datetime.fromtimestamp(int(ts), _dt.timezone.utc).isoformat()
+
+
+def _parse_iso(value) -> _dt.datetime | None:
+    if not value:
+        return None
+    try:
+        t = _dt.datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return t if t.tzinfo else t.replace(tzinfo=_dt.timezone.utc)
+
+
+def grace_until(period_end_iso: str | None) -> _dt.datetime | None:
+    """When a failed renewal's grace period ends: GRACE_DAYS past the
+    paid-up date. None when there is no paid-up date to count from."""
+    end = _parse_iso(period_end_iso)
+    return end + _dt.timedelta(days=GRACE_DAYS) if end else None
+
+
+def tier_for(status: str | None, period_end_iso: str | None, *, now: _dt.datetime | None = None) -> str:
+    """The tier a subscription status earns right now."""
+    if status in _ACTIVE_STATUSES:
+        return "pro"
+    if status in _GRACE_STATUSES:
+        until = grace_until(period_end_iso)
+        now = now or _dt.datetime.now(_dt.timezone.utc)
+        if until and now < until:
+            return "pro"
+    return "free"
+
+
+def state_for(user_id: str) -> dict:
+    """What the account and pricing pages show: the tier, the provider
+    status, and when a grace period ends if one is running."""
+    try:
+        row = db.get_subscription(user_id) or {}
+    except Exception:
+        row = {}
+    status = row.get("status")
+    period_end = row.get("current_period_end")
+    tier = tier_for(status, period_end)
+    until = grace_until(period_end) if status in _GRACE_STATUSES else None
+    return {
+        "tier": tier,
+        "status": status,
+        "period_end": period_end,
+        "grace_until": until.isoformat() if (until and tier == "pro") else None,
+    }
+
+
+def _payment_failed_text(until: _dt.datetime | None) -> tuple[str, str]:
+    from app.config import PUBLIC_APP_URL
+
+    keep = f"Pro stays on until {until.date().isoformat()}." if until else "Pro stays on for a few days."
+    body = "\n".join([
+        "Hi,",
+        "",
+        "Your SheetsLLM Pro renewal didn't go through. " + keep,
+        "",
+        "Razorpay will retry the card and has emailed you a link to pay. Once it goes through, nothing changes.",
+        "If the card has expired, replace it from that email, or cancel and subscribe again from your account page.",
+        "",
+        f"Your account: {PUBLIC_APP_URL}/account",
+        "",
+        "SheetsLLM",
+    ])
+    return "Your SheetsLLM payment didn't go through", body
 
 
 def create_checkout_session(user_id: str, email: str | None) -> str:
@@ -118,6 +190,22 @@ def _entity(event: dict) -> dict | None:
     return sub.get("entity")
 
 
+def _notify_payment_failed(user_id: str, until: _dt.datetime | None) -> None:
+    """One email when a renewal first fails. Never raises: the webhook's
+    job is the state change, the mail is a courtesy."""
+    from app import events, mail
+
+    try:
+        email = db.user_email(user_id)
+        if not email:
+            return
+        subject, body = _payment_failed_text(until)
+        if mail.send(email, subject, body):
+            events.record(user_id, "payment_failed_notified")
+    except Exception as exc:
+        logger.warning("billing: could not notify %s of a failed payment: %s", user_id, exc)
+
+
 def handle_event(event: dict) -> None:
     """Apply a verified Razorpay event to local subscription state."""
     etype = event.get("event", "")
@@ -143,24 +231,35 @@ def handle_event(event: dict) -> None:
         logger.warning("billing: no local user for subscription %s", sub_id)
         return
 
-    tier = "pro" if status in _ACTIVE_STATUSES else "free"
+    period_end = _period_end_iso(entity.get("current_end"))
+    try:
+        prior = db.get_subscription(user_id) or {}
+    except Exception:
+        prior = {}
+    # A failed renewal carries no new period end; keep counting from the paid-up date
+    if not period_end and status in _GRACE_STATUSES:
+        period_end = prior.get("current_period_end")
+    tier = tier_for(status, period_end)
 
     # Funnel event on the actual free -> pro transition only (webhooks for
     # renewals/charges keep tier=pro and must not double-count).
     try:
-        prior = db.get_subscription(user_id)
-        if tier == "pro" and (prior or {}).get("tier") != "pro":
+        if tier == "pro" and prior.get("tier") != "pro" and status in _ACTIVE_STATUSES:
             from app import events
 
             events.record(user_id, "subscription_activated", status=status)
     except Exception:
         pass  # analytics must never break webhook handling
 
+    # The first time a renewal fails, say so, once
+    if status in _GRACE_STATUSES and prior.get("status") not in _GRACE_STATUSES:
+        _notify_payment_failed(user_id, grace_until(period_end))
+
     db.upsert_subscription(
         user_id,
         provider_subscription_id=sub_id,
         tier=tier,
         status=status,
-        current_period_end=_period_end_iso(entity.get("current_end")),
+        current_period_end=period_end,
     )
     logger.info("billing: user %s -> tier=%s status=%s (%s)", user_id, tier, status, etype)

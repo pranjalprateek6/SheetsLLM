@@ -39,8 +39,12 @@ def _require_real_user(request: Request) -> str | None:
 @router.get("/billing/status")
 def billing_status(request: Request):
     user_id = getattr(request.state, "user_id", "anonymous")
+    state = billing.state_for(user_id)
     return {
-        "tier": usage.get_user_tier(user_id),
+        "tier": state["tier"],
+        "status": state["status"],
+        "grace_until": state["grace_until"],
+        "period_end": state["period_end"],
         "billing_configured": billing.is_configured(),
         "plans": usage.plans(),
     }

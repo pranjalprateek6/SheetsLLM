@@ -36,8 +36,30 @@ _ROUTE_TIMEOUTS = {
     "/download": 60,
     "/chat": 90,
     "/insights": 30,  # a budgeted pass over the file as its steps left it
+    # Everything that replays a file's steps gets the same room a fix does:
+    # a recipe run, undo, reset, redo and revert, a shared link, the lookups
+    "/recipes": 90,
+    "/undo": 90,
+    "/reset": 90,
+    "/files": 90,
+    "/shared": 60,
 }
 _DEFAULT_TIMEOUT = 10
+
+# What the 504 says, by what was being done. A person reads the operation,
+# not the number of seconds.
+_TIMEOUT_WHAT = {
+    "/upload": "The upload",
+    "/transform/op": "That fix",
+    "/download": "The export",
+    "/chat": "Chef",
+    "/insights": "The look at your file",
+    "/recipes": "The recipe run",
+    "/undo": "Undo",
+    "/reset": "Going back",
+    "/files": "That step",
+    "/shared": "The shared file",
+}
 
 
 # ── Lifespan (cache eviction background task) ────────────────────────
@@ -113,12 +135,15 @@ async def request_timeout_middleware(request: Request, call_next):
         response = await asyncio.wait_for(call_next(request), timeout=timeout)
         return response
     except asyncio.TimeoutError:
-        logger.warning("Request timeout: %s %s (%ds)", request.method, path, timeout)
+        request_id = getattr(request.state, "request_id", "")
+        logger.warning("Request timeout: %s %s (%ds) [%s]", request.method, path, timeout, request_id)
+        what = next((w for prefix, w in _TIMEOUT_WHAT.items() if path.startswith(prefix)), "That")
         return JSONResponse(
             status_code=504,
             content={
                 "code": "REQUEST_TIMEOUT",
-                "message": f"Request exceeded {timeout}s time limit",
+                "message": f"{what} took more than {timeout} seconds and was stopped.",
+                "request_id": request_id,
             },
         )
 
@@ -160,6 +185,27 @@ async def auth_middleware(request: Request, call_next):
             return JSONResponse(status_code=status, content=detail)
 
     return await call_next(request)
+
+
+# ── The last line of defence ─────────────────────────────────────────
+
+
+@app.exception_handler(Exception)
+async def unhandled_error(request: Request, exc: Exception):
+    """A crash answers in the same JSON shape as every other error, with
+    the request id, so "it broke" comes back as something searchable in
+    the log. Starlette logs the traceback itself."""
+    request_id = getattr(request.state, "request_id", "")
+    logger.error("Unhandled error on %s %s [%s]: %s", request.method, request.url.path, request_id, exc)
+    return JSONResponse(
+        status_code=500,
+        content={
+            "code": "INTERNAL",
+            "message": "Something went wrong on our side. Try again; if it keeps happening, tell us the reference.",
+            "request_id": request_id,
+        },
+        headers={"x-request-id": request_id} if request_id else None,
+    )
 
 
 # ── Routes ────────────────────────────────────────────────────────────
