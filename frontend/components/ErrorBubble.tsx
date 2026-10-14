@@ -34,7 +34,7 @@ export default function ErrorBubble({
     return () => clearTimeout(t);
   }, [left, error.actions]);
 
-  const link = "text-[11px] font-medium text-primary underline-offset-2 hover:underline";
+  const link = "text-[11px] font-medium text-primary-accent underline-offset-2 hover:underline";
   return (
     <div>
       <p className="whitespace-pre-wrap">

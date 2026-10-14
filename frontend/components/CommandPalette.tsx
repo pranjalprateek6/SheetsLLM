@@ -1,5 +1,4 @@
 "use client";
-import { useRouter } from "next/navigation";
 import {
   Upload,
   Undo2,
@@ -7,12 +6,14 @@ import {
   X,
   MessageSquare,
   History,
-  ArrowRight,
   BookMarked,
   Command as CommandIcon,
   FileSpreadsheet,
   Pencil,
-  Sparkles,
+  Redo2,
+  BarChart3,
+  Columns3,
+  Link2,
 } from "lucide-react";
 
 import {
@@ -22,7 +23,9 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
+  CommandShortcut,
 } from "@/components/ui/command";
+import { NavigateItems } from "@/components/GlobalCommandPalette";
 import { useModKey } from "@/lib/platform";
 
 export default function CommandPalette({
@@ -37,8 +40,16 @@ export default function CommandPalette({
   onHistory,
   onSaveRecipe,
   onRename,
+  onRedo,
+  onChart,
+  onSchema,
+  onLookups,
   fileId,
 }: {
+  onRedo?: () => void;
+  onChart?: () => void;
+  onSchema?: () => void;
+  onLookups?: () => void;
   open: boolean;
   onClose: () => void;
   onUpload: () => void;
@@ -53,7 +64,6 @@ export default function CommandPalette({
   onRename?: () => void;
   fileId?: string;
 }) {
-  const router = useRouter();
   const modKey = useModKey();
 
   const runCommand = (action: () => void) => {
@@ -73,29 +83,38 @@ export default function CommandPalette({
         <CommandEmpty>No matching commands</CommandEmpty>
         <CommandGroup heading="Actions">
           <CommandItem
-            keywords={["upload", "open", "import"]}
+            keywords={["upload", "open", "import", "new file"]}
             onSelect={() => runCommand(onUpload)}
           >
             <Upload />
-            <span>Upload file</span>
+            <span>Open a new file</span>
           </CommandItem>
           <CommandItem
-            keywords={["undo", "revert", "back"]}
+            keywords={["undo", "back", "step"]}
             onSelect={() => runCommand(onUndo)}
           >
             <Undo2 />
-            <span>Undo last step</span>
+            <span>Undo the last step</span>
+            <CommandShortcut>{modKey === "⌘" ? "⌘Z" : "Ctrl+Z"}</CommandShortcut>
           </CommandItem>
+          {onRedo && (
+            <CommandItem keywords={["redo", "again", "put back"]} onSelect={() => runCommand(onRedo)}>
+              <Redo2 />
+              <span>Redo</span>
+              <CommandShortcut>{modKey === "⌘" ? "⌘⇧Z" : "Ctrl+Shift+Z"}</CommandShortcut>
+            </CommandItem>
+          )}
           <CommandItem
-            keywords={["download", "export", "save", "csv"]}
+            keywords={["export", "save", "csv", "file"]}
             onSelect={() => runCommand(onDownload)}
           >
             <Download />
             <span>Export as CSV</span>
+            <CommandShortcut>{modKey === "⌘" ? "⌘S" : "Ctrl+S"}</CommandShortcut>
           </CommandItem>
           {fileId && onDownloadXlsx && (
             <CommandItem
-              keywords={["download", "export", "excel", "xlsx"]}
+              keywords={["export", "excel", "xlsx"]}
               onSelect={() => runCommand(onDownloadXlsx)}
             >
               <FileSpreadsheet />
@@ -134,41 +153,38 @@ export default function CommandPalette({
             onSelect={() => runCommand(onChat)}
           >
             <MessageSquare />
-            <span>Toggle Chef</span>
+            <span>Show or hide Chef</span>
+            <CommandShortcut>/</CommandShortcut>
           </CommandItem>
+          {fileId && onChart && (
+            <CommandItem keywords={["chart", "graph", "plot"]} onSelect={() => runCommand(onChart)}>
+              <BarChart3 />
+              <span>Quick chart</span>
+            </CommandItem>
+          )}
+          {fileId && onSchema && (
+            <CommandItem keywords={["schema", "columns", "types"]} onSelect={() => runCommand(onSchema)}>
+              <Columns3 />
+              <span>Schema</span>
+            </CommandItem>
+          )}
+          {fileId && onLookups && (
+            <CommandItem keywords={["lookup", "join", "link a file"]} onSelect={() => runCommand(onLookups)}>
+              <Link2 />
+              <span>Lookup tables</span>
+            </CommandItem>
+          )}
           {fileId && (
             <CommandItem
               keywords={["history", "timeline", "steps"]}
               onSelect={() => runCommand(onHistory)}
             >
               <History />
-              <span>View history</span>
+              <span>History and SQL</span>
             </CommandItem>
           )}
         </CommandGroup>
-        <CommandGroup heading="Navigate">
-          <CommandItem
-            keywords={["dashboard", "files", "list"]}
-            onSelect={() => runCommand(() => router.push("/dashboard"))}
-          >
-            <ArrowRight />
-            <span>Go to Dashboard</span>
-          </CommandItem>
-          <CommandItem
-            keywords={["workspace", "editor"]}
-            onSelect={() => runCommand(() => router.push("/workspace"))}
-          >
-            <ArrowRight />
-            <span>Go to Workspace</span>
-          </CommandItem>
-          <CommandItem
-            keywords={["account", "billing", "settings", "privacy"]}
-            onSelect={() => runCommand(() => router.push("/account"))}
-          >
-            <Sparkles />
-            <span>Account &amp; billing</span>
-          </CommandItem>
-        </CommandGroup>
+        <NavigateItems run={runCommand} />
       </CommandList>
       <div className="flex items-center gap-4 border-t px-4 py-2 text-xs text-muted-foreground">
         <span className="inline-flex items-center gap-1">

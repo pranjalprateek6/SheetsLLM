@@ -110,7 +110,7 @@ function RecipesContent() {
       {failed && (
         <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm">
           Couldn&apos;t load your recipes.{" "}
-          <button className="font-medium text-primary hover:underline" onClick={load}>Retry</button>
+          <button className="font-medium text-primary-accent hover:underline" onClick={load}>Retry</button>
         </div>
       )}
 

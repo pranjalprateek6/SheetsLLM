@@ -46,7 +46,7 @@ export default function FeedbackWidget({
       });
       const data = await res.json();
       if (!res.ok) {
-        toast.error(data.message || "Couldn't send feedback. Please try again.");
+        toast.error(data.message || "Couldn't send feedback. Try again.");
       } else {
         setOpen(false);
         setMessage("");

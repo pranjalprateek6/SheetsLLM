@@ -157,9 +157,17 @@ describe("DataGrid preview sort", () => {
     expect(screen.getByRole("table").querySelector("tbody[aria-busy='true']")).not.toBeNull();
   });
 
-  it("shimmers when there is nothing loaded yet", () => {
+  it("shows rows shaped like rows while there is nothing loaded yet", () => {
     grid({ loading: true, rows: [] });
-    expect(screen.getByText(/Loading data/)).toBeInTheDocument();
+    expect(screen.getByRole("table").querySelectorAll("tbody tr[aria-hidden]").length).toBe(12);
+  });
+
+  it("offers a next step when a step left no rows", async () => {
+    const onUndoStep = vi.fn();
+    grid({ rows: [], stepCount: 2, onUndoStep, onAskChef: vi.fn() });
+    expect(screen.getByText("No rows here.")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Undo this step" }));
+    expect(onUndoStep).toHaveBeenCalled();
   });
 
   it("with a server view, a header sort asks for the view instead of sorting the loaded rows", async () => {

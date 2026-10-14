@@ -413,7 +413,7 @@ export default function ChatPanel({
   if (!open) return null;
 
   return (
-    <div className="ws-glass-panel flex h-full flex-col border-l border-border/70">
+    <div className="flex h-full flex-col border-l border-border/70 bg-card">
       {/* Header */}
       <div className="flex-shrink-0 border-b px-4 py-3">
         <div className="flex items-center justify-between">

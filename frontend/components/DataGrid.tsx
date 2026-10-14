@@ -5,8 +5,8 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   ArrowDown, ArrowUp, ArrowUpDown, Calendar, CalendarDays, Check, ChevronDown, Copy, Filter, Link2, Hash,
   PaintBucket, Pencil, Replace, Rows3, Rows4, Scissors, ChefHat, ToggleLeft, Trash2, Type,
+  X,
 } from "lucide-react";
-import { TextShimmer } from "@/components/ui/text-shimmer";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator,
   DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger,
@@ -92,7 +92,10 @@ export default function DataGrid({
   onViewChange,
   onLoadMore,
   hasMore = false,
+  onUndoStep,
 }: {
+  /** From an empty grid: take the last step back */
+  onUndoStep?: () => void;
   /** The server-side view (sort, filter, empty cells). With onViewChange,
    *  sorting and filtering cover every row, not the loaded ones. */
   view?: GridView;
@@ -463,8 +466,8 @@ export default function DataGrid({
                       >
                         <span className="truncate max-w-[110px]">{h}</span>
                         {freshCols.includes(h) && (
-                          <span className="flex-shrink-0 rounded bg-primary/15 px-1 py-px text-[8px] font-bold tracking-wider text-primary">
-                            NEW
+                          <span className="flex-shrink-0 rounded bg-primary/15 px-1 py-px text-[11px] font-medium text-primary-accent">
+                            new
                           </span>
                         )}
                         {nullPct > 0 && (
@@ -592,7 +595,7 @@ export default function DataGrid({
                             autoFocus
                             value={field.value}
                             onChange={(e) => setField({ ...field, value: e.target.value })}
-                            className="h-8 w-full rounded border bg-background px-1.5 text-xs"
+                            className="h-8 w-full rounded-md border border-input bg-background px-1.5 text-xs"
                           >
                             {DATE_FORMATS.map((f) => (
                               <option key={f.value} value={f.value}>{f.example}</option>
@@ -614,7 +617,7 @@ export default function DataGrid({
                                     const next = lookups.find((l) => l.alias === e.target.value);
                                     setField({ ...field, alias: e.target.value, value: next?.columns.find((c) => c.name === field.column)?.name ?? next?.columns[0]?.name ?? "", take: [] });
                                   }}
-                                  className="h-8 w-full rounded border bg-background px-1.5 text-xs"
+                                  className="h-8 w-full rounded-md border border-input bg-background px-1.5 text-xs"
                                 >
                                   {lookups.map((l) => (
                                     <option key={l.alias} value={l.alias}>{l.alias}</option>
@@ -626,7 +629,7 @@ export default function DataGrid({
                                     aria-label="Lookup key column"
                                     value={field.value}
                                     onChange={(e) => setField({ ...field, value: e.target.value })}
-                                    className="mt-1 h-8 w-full rounded border bg-background px-1.5 text-xs"
+                                    className="mt-1 h-8 w-full rounded-md border border-input bg-background px-1.5 text-xs"
                                   >
                                     {names.map((n) => (
                                       <option key={n} value={n}>{n}</option>
@@ -659,7 +662,7 @@ export default function DataGrid({
                               aria-label="How to compare"
                               value={field.compare ?? "eq"}
                               onChange={(e) => setField({ ...field, compare: e.target.value })}
-                              className="h-8 w-[112px] flex-shrink-0 rounded border bg-background px-1 text-base sm:text-xs"
+                              className="h-8 w-[112px] flex-shrink-0 rounded-md border border-input bg-background px-1 text-base sm:text-xs"
                             >
                               {COMPARES.map((c) => (
                                 <option key={c.value} value={c.value}>{c.label}</option>
@@ -672,7 +675,7 @@ export default function DataGrid({
                                 onChange={(e) => setField({ ...field, value: e.target.value })}
                                 maxLength={500}
                                 placeholder="value"
-                                className="h-8 min-w-0 flex-1 rounded border bg-background px-1.5 text-base outline-none focus:ring-1 focus:ring-ring/40 sm:text-xs"
+                                className="h-8 min-w-0 flex-1 rounded-md border border-input bg-background px-1.5 text-base outline-none focus-visible:border-primary focus-visible:ring-[3px] focus-visible:ring-primary/20 sm:text-xs"
                               />
                             )}
                           </div>
@@ -683,7 +686,7 @@ export default function DataGrid({
                             value={field.value}
                             onChange={(e) => setField({ ...field, value: e.target.value })}
                             maxLength={field.kind === "rename" ? 100 : 500}
-                            className="h-8 w-full rounded border bg-background px-1.5 text-xs outline-none focus:ring-1 focus:ring-ring/40"
+                            className="h-8 w-full rounded-md border border-input bg-background px-1.5 text-xs outline-none focus-visible:border-primary focus-visible:ring-[3px] focus-visible:ring-primary/20"
                           />
                         )}
                         <div className="mt-2 flex justify-end gap-2">
@@ -733,15 +736,36 @@ export default function DataGrid({
           </tbody>
           <tbody className={`[&_tr:hover]:bg-accent transition-opacity duration-200 ${loading && rows.length > 0 ? "opacity-50" : ""}`} aria-busy={loading || undefined}>
             {loading && rows.length === 0 ? (
-              <tr>
-                <td className="px-3 py-8 text-center" colSpan={head.length + 1}>
-                  <TextShimmer className="text-sm" duration={1.2}>Loading data...</TextShimmer>
-                </td>
-              </tr>
+              Array.from({ length: 12 }, (_, i) => (
+                <tr key={`sk-${i}`} aria-hidden>
+                  <td className="w-[46px] border-r px-2 py-2"><span className="block h-3 w-4 animate-pulse rounded bg-muted" /></td>
+                  {head.map((h) => (
+                    <td key={h} className="px-2 py-2"><span className="block h-3 animate-pulse rounded bg-muted" style={{ width: `${45 + ((i * 7 + h.length * 13) % 45)}%` }} /></td>
+                  ))}
+                </tr>
+              ))
             ) : visibleRows.length === 0 ? (
               <tr>
                 <td className="px-3 py-8 text-center text-sm text-muted-foreground" colSpan={head.length + 1}>
-                  {filterQ ? "No preview rows match the filter" : "No data"}
+                  {filterQ ? (
+                    "No rows match the filter"
+                  ) : (
+                    <span className="flex flex-col items-center gap-3">
+                      <span>No rows here.</span>
+                      <span className="flex items-center gap-2">
+                        {onUndoStep && typeof stepCount === "number" && stepCount > 0 && (
+                          <button type="button" onClick={onUndoStep} className="rounded-md border px-2.5 py-1 text-[12px] font-medium text-foreground hover:bg-accent">
+                            Undo this step
+                          </button>
+                        )}
+                        {onAskChef && (
+                          <button type="button" onClick={() => onAskChef("")} className="rounded-md border px-2.5 py-1 text-[12px] font-medium text-foreground hover:bg-accent">
+                            Ask Chef
+                          </button>
+                        )}
+                      </span>
+                    </span>
+                  )}
                 </td>
               </tr>
             ) : (
@@ -759,10 +783,10 @@ export default function DataGrid({
                   return (
                     <tr
                       key={virtualRow.index}
-                      className="border-b border-border/60 transition-colors"
+                      className="group/row border-b border-border/60 transition-colors"
                       style={{ height: virtualRow.size }}
                     >
-                      <td className="w-[46px] min-w-[46px] border-r bg-card text-center text-[11px] text-muted-foreground tabular-nums select-none sticky left-0 z-[5]">
+                      <td className="w-[46px] min-w-[46px] border-r bg-card text-center text-[11px] text-muted-foreground tabular-nums select-none sticky left-0 z-[5] group-hover/row:bg-accent">
                         {virtualRow.index + 1}
                       </td>
                       {head.map((h) => {
@@ -854,7 +878,7 @@ export default function DataGrid({
               <button
                 type="button"
                 onClick={() => onOp({ op: "sort", column: sortCol, args: { direction: sortDir } })}
-                className="whitespace-nowrap font-medium text-primary underline-offset-2 hover:underline"
+                className="whitespace-nowrap font-medium text-primary-accent underline-offset-2 hover:underline"
               >
                 Sort all rows
               </button>
@@ -885,7 +909,7 @@ export default function DataGrid({
             <button
               type="button"
               onClick={() => onAskChef(`Keep only rows where any column contains "${filterQ.trim()}"`)}
-              className="inline-flex h-6 items-center gap-1 whitespace-nowrap text-[11px] font-medium text-primary underline-offset-2 hover:underline"
+              className="inline-flex h-6 items-center gap-1 whitespace-nowrap text-[11px] font-medium text-primary-accent underline-offset-2 hover:underline"
               title="Turn this preview filter into a real step"
             >
               <ChefHat className="h-3 w-3" /> Filter all rows with Chef
@@ -897,7 +921,7 @@ export default function DataGrid({
             onChange={(e) => setFilterQ(e.target.value)}
             placeholder={serverView ? "Filter rows…" : "Filter preview…"}
             aria-label={serverView ? "Filter every row" : "Filter the loaded preview rows"}
-            className="h-6 w-32 rounded border bg-background px-1.5 text-[11px] outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-ring/40 coarse:h-8 coarse:text-base"
+            className="h-6 w-32 rounded-md border border-input bg-background px-1.5 text-[11px] outline-none placeholder:text-muted-foreground focus-visible:border-primary focus-visible:ring-[3px] focus-visible:ring-primary/20 coarse:h-8 coarse:text-base"
           />
           {filterQ && (
             <button
@@ -906,7 +930,7 @@ export default function DataGrid({
               className="flex h-6 w-6 items-center justify-center rounded text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground"
               aria-label="Clear filter"
             >
-              ✕
+              <X className="h-3.5 w-3.5" aria-hidden />
             </button>
           )}
         </div>

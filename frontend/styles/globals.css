@@ -202,36 +202,6 @@
 }
 
 @layer utilities {
-  /* brand gradient text — marketing surfaces only */
-  .text-gradient {
-    @apply bg-clip-text text-transparent;
-    background-image: linear-gradient(
-      100deg,
-      hsl(var(--gradient-from)),
-      hsl(var(--gradient-via)) 45%,
-      hsl(var(--gradient-to))
-    );
-  }
-
-  /* Windows High Contrast removes background images, so clipped-text
-     headlines need a real colour to fall back to. */
-  @media (forced-colors: active) {
-    .text-gradient {
-      background-image: none;
-      color: CanvasText;
-      -webkit-text-fill-color: CanvasText;
-    }
-  }
-
-  .bg-gradient-brand {
-    background-image: linear-gradient(
-      100deg,
-      hsl(var(--gradient-from)),
-      hsl(var(--gradient-via)) 45%,
-      hsl(var(--gradient-to))
-    );
-  }
-
   /* numbers in data tables align */
   .tabular-nums {
     font-variant-numeric: tabular-nums;
@@ -458,7 +428,9 @@
   }
 }
 
-/* Respect user motion preferences */
+/* Respect user motion preferences: CSS animations and transitions collapse
+   to imperceptible durations (framer-motion is handled by MotionConfig).
+   Iteration count is left alone so a loading spinner still turns. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -468,45 +440,3 @@
     scroll-behavior: auto !important;
   }
 }
-
-/* Scrollbar — quiet, follows the active theme */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: hsl(220 12% 84%);
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: hsl(220 10% 72%);
-}
-
-.dark ::-webkit-scrollbar-thumb {
-  background: hsl(224 14% 26%);
-}
-
-.dark ::-webkit-scrollbar-thumb:hover {
-  background: hsl(224 12% 36%);
-}
-
-/* Honor the OS reduce-motion preference: collapse CSS animations and
-   transitions to imperceptible durations (framer-motion is handled by
-   MotionConfig in the provider tree). */
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-    scroll-behavior: auto !important;
-  }
-}
-

@@ -153,7 +153,7 @@ export default function DashboardPage() {
       fetchFiles();
     } catch (e) {
       console.error("Duplicate failed:", e);
-      toast.error("Couldn't duplicate the file. Please try again.");
+      toast.error("Couldn't duplicate the file. Try again.");
     } finally { setActionLoading(null); }
   };
 
@@ -186,7 +186,7 @@ export default function DashboardPage() {
       setRenamingId(null);
     } catch (e) {
       console.error("Rename failed:", e);
-      toast.error("Couldn't rename the file. Please try again.");
+      toast.error("Couldn't rename the file. Try again.");
     }
     finally { setActionLoading(null); }
   };
@@ -203,7 +203,7 @@ export default function DashboardPage() {
       await downloadExport(fileId, format, exportFileName(fileStem(name), steps ?? 0, format));
     } catch (e) {
       console.error("Download failed:", e);
-      toast.error("Download failed. Please try again.");
+      toast.error("Couldn't export the file. Try again.");
     }
   };
 

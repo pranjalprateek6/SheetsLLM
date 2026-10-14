@@ -4,6 +4,7 @@ import { useEffect } from "react";
 type ShortcutHandlers = {
   onRun?: () => void;
   onUndo?: () => void;
+  onRedo?: () => void;
   onDownload?: () => void;
   onFocusInput?: () => void;
   onEscape?: () => void;
@@ -12,6 +13,7 @@ type ShortcutHandlers = {
 export default function KeyboardShortcuts({
   onRun,
   onUndo,
+  onRedo,
   onDownload,
   onFocusInput,
   onEscape,
@@ -20,7 +22,7 @@ export default function KeyboardShortcuts({
     const handler = (e: KeyboardEvent) => {
       const ctrl = e.ctrlKey || e.metaKey;
       const target = e.target as HTMLElement;
-      const isInput = target.tagName === "INPUT" || target.tagName === "TEXTAREA";
+      const isInput = target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT" || target.isContentEditable;
 
       // Ctrl+Enter — Run transformation
       if (ctrl && e.key === "Enter" && onRun) {
@@ -29,7 +31,14 @@ export default function KeyboardShortcuts({
         return;
       }
 
-      // Ctrl+Z — Undo (only when not in an input)
+      // Ctrl+Shift+Z or Ctrl+Y: Redo (only when not in an input)
+      if (ctrl && !isInput && ((e.shiftKey && e.key.toLowerCase() === "z") || e.key.toLowerCase() === "y")) {
+        e.preventDefault();
+        onRedo?.();
+        return;
+      }
+
+      // Ctrl+Z: Undo (only when not in an input)
       if (ctrl && e.key === "z" && !isInput) {
         e.preventDefault();
         onUndo?.();
@@ -51,8 +60,8 @@ export default function KeyboardShortcuts({
         return;
       }
 
-      // Escape — Close modal / cancel
-      if (e.key === "Escape") {
+      // Escape: close a panel, but never while typing in a field
+      if (e.key === "Escape" && !isInput) {
         onEscape?.();
         return;
       }
@@ -60,7 +69,7 @@ export default function KeyboardShortcuts({
 
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
-  }, [onRun, onUndo, onDownload, onFocusInput, onEscape]);
+  }, [onRun, onUndo, onRedo, onDownload, onFocusInput, onEscape]);
 
   return null;
 }
