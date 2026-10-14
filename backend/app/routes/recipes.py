@@ -147,6 +147,14 @@ def list_recipes(request: Request):
         names = db.file_names([r["source_file_id"] for r in recipes if r.get("source_file_id")])
     except Exception:
         names = {}
+    try:
+        scheduled = {r["id"]: r.get("schedule") for r in db.list_scheduled_recipes(user_id)}
+    except Exception:
+        scheduled = {}
+    try:
+        sources = db.file_rows([r["source_file_id"] for r in recipes if r.get("source_file_id")])
+    except Exception:
+        sources = {}
     return {
         "recipes": [
             {
@@ -157,6 +165,8 @@ def list_recipes(request: Request):
                 "created_at": r.get("created_at"),
                 "source_file_id": r.get("source_file_id"),
                 "source_file_name": names.get(r.get("source_file_id") or ""),
+                "schedule": scheduled.get(r["id"]),
+                "source_url": (sources.get(r.get("source_file_id") or "") or {}).get("source_url"),
                 "required_columns": [
                     c.get("name") for c in (r.get("required_columns") or [])
                     if isinstance(c, dict) and c.get("name")

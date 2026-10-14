@@ -107,9 +107,10 @@ export default function ExportMenu({
       const r = await fetchWithAuth(`/api/files/${encodeURIComponent(fileId)}/share`, { method: "POST" });
       const d = await r.json().catch(() => ({}));
       if (!r.ok || !d.token) throw new Error(String(r.status));
+      const page = `${window.location.origin}/s/${d.token}`;
       const link = `${window.location.origin}/api/shared/${d.token}`;
-      await navigator.clipboard.writeText(link);
-      toast.success(`Link copied. It serves the cleaned CSV for ${d.days ?? 7} days. In Google Sheets: =IMPORTDATA("${link}")`, { duration: 8000 });
+      await navigator.clipboard.writeText(page);
+      toast.success(`Link copied: a page with the cleaned file, for ${d.days ?? 7} days. For Google Sheets, =IMPORTDATA("${link}")`, { duration: 9000 });
     } catch {
       toast.error("Couldn't make a link. Try again in a moment.");
     } finally {

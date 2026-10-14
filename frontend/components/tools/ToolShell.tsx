@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight, Lock } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import OpenInAppLink from "@/components/tools/OpenInAppLink";
 import { Container, Prefooter, SiteFooter } from "@/components/marketing/blocks";
 import { relatedTools, TOOLS, type Tool } from "@/components/tools/catalog";
 
@@ -65,9 +66,7 @@ export function RecipeHook({ href }: { href?: string }) {
             </p>
           </div>
           <div className="flex flex-shrink-0 items-center gap-3">
-            <Button variant="inverse" className="h-9 px-4" asChild>
-              <Link href={`/auth?mode=signup&from=tool-${slug}`}>Start free</Link>
-            </Button>
+            <OpenInAppLink slug={slug} />
             <Link href="/product/recipes" className="group inline-flex items-center gap-1 text-[13px] font-medium text-foreground/90 transition-colors hover:text-foreground">
               How recipes work <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
             </Link>

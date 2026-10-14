@@ -62,7 +62,7 @@ export default function ExportClosingStrip({
       });
       const data = await r.json().catch(() => ({}));
       if (r.status === 402) {
-        setWall(data.message || "The Free plan holds one saved recipe.");
+        setWall(data.message || "The Free plan's recipe slots are all in use.");
         return;
       }
       if (!r.ok) throw new Error(data.message || `HTTP ${r.status}`);

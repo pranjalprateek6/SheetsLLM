@@ -70,6 +70,9 @@ EVENTS = frozenset({
     "checklist_dismissed", "sample_opened",
     # a step Chef proposed and the person applied from its preview
     "chef_proposal_applied",
+    # loops: schedules, lifecycle email, shared recipes, where signups came from
+    "schedule_set", "schedule_ran", "lifecycle_mail_sent", "recipe_shared", "recipe_imported",
+    "signed_up_from", "tool_cta_clicked", "tool_run",
 })
 
 

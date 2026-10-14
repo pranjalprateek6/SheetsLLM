@@ -21,7 +21,7 @@ from app.recipes import (
 
 def test_recipe_limit_free_is_capped(monkeypatch):
     monkeypatch.setattr(usage.db, "get_subscription", lambda uid: None)  # free
-    assert usage.recipe_limit("u") == 1
+    assert usage.recipe_limit("u") == 3
 
 
 def test_recipe_limit_pro_is_unlimited(monkeypatch):

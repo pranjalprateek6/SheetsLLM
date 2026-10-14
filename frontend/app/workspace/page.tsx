@@ -32,6 +32,7 @@ import { downloadExport, exportFileName, fileStem as stemOf } from "@/lib/export
 import { type SchemaColumn } from "@/components/SchemaPanel";
 import { listLookups, uploadAndLink, type Lookup } from "@/lib/lookups";
 import { fetchRows, isViewActive, PAGE_SIZE, type GridView } from "@/lib/rows";
+import { takeToolResult } from "@/lib/loops";
 const LookupsPanel = dynamic(() => import("@/components/LookupsPanel"));
 const SchemaPanel = dynamic(() => import("@/components/SchemaPanel"));
 const ChartPanel = dynamic(() => import("@/components/ChartPanel"));
@@ -1070,6 +1071,17 @@ function WorkspaceContent() {
       setRecipesOpen(true);
     }
   };
+
+  // From a free tool: /workspace?import=tool opens the result it kept
+  const importParam = useSearchParams().get("import");
+  const importRan = useRef(false);
+  useEffect(() => {
+    if (importRan.current || importParam !== "tool" || fileReady) return;
+    importRan.current = true;
+    const file = takeToolResult();
+    if (file) void onUpload(file);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [importParam, fileReady]);
 
   // From the dashboard's checklist: /workspace?checklist=upload|rerun
   const checklistParam = useSearchParams().get("checklist");

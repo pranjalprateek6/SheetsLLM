@@ -197,6 +197,13 @@ export async function toCsvAsync(
 }
 
 export function downloadText(filename: string, text: string, mime = "text/csv") {
+  // A CSV result can open in the app after signing up, in this tab
+  if (mime.startsWith("text/csv") || mime.startsWith("text/tab-separated")) {
+    void import("@/lib/loops").then((m) => m.stashToolResult(filename, text)).catch(() => {});
+  }
+  void import("@/lib/track")
+    .then((m) => m.track("tool_run", { tool: (typeof window !== "undefined" ? window.location.pathname.split("/").pop() : "") || "tool" }))
+    .catch(() => {});
   // Excel on Windows reads a BOM-less CSV in the system code page and mojibakes
   // anything non-Latin; the MIME charset is not stored in the file.
   const body = mime.startsWith("text/csv") ? "\ufeff" + text : text;

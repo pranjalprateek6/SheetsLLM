@@ -27,8 +27,8 @@ describe("plans", () => {
   });
 
   it("says today's numbers by default, the same as the backend config", () => {
-    expect(planSummary(DEFAULT_PLANS, "free")).toBe("50 uploads and 200 AI requests a month, and 1 saved recipe.");
-    expect(planReasons(DEFAULT_PLANS).recipes.headline).toBe("The Free plan holds one saved recipe");
+    expect(planSummary(DEFAULT_PLANS, "free")).toBe("50 uploads and 200 AI requests a month, and 3 saved recipes.");
+    expect(planReasons(DEFAULT_PLANS).recipes.headline).toBe("The Free plan holds 3 saved recipes");
     expect(planNudge(DEFAULT_PLANS)).toBe("Pro raises caps to 1,000 uploads and 5,000 AI requests a month.");
   });
 });

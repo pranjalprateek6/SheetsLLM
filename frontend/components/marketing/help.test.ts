@@ -21,7 +21,7 @@ describe("help", () => {
 
   it("says the plan numbers the plans module says", () => {
     const plans = helpSection("plans")!.items.join("\n");
-    expect(plans).toMatch(/Free: 50 uploads and 200 AI requests a month, 1 saved recipe\./);
+    expect(plans).toMatch(/Free: 50 uploads and 200 AI requests a month, 3 saved recipes, one on a schedule\./);
     expect(plans).toMatch(/Pro: 1,000 uploads and 5,000 AI requests a month, unlimited saved recipes\./);
   });
 });

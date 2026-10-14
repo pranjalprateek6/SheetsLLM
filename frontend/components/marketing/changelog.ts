@@ -10,6 +10,21 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: "2026-10-14",
+    title: "Recipes that run themselves, Chef steps you see before they land, and every row in the grid",
+    items: [
+      "A recipe can run on a schedule: a link and a day of the month, and the cleaned file comes by email.",
+      "Share a recipe's steps with a link; whoever opens it can add it to their own account.",
+      "A shared file now opens a page with what it is and how it was cleaned, beside the download.",
+      "Chef shows the step it would make, with the SQL and a few rows, and nothing changes until you apply it.",
+      "Sorting and filtering in the grid cover every row, and scrolling loads the rest of the file.",
+      "A warning about emptied cells shows the rows it means; a fix says how many cells it changed.",
+      "Click a step to see the file as it was then, without going back.",
+      "Sign in from the email link, or ask for a sign-in link instead of a password.",
+      "The Free plan holds three recipes, and a practice recipe from the sample does not count.",
+    ],
+  },
+  {
     date: "2026-10-13",
     title: "Questions answered from the data, recipes you can edit, and no AI for the common fixes",
     items: [

@@ -5,7 +5,7 @@ export type PlanLimits = { uploads: number; ai_requests: number; recipes: number
 export type Plans = { free: PlanLimits; pro: PlanLimits };
 
 export const DEFAULT_PLANS: Plans = {
-  free: { uploads: 50, ai_requests: 200, recipes: 1 },
+  free: { uploads: 50, ai_requests: 200, recipes: 3 },
   pro: { uploads: 1000, ai_requests: 5000, recipes: 0 },
 };
 
