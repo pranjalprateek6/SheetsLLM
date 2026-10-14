@@ -307,6 +307,97 @@ def count_on_current(local_path: str | Path, steps: list[dict], count_sql: str, 
     return _run_with_timeout(_inner, timeout=timeout if timeout is not None else DUCKDB_QUERY_TIMEOUT)
 
 
+# ── Paging the grid ──────────────────────────────────────────────────
+
+
+def _qi(name: str) -> str:
+    return '"' + str(name).replace('"', '""') + '"'
+
+
+def page_rows(
+    local_path: str | Path,
+    steps: list[dict],
+    *,
+    offset: int = 0,
+    limit: int = MAX_PREVIEW_ROWS,
+    sort: str | None = None,
+    descending: bool = False,
+    q: str | None = None,
+    empty: str | None = None,
+    timeout: int | None = None,
+) -> dict[str, Any]:
+    """A page of the file as the steps left it, optionally sorted, filtered
+    to rows containing `q` in any column, or to rows where `empty` has no
+    value. A view only: nothing is saved. Column names are checked against
+    the result's own columns; `q` is bound as a parameter."""
+    source, remaining = _resolve_checkpoint(local_path, steps)
+    sql = build_replay_sql(remaining)
+
+    def _inner():
+        con = get_connection(read=(source,))
+        con.execute(f"CREATE VIEW data AS SELECT * FROM read_parquet('{_sql_path(source)}')")
+        columns = [str(r[0]) for r in con.execute(f"DESCRIBE SELECT * FROM (\n{sql}\n) AS _d").fetchall()]
+        where: list[str] = []
+        params: list[Any] = []
+        if q:
+            where.append("(" + " OR ".join(f"CAST({_qi(c)} AS VARCHAR) ILIKE ?" for c in columns) + ")")
+            params.extend([f"%{q}%"] * len(columns))
+        if empty:
+            if empty not in columns:
+                raise ValueError(f"No column named {empty!r}")
+            where.append(f"({_qi(empty)} IS NULL OR TRIM(CAST({_qi(empty)} AS VARCHAR)) = '')")
+        order = "_rn"
+        if sort:
+            if sort not in columns:
+                raise ValueError(f"No column named {sort!r}")
+            order = f"{_qi(sort)} {'DESC' if descending else 'ASC'} NULLS LAST, _rn"
+        clause = f"WHERE {' AND '.join(where)}" if where else ""
+        base = f"SELECT *, row_number() OVER () AS _rn FROM (\n{sql}\n) AS _v"
+        total = con.execute(f"SELECT COUNT(*) FROM ({base}) AS _b {clause}", params).fetchone()[0]
+        frame = con.execute(
+            f"SELECT * EXCLUDE (_rn) FROM ({base}) AS _b {clause} ORDER BY {order} "
+            f"LIMIT {max(1, min(int(limit), 2000))} OFFSET {max(0, int(offset))}",
+            params,
+        ).fetchdf(date_as_object=True)
+        import numpy as np
+
+        rows = frame.replace({np.nan: None}).to_dict(orient="records")
+        return {"columns": columns, "rows": rows, "total_rows": int(total), "total_columns": len(columns), "offset": int(offset)}
+
+    return _run_with_timeout(_inner, timeout=timeout if timeout is not None else DUCKDB_QUERY_TIMEOUT)
+
+
+def changed_cells(
+    local_path: str | Path, steps: list[dict], step_sql: str, column: str, *, timeout: int | None = None
+) -> int | None:
+    """How many cells of `column` the step changed, row for row, or None
+    when the step changed the row count or dropped the column. Compared as
+    text, so a type change that keeps the value is not a change."""
+
+    def _inner():
+        con = get_connection(read=(local_path,))
+        con.execute(f"CREATE VIEW raw AS SELECT * FROM read_parquet('{_sql_path(local_path)}')")
+        before = _retarget_from_data(build_replay_sql(steps), "raw")
+        con.execute(f"CREATE VIEW data AS {before}")
+        after = step_sql
+        cols_after = [str(r[0]) for r in con.execute(f"DESCRIBE SELECT * FROM (\n{after}\n) AS _d").fetchall()]
+        cols_before = [str(r[0]) for r in con.execute("DESCRIBE SELECT * FROM data").fetchall()]
+        if column not in cols_after or column not in cols_before:
+            return None
+        n_before = con.execute("SELECT COUNT(*) FROM data").fetchone()[0]
+        n_after = con.execute(f"SELECT COUNT(*) FROM (\n{after}\n) AS _a").fetchone()[0]
+        if n_before != n_after:
+            return None
+        c = _qi(column)
+        return int(con.execute(
+            f"SELECT COUNT(*) FROM (SELECT row_number() OVER () AS rn, CAST({c} AS VARCHAR) AS v FROM data) AS a "
+            f"JOIN (SELECT row_number() OVER () AS rn, CAST({c} AS VARCHAR) AS v FROM (\n{after}\n) AS _a) AS b "
+            f"USING (rn) WHERE a.v IS DISTINCT FROM b.v"
+        ).fetchone()[0])
+
+    return _run_with_timeout(_inner, timeout=timeout if timeout is not None else DUCKDB_QUERY_TIMEOUT)
+
+
 # ── Checking a chain before it is saved ──────────────────────────────
 
 

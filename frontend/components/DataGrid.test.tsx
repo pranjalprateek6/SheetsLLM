@@ -161,4 +161,33 @@ describe("DataGrid preview sort", () => {
     grid({ loading: true, rows: [] });
     expect(screen.getByText(/Loading data/)).toBeInTheDocument();
   });
+
+  it("with a server view, a header sort asks for the view instead of sorting the loaded rows", async () => {
+    const onViewChange = vi.fn();
+    grid({ onViewChange, view: {} });
+    await userEvent.click(screen.getByRole("button", { name: "Sort preview by Amount" }));
+    expect(onViewChange).toHaveBeenCalledWith({ sort: "Amount", dir: "asc" });
+  });
+
+  it("says what a view is and offers to keep a sort as a step", async () => {
+    const onOp = grid({ onViewChange: vi.fn(), view: { sort: "Amount", dir: "desc" }, totalRows: 2 });
+    expect(screen.getByText(/Sorted by Amount ↓, a view: not saved/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Save as a step" }));
+    expect(onOp).toHaveBeenCalledWith({ op: "sort", column: "Amount", args: { direction: "desc" } });
+  });
+
+  it("shows the rows behind an empty-cells view, and clears it", async () => {
+    const onViewChange = vi.fn();
+    grid({ onViewChange, view: { empty: "Email" }, totalRows: 7 });
+    expect(screen.getByText("7 rows where Email is empty")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Clear" }));
+    expect(onViewChange).toHaveBeenCalledWith({});
+  });
+
+  it("toggles a stats row under the headers", async () => {
+    grid();
+    expect(screen.queryByText(/50% empty/)).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Stats" }));
+    expect(screen.getByText(/50% empty/)).toBeInTheDocument();
+  });
 });

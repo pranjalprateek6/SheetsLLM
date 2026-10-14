@@ -31,6 +31,7 @@ import { announceOpenFile } from "@/lib/open-file";
 import { downloadExport, exportFileName, fileStem as stemOf } from "@/lib/export";
 import { type SchemaColumn } from "@/components/SchemaPanel";
 import { listLookups, uploadAndLink, type Lookup } from "@/lib/lookups";
+import { fetchRows, isViewActive, PAGE_SIZE, type GridView } from "@/lib/rows";
 const LookupsPanel = dynamic(() => import("@/components/LookupsPanel"));
 const SchemaPanel = dynamic(() => import("@/components/SchemaPanel"));
 const ChartPanel = dynamic(() => import("@/components/ChartPanel"));
@@ -152,6 +153,18 @@ function WorkspaceContent() {
   // A recipe the Recipes page asked to run on the file being opened
   const queuedRecipeId = useSearchParams().get("apply_recipe");
   const queuedRunRef = useRef<string | null>(null);
+  // How the grid is looking at the file: a server-side view over every row,
+  // a history step being looked at, and the view's own row count
+  const [view, setView] = useState<GridView>({});
+  const [viewTotal, setViewTotal] = useState<number | null>(null);
+  const [viewingStep, setViewingStep] = useState<number | null>(null);
+  const loadingMoreRef = useRef(false);
+  const setGridRows = useCallback((next: Record<string, unknown>[]) => {
+    setView({});
+    setViewTotal(null);
+    setViewingStep(null);
+    setRows(next);
+  }, []);
   const [lastChange, setLastChange] = useState<{
     stepNumber?: number;
     label: string;
@@ -323,15 +336,15 @@ function WorkspaceContent() {
 
       setShowTransform(true); // the grid is the file view — no interstitial
 
-      const previewRes = await fetchWithAuth(`/api/download?file_id=${id}&format=json&purpose=preview`);
-      if (previewRes.ok) {
-        const previewData = await previewRes.json();
-        const loaded = Array.isArray(previewData) && previewData.length > 0 ? Object.keys(previewData[0]) : [];
+      const page = await fetchRows(id, { limit: PAGE_SIZE }).catch(() => null);
+      if (page) {
+        const loaded = page.columns;
         if (loaded.length) {
           setColumns(loaded);
-          setRows(previewData.slice(0, 500));
+          setGridRows(page.rows);
         }
-        runQueuedRecipe(id, { columns: loaded, rowCount: file.row_count || 0 });
+        setRowCount(page.total_rows);
+        runQueuedRecipe(id, { columns: loaded, rowCount: page.total_rows });
       } else {
         // The file opened but its rows did not; an empty grid alone would
         // read as an empty file
@@ -350,7 +363,7 @@ function WorkspaceContent() {
   const adoptUpload = async (data: any, displayName: string): Promise<string | false> => {
     if (data.preview && data.file_id) {
       setColumns(data.preview.columns);
-      setRows(data.preview.rows);
+      setGridRows(data.preview.rows);
       setRowCount(data.preview.total_rows ?? data.preview.rows?.length ?? 0);
       setColumnCount(data.preview.total_columns ?? data.preview.columns?.length ?? 0);
       setSteps([]);
@@ -549,7 +562,7 @@ function WorkspaceContent() {
       const data = await res.json();
       if (res.ok) {
         setColumns(data.preview?.columns ?? data.columns ?? []);
-        setRows(data.preview?.rows ?? data.preview ?? []);
+        setGridRows(data.preview?.rows ?? data.preview ?? []);
         setRowCount(data.preview?.total_rows ?? data.total_rows ?? rows.length);
         setColumnCount(data.preview?.total_columns ?? data.total_columns ?? columns.length);
         setSteps((s) => s.slice(0, -1));
@@ -595,7 +608,7 @@ function WorkspaceContent() {
       const data = await res.json();
       if (res.ok) {
         setColumns(data.preview?.columns ?? data.columns ?? []);
-        setRows(data.preview?.rows ?? data.preview ?? []);
+        setGridRows(data.preview?.rows ?? data.preview ?? []);
         setRowCount(data.preview?.total_rows ?? data.total_rows ?? 0);
         setColumnCount(data.preview?.total_columns ?? data.total_columns ?? 0);
         setSteps([]);
@@ -617,7 +630,7 @@ function WorkspaceContent() {
     setFileReady(false);
     setShowTransform(false);
     setColumns([]);
-    setRows([]);
+    setGridRows([]);
     setRowCount(0);
     setColumnCount(0);
     setFileId(undefined);
@@ -641,7 +654,7 @@ function WorkspaceContent() {
       const data = await res.json().catch(() => ({}));
       if (res.ok && data.preview) {
         setColumns(data.preview.columns);
-        setRows(data.preview.rows);
+        setGridRows(data.preview.rows);
         setRowCount(data.preview.total_rows);
         setColumnCount(data.preview.total_columns);
         await refreshSteps(fileId);
@@ -681,7 +694,7 @@ function WorkspaceContent() {
       const data = await res.json();
       if (res.ok && data.preview) {
         setColumns(data.preview.columns);
-        setRows(data.preview.rows);
+        setGridRows(data.preview.rows);
         setRowCount(data.preview.total_rows);
         setColumnCount(data.preview.total_columns);
         setSteps((s) => s.filter((x) => x.step_number <= stepNum));
@@ -739,7 +752,7 @@ function WorkspaceContent() {
     }
 
     setColumns(p.columns);
-    setRows(p.rows);
+    setGridRows(p.rows);
     if (typeof p.totalRows === "number") setRowCount(p.totalRows);
     if (typeof p.totalColumns === "number") setColumnCount(p.totalColumns);
     setExportStrip(null);
@@ -754,14 +767,11 @@ function WorkspaceContent() {
   const handleLateStep = useCallback(async (step: LateStep) => {
     if (!fileId) return;
     try {
-      const res = await fetchWithAuth(`/api/download?file_id=${fileId}&format=json&purpose=preview`);
-      if (!res.ok) return;
-      const data = await res.json();
-      if (!Array.isArray(data)) return;
+      const page = await fetchRows(fileId, { limit: PAGE_SIZE });
       previewHandler({
-        columns: data.length > 0 ? Object.keys(data[0]) : [],
-        rows: data.slice(0, 500),
-        totalRows: step.totalRows ?? data.length,
+        columns: page.columns,
+        rows: page.rows,
+        totalRows: step.totalRows ?? page.total_rows,
         totalColumns: step.totalColumns,
         stepNumber: step.stepNumber,
         instruction: step.instruction,
@@ -785,7 +795,7 @@ function WorkspaceContent() {
       removedCols: prev.columns.filter((c) => !result.preview.columns.includes(c)),
     });
     setColumns(result.preview.columns);
-    setRows(result.preview.rows);
+    setGridRows(result.preview.rows);
     setRowCount(result.preview.total_rows);
     setColumnCount(result.preview.total_columns);
     setExportStrip(null);
@@ -794,6 +804,64 @@ function WorkspaceContent() {
     const id = appliedTo ?? fileId;
     if (id) refreshSteps(id);
   }, [fileId, refreshSteps]);
+
+  // ── Views over every row, more rows on scroll, looking at a step ────
+  // Only the newest view's answer is applied: two quick clicks must not
+  // let the older response land last
+  const viewSeq = useRef(0);
+  const changeView = useCallback(async (next: GridView) => {
+    if (!fileId) return;
+    const seq = ++viewSeq.current;
+    setView(next);
+    setLoading(true);
+    try {
+      const page = await fetchRows(fileId, { ...next, upto: viewingStep, limit: PAGE_SIZE });
+      if (seq !== viewSeq.current) return;
+      setColumns(page.columns);
+      setRows(page.rows);
+      setViewTotal(isViewActive(next) || viewingStep !== null ? page.total_rows : null);
+    } catch (e) {
+      if (seq === viewSeq.current) toast.error(e instanceof Error ? e.message : "Couldn't read the rows of this file.");
+    } finally {
+      if (seq === viewSeq.current) setLoading(false);
+    }
+  }, [fileId, viewingStep]);
+
+  const gridTotal = viewTotal ?? rowCount;
+  const loadMore = useCallback(async () => {
+    if (!fileId || loadingMoreRef.current || rows.length >= gridTotal) return;
+    loadingMoreRef.current = true;
+    try {
+      const seq = viewSeq.current;
+      const page = await fetchRows(fileId, { ...view, upto: viewingStep, offset: rows.length, limit: PAGE_SIZE });
+      if (seq === viewSeq.current) setRows((prev) => [...prev, ...page.rows]);
+    } catch {
+      // the next scroll asks again
+    } finally {
+      loadingMoreRef.current = false;
+    }
+  }, [fileId, rows.length, gridTotal, view, viewingStep]);
+
+  const viewStep = useCallback(async (n: number) => {
+    if (!fileId) return;
+    const latest = steps.reduce((m, s) => Math.max(m, s.step_number), 0);
+    setLoading(true);
+    try {
+      const atLatest = n >= latest;
+      const page = await fetchRows(fileId, { upto: atLatest ? null : n, limit: PAGE_SIZE });
+      setView({});
+      setViewingStep(atLatest ? null : n);
+      setViewTotal(atLatest ? null : page.total_rows);
+      setColumns(page.columns);
+      setRows(page.rows);
+      if (atLatest) setRowCount(page.total_rows);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't read that step.");
+    } finally {
+      setLoading(false);
+    }
+  }, [fileId, steps]);
+  const backToLatest = useCallback(() => viewStep(Number.MAX_SAFE_INTEGER), [viewStep]);
 
   // ── One-click fixes: a step with no AI call ─────────────────────────
   const handleOp = useCallback(async (req: OpRequest, source?: string): Promise<boolean> => {
@@ -809,6 +877,11 @@ function WorkspaceContent() {
         totalColumns: r.preview.total_columns,
         stepNumber: r.step_number,
         instruction: r.instruction,
+        note: r.changed
+          ? r.changed.cells === 0
+            ? `nothing in ${r.changed.column} needed it`
+            : `changed ${r.changed.cells.toLocaleString()} cell${r.changed.cells === 1 ? "" : "s"} in ${r.changed.column}`
+          : undefined,
       });
       if (r.warning) warnAfterSort(r.warning, req);
       return true;
@@ -1248,6 +1321,7 @@ function WorkspaceContent() {
             <PipelineSpine
               steps={steps}
               onRevertTo={(n) => setConfirmRevert(n)}
+              onViewStep={viewStep}
               onAddStep={() => {
                 setChatOpen(true);
                 setChatPrefill({ text: "", nonce: Date.now() });
@@ -1556,9 +1630,21 @@ function WorkspaceContent() {
                   <span className="min-w-0 flex-1">{sortWarning.warning.message}</span>
                   <div className="flex items-center gap-2">
                     {sortWarning.warning.code === "VALUES_LOST" || sortWarning.warning.code === "NO_MATCH" ? (
-                      <Button size="sm" variant="outline" className="h-7" disabled={loading} onClick={handleUndo}>
-                        Undo this step
-                      </Button>
+                      <>
+                        {sortWarning.warning.show_empty && (
+                          <Button
+                            size="sm"
+                            className="h-7"
+                            disabled={loading}
+                            onClick={() => void changeView({ empty: sortWarning.warning.show_empty! })}
+                          >
+                            Show them
+                          </Button>
+                        )}
+                        <Button size="sm" variant="outline" className="h-7" disabled={loading} onClick={handleUndo}>
+                          Undo this step
+                        </Button>
+                      </>
                     ) : sortWarning.warning.fix ? (
                       <Button size="sm" className="h-7" disabled={loading} onClick={() => fixDatesThenSort(sortWarning.warning.fix!, sortWarning.sort)}>
                         Fix the dates and sort again
@@ -1625,6 +1711,25 @@ function WorkspaceContent() {
                 />
               )}
 
+              {/* Looking at an earlier step: nothing changes until the person chooses */}
+              {viewingStep !== null && (
+                <div role="status" className="flex flex-shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-primary/25 bg-primary/[0.06] px-4 py-2 text-xs">
+                  <History className="h-3.5 w-3.5 flex-shrink-0 text-primary-accent" aria-hidden />
+                  <span className="font-medium">
+                    {viewingStep === 0 ? "Looking at the original file" : `Looking at the file after step ${viewingStep}`}
+                  </span>
+                  <span className="text-muted-foreground">Nothing has changed. Later steps are still there.</span>
+                  <div className="ml-auto flex items-center gap-2">
+                    <Button size="sm" className="h-7" onClick={backToLatest} disabled={loading}>
+                      Back to the latest
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-7" onClick={() => setConfirmRevert(viewingStep)} disabled={loading}>
+                      Go back to here
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               {/* Data grid */}
               <div className="flex-1 overflow-hidden">
                 <DataGrid
@@ -1633,10 +1738,14 @@ function WorkspaceContent() {
                   loading={loading}
                   columnMeta={columnMetaMap}
                   highlightCols={lastChange?.addedCols}
-                  totalRows={rowCount}
+                  totalRows={gridTotal}
                   stepCount={steps.length}
                   onColumnWidths={handleColumnWidths}
-                  onOp={(req) => handleOp(req, "grid")}
+                  onOp={viewingStep === null ? (req) => handleOp(req, "grid") : undefined}
+                  view={view}
+                  onViewChange={changeView}
+                  onLoadMore={loadMore}
+                  hasMore={rows.length < gridTotal}
                   onAskColumn={(col) => {
                     setChatOpen(true);
                     setChatPrefill({ text: `Tell me about the "${col}" column`, nonce: Date.now() });
@@ -1729,6 +1838,7 @@ function WorkspaceContent() {
           onClose={() => setHistoryOpen(false)}
           fileId={fileId}
           onRevert={(n) => { setHistoryOpen(false); setConfirmRevert(n); }}
+          onPreviewStep={(n) => { setHistoryOpen(false); void viewStep(n); }}
           onRemove={(n) => { setHistoryOpen(false); setConfirmRemove(n); }}
         />
         <ConfirmDialog

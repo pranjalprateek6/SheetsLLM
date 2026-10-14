@@ -1,5 +1,6 @@
 "use client";
 import { useRef, useState, useMemo, useCallback, useEffect } from "react";
+import type { GridView } from "@/lib/rows";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   ArrowDown, ArrowUp, ArrowUpDown, Calendar, CalendarDays, Check, ChevronDown, Copy, Filter, Link2, Hash,
@@ -87,7 +88,18 @@ export default function DataGrid({
   scrollToCol,
   onColumnWidths,
   lookups = [],
+  view,
+  onViewChange,
+  onLoadMore,
+  hasMore = false,
 }: {
+  /** The server-side view (sort, filter, empty cells). With onViewChange,
+   *  sorting and filtering cover every row, not the loaded ones. */
+  view?: GridView;
+  onViewChange?: (next: GridView) => void;
+  /** Called near the bottom while more rows exist */
+  onLoadMore?: () => void;
+  hasMore?: boolean;
   columns: string[];
   /** The file's lookup tables, for "Add columns from a lookup" */
   lookups?: { alias: string; columns: { name: string }[] }[];
@@ -226,8 +238,9 @@ export default function DataGrid({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [highlightCols?.join("|")]);
 
+  const serverView = !!onViewChange;
   const sortedRows = useMemo(() => {
-    if (!sortCol || !sortDir || onSort) return rows;
+    if (serverView || !sortCol || !sortDir || onSort) return rows;
     return [...rows].sort((a, b) => {
       const va = a[sortCol];
       const vb = b[sortCol];
@@ -241,20 +254,57 @@ export default function DataGrid({
       const sb = String(vb);
       return sortDir === "asc" ? sa.localeCompare(sb) : sb.localeCompare(sa);
     });
-  }, [rows, sortCol, sortDir, onSort]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, sortCol, sortDir, onSort, serverView]);
 
   // Quick-filter is an eyeball tool over the loaded preview only; the
   // status bar says so, and Chef is one click away for a real filter.
   const visibleRows = useMemo(() => {
     const q = filterQ.trim().toLowerCase();
-    if (!q) return sortedRows;
+    if (!q || serverView) return sortedRows;
     return sortedRows.filter((row) =>
       head.some((h) => {
         const v = row[h];
         return v != null && String(v).toLowerCase().includes(q);
       })
     );
-  }, [sortedRows, filterQ, head]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sortedRows, filterQ, head, serverView]);
+
+  // The sort the headers show: the server view's, or the local one
+  const shownSortCol = serverView ? view?.sort ?? null : sortCol;
+  const shownSortDir: SortDir = serverView ? (view?.sort ? view?.dir ?? "asc" : null) : sortDir;
+
+  // A typed filter becomes the server view after a pause
+  useEffect(() => {
+    if (!serverView) return;
+    const q = filterQ.trim();
+    if (q === (view?.q ?? "")) return;
+    const t = setTimeout(() => onViewChange?.({ ...(view ?? {}), q: q || undefined, empty: undefined }), 350);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterQ, serverView]);
+  // ...and a filter cleared from outside clears the box
+  useEffect(() => {
+    if (serverView && (view?.q ?? "") !== filterQ.trim()) setFilterQ(view?.q ?? "");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view?.q]);
+
+  // A column stats row under the headers, kept per browser
+  const [showStats, setShowStats] = useState(false);
+  useEffect(() => {
+    try {
+      setShowStats(window.localStorage.getItem("sllm_grid_stats") === "1");
+    } catch {}
+  }, []);
+  const toggleStats = () => {
+    setShowStats((v) => {
+      try {
+        window.localStorage.setItem("sllm_grid_stats", v ? "0" : "1");
+      } catch {}
+      return !v;
+    });
+  };
 
   const rowVirtualizer = useVirtualizer({
     count: visibleRows.length,
@@ -272,17 +322,33 @@ export default function DataGrid({
   const handleSort = useCallback(
     (col: string) => {
       let dir: SortDir;
-      if (sortCol === col) {
-        dir = sortDir === "asc" ? "desc" : sortDir === "desc" ? null : "asc";
+      if (shownSortCol === col) {
+        dir = shownSortDir === "asc" ? "desc" : shownSortDir === "desc" ? null : "asc";
       } else {
         dir = "asc";
+      }
+      if (onViewChange) {
+        onViewChange({ ...(view ?? {}), sort: dir ? col : undefined, dir: dir ?? undefined });
+        return;
       }
       setSortCol(dir ? col : null);
       setSortDir(dir);
       if (dir && onSort) onSort(col, dir);
     },
-    [sortCol, sortDir, onSort]
+    [shownSortCol, shownSortDir, onSort, onViewChange, view]
   );
+
+  // Near the bottom with more rows to come: ask for the next page, once per length
+  const askedAt = useRef(-1);
+  const virtualItems = rowVirtualizer.getVirtualItems();
+  const lastIndex = virtualItems.length ? virtualItems[virtualItems.length - 1].index : -1;
+  useEffect(() => {
+    if (!onLoadMore || !hasMore || loading) return;
+    if (lastIndex >= visibleRows.length - 40 && askedAt.current !== visibleRows.length) {
+      askedAt.current = visibleRows.length;
+      onLoadMore();
+    }
+  }, [lastIndex, visibleRows.length, hasMore, onLoadMore, loading]);
 
   const handleCopy = useCallback(async (value: string, key: string) => {
     try {
@@ -407,8 +473,8 @@ export default function DataGrid({
                             aria-label={`${nullPct}% null values`}
                           />
                         )}
-                        {sortCol === h && sortDir === "asc" && <ArrowUp className="h-3 w-3 flex-shrink-0 text-primary" />}
-                        {sortCol === h && sortDir === "desc" && <ArrowDown className="h-3 w-3 flex-shrink-0 text-primary" />}
+                        {shownSortCol === h && shownSortDir === "asc" && <ArrowUp className="h-3 w-3 flex-shrink-0 text-primary" />}
+                        {shownSortCol === h && shownSortDir === "desc" && <ArrowDown className="h-3 w-3 flex-shrink-0 text-primary" />}
                       </button>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -640,6 +706,26 @@ export default function DataGrid({
                 );
               })}
             </tr>
+            {showStats && (
+              <tr className="border-b bg-muted/30">
+                <th className="w-[50px] min-w-[50px] sticky left-0 z-20 py-1 text-[10px] font-normal text-muted-foreground [background:linear-gradient(hsl(var(--muted)/.3),hsl(var(--muted)/.3)),hsl(var(--card))]">stats</th>
+                {head.map((h) => {
+                  const meta = columnMeta?.[h];
+                  return (
+                    <th key={h} className="border-r border-border/60 px-2 py-1 text-left text-[11px] font-normal tabular-nums text-muted-foreground last:border-r-0">
+                      {meta ? (
+                        <span className="block truncate">
+                          {typeof meta.null_pct === "number" ? `${meta.null_pct}% empty` : ""}
+                          {typeof meta.unique_count === "number" ? `${typeof meta.null_pct === "number" ? " · " : ""}${meta.unique_count.toLocaleString()} distinct` : ""}
+                        </span>
+                      ) : (
+                        <span className="block truncate opacity-60">new column</span>
+                      )}
+                    </th>
+                  );
+                })}
+              </tr>
+            )}
           </thead>
           <tbody>
             {/* Spacer after header */}
@@ -728,7 +814,34 @@ export default function DataGrid({
       </div>
       {/* Status bar */}
       <div className="flex h-8 flex-shrink-0 items-center justify-between gap-2 border-t bg-card px-3 coarse:h-11">
-        {sortCol && sortDir && !filterQ.trim() ? (
+        {serverView && (view?.empty || view?.sort || view?.q) ? (
+          // A view over every row: say what it is and offer to keep it as a step
+          <span className="flex min-w-0 items-center gap-2 text-[11px] tabular-nums text-muted-foreground">
+            <span className="truncate">
+              {view?.empty
+                ? `${(totalRows ?? rows.length).toLocaleString()} rows where ${view.empty} is empty`
+                : view?.q
+                  ? `${(totalRows ?? rows.length).toLocaleString()} rows contain \u201c${view.q}\u201d`
+                  : `Sorted by ${view?.sort} ${view?.dir === "desc" ? "\u2193" : "\u2191"}, a view: not saved`}
+            </span>
+            {view?.sort && !view?.q && !view?.empty && onOp && (
+              <button
+                type="button"
+                onClick={() => onOp({ op: "sort", column: view.sort!, args: { direction: view.dir ?? "asc" } })}
+                className="whitespace-nowrap font-medium text-primary-accent underline-offset-2 hover:underline"
+              >
+                Save as a step
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => { setFilterQ(""); onViewChange?.({}); }}
+              className="whitespace-nowrap underline-offset-2 hover:text-foreground hover:underline"
+            >
+              Clear
+            </button>
+          </span>
+        ) : sortCol && sortDir && !filterQ.trim() ? (
           // A header sort reorders the loaded preview only; say so, and offer
           // the real thing, which saves as a step and reaches the export.
           <span className="flex min-w-0 items-center gap-2 text-[11px] tabular-nums text-muted-foreground">
@@ -756,9 +869,11 @@ export default function DataGrid({
           </span>
         ) : (
           <span className="min-w-0 truncate text-[11px] tabular-nums text-muted-foreground">
-            {filterQ.trim()
+            {filterQ.trim() && !serverView
               ? `${visibleRows.length.toLocaleString()} of ${rows.length.toLocaleString()} preview rows match`
-              : typeof totalRows === "number" && totalRows > rows.length
+              : serverView && typeof totalRows === "number"
+                ? `${totalRows.toLocaleString()} rows`
+                : typeof totalRows === "number" && totalRows > rows.length
                 ? `First ${rows.length.toLocaleString()} of ${totalRows.toLocaleString()} rows`
                 : `${rows.length.toLocaleString()} rows`}
             {!filterQ.trim() && ` × ${head.length.toLocaleString()} cols`}
@@ -780,8 +895,8 @@ export default function DataGrid({
             type="text"
             value={filterQ}
             onChange={(e) => setFilterQ(e.target.value)}
-            placeholder="Filter preview…"
-            aria-label="Filter the loaded preview rows"
+            placeholder={serverView ? "Filter rows…" : "Filter preview…"}
+            aria-label={serverView ? "Filter every row" : "Filter the loaded preview rows"}
             className="h-6 w-32 rounded border bg-background px-1.5 text-[11px] outline-none placeholder:text-muted-foreground focus:ring-1 focus:ring-ring/40 coarse:h-8 coarse:text-base"
           />
           {filterQ && (
@@ -795,6 +910,15 @@ export default function DataGrid({
             </button>
           )}
         </div>
+        <button
+          type="button"
+          onClick={toggleStats}
+          aria-pressed={showStats}
+          title="Column stats under the headers"
+          className={`flex h-6 items-center rounded px-1.5 text-[11px] font-medium transition-colors coarse:h-8 ${showStats ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+        >
+          Stats
+        </button>
         <div
           className="flex items-center gap-0.5 rounded-md bg-muted p-0.5"
           role="group"

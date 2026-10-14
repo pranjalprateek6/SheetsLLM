@@ -68,6 +68,8 @@ EVENTS = frozenset({
     "payment_failed_notified", "reminders_unsubscribed",
     # the first-loop checklist dismissed, a bundled sample opened
     "checklist_dismissed", "sample_opened",
+    # a step Chef proposed and the person applied from its preview
+    "chef_proposal_applied",
 })
 
 

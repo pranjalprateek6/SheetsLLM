@@ -37,6 +37,8 @@ export type OpWarning = {
   /** VALUES_LOST: how many cells, and a few of the values that were in them */
   count?: number;
   examples?: string[];
+  /** The column whose empty cells are the rows this warning is about */
+  show_empty?: string | null;
 };
 
 export type OpResult = {
@@ -46,6 +48,8 @@ export type OpResult = {
   sql: string;
   preview: { columns: string[]; rows: Record<string, unknown>[]; total_rows: number; total_columns: number };
   warning?: OpWarning | null;
+  /** A fix that kept every row: how many cells of the column it rewrote */
+  changed?: { column: string; cells: number } | null;
 };
 
 /** Formats the backend accepts for standardise_date, with an example each. */

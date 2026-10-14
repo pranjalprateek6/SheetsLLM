@@ -136,6 +136,8 @@ async def chat(request: Request):
 
     file_id = body.get("file_id")
     message = (body.get("message") or "").strip()
+    # The workspace asks for a proposal: the step is shown, not saved
+    propose = body.get("propose") is True
 
     if not file_id:
         return _json_response(400, "MISSING_FILE_ID", "file_id is required")
@@ -287,6 +289,35 @@ async def chat(request: Request):
             return _json_response(
                 400, "EXECUTION_FAILED", f"SQL execution failed: {first_error}", sql=sql,
             )
+
+    # A proposal: show what the step would do, save nothing. The person
+    # applies it from the card, through the step route, with no second AI call
+    if propose:
+        cols_before = [c["name"] for c in schema.get("columns", [])]
+        summary = "This step would give " + done_message(
+            file_rec.get("row_count"), result["total_rows"], cols_before, result["columns"]
+        ).removeprefix("Done. ")
+        db.create_chat_message(
+            file_id=file_id, role="assistant", content=summary, message_type="proposal",
+            metadata={"sql": sql, "sent": sent, "instruction": message,
+                      "total_rows": result["total_rows"], "total_columns": result["total_columns"]},
+        )
+        events.record(user_id, "chat_sent", kind="proposal")
+        return {
+            "type": "proposal",
+            "message": summary,
+            "file_id": file_id,
+            "instruction": message,
+            "sql": sql,
+            "sent": sent,
+            "before": {"total_rows": file_rec.get("row_count"), "columns": cols_before},
+            "preview": {
+                "columns": result["columns"],
+                "rows": result["preview"][:20],
+                "total_rows": result["total_rows"],
+                "total_columns": result["total_columns"],
+            },
+        }
 
     # Save transformation
     step_number = db.get_next_step_number(file_id)

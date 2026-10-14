@@ -21,6 +21,7 @@ export type PipelineStep = { step_number: number; instruction: string };
 export default function PipelineSpine({
   steps,
   onRevertTo,
+  onViewStep,
   onAddStep,
   onSaveRecipe,
   className,
@@ -28,6 +29,8 @@ export default function PipelineSpine({
   steps: PipelineStep[];
   /** Go back to this step number; 0 means the original file. */
   onRevertTo: (stepNumber: number) => void;
+  /** Look at the file as a step left it, without changing anything */
+  onViewStep?: (stepNumber: number) => void;
   onAddStep: () => void;
   /** Save these steps as a recipe; the row shows once there is a step. */
   onSaveRecipe?: () => void;
@@ -140,8 +143,8 @@ export default function PipelineSpine({
             n={null}
             label="Original file"
             active={steps.length === 0}
-            onClick={() => onRevertTo(0)}
-            title="Back to the original file"
+            onClick={() => (onViewStep ? onViewStep(0) : onRevertTo(0))}
+            title={onViewStep ? "See the original file" : "Back to the original file"}
           />
           {steps.map((s) => (
             <Node
@@ -149,11 +152,13 @@ export default function PipelineSpine({
               n={s.step_number}
               label={s.instruction}
               active={s.step_number === last}
-              onClick={() => onRevertTo(s.step_number)}
+              onClick={() => (onViewStep ? onViewStep(s.step_number) : onRevertTo(s.step_number))}
               title={
                 s.step_number === last
                   ? s.instruction
-                  : `${s.instruction}. Click to go back to this step.`
+                  : onViewStep
+                    ? `${s.instruction}. Click to see the file at this step.`
+                    : `${s.instruction}. Click to go back to this step.`
               }
             />
           ))}
