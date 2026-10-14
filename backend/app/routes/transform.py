@@ -17,7 +17,7 @@ from fastapi import APIRouter, Request, Response
 from app import lookups
 from app import db, events, usage
 from app.cache import get_local_parquet
-from app.engine import get_schema_after_steps, replay_transformations_local, values_lost_by
+from app.engine import changed_cells, get_schema_after_steps, replay_transformations_local, values_lost_by
 from app.insights import sort_warning
 from app.ops import OpError, build_op, number_expr, quote_ident
 from app.security import RateLimitExceeded, check_rate_limit
@@ -109,8 +109,11 @@ async def _unmatched_warning(r2_key: str, steps: list[dict], column: str, args: 
         return None
     if not n:
         return None
+    take = [str(c) for c in (args.get("take") or []) if c]
     return {
         "code": "NO_MATCH", "column": column, "count": n, "fix": None, "instruction": "",
+        # the rows a person wants to see: where the first column brought in is empty
+        "show_empty": take[0] if take else None,
         "message": f"{n:,} row{'s' if n != 1 else ''} found no match in {alias} for {'their' if n != 1 else 'its'} {column}, so the new columns are empty there.",
     }
 
@@ -135,11 +138,16 @@ async def _lost_values_warning(r2_key: str, steps: list[dict], column: str, deci
     )
     return {
         "code": "VALUES_LOST", "column": column, "count": n, "examples": lost["examples"],
+        "show_empty": column,
         "message": message, "fix": None, "instruction": "",
     }
 
 
 # ── POST /transform/op: a fix that needs no AI ───────────────────────
+
+
+# Fixes that rewrite one column's cells in place
+_CELL_OPS = {"trim", "fill_nulls", "standardise_date", "clean_number", "cast"}
 
 
 @router.post("/transform/op")
@@ -237,10 +245,23 @@ async def transform_op(request: Request):
         if warning:
             events.record(user_id, "clean_number_lost", count=warning["count"])
 
+    # A fix that keeps every row: say how many cells it changed, so a trim
+    # or a fill that leaves the counts alone still shows what it did
+    changed = None
+    if op in _CELL_OPS and body.get("column"):
+        try:
+            local_path = await asyncio.to_thread(get_local_parquet, r2_key)
+            n = await asyncio.to_thread(changed_cells, local_path, steps, sql, body["column"])
+            if n is not None:
+                changed = {"column": body["column"], "cells": n}
+        except Exception as exc:
+            logger.warning("Changed-cells count failed for %s: %s", file_id, exc)
+
     return {
         "type": "transform",
         "source": "op",
         "warning": warning,
+        "changed": changed,
         "op": op,
         "file_id": file_id,
         "step_number": step_number,

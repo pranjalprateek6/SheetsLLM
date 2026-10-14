@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import uuid
@@ -269,6 +270,44 @@ def with_deltas(steps: list[dict], base_columns: list[str]) -> list[dict]:
 # ── POST /files/{id}/steps: put back a step you know the SQL of ──────
 
 
+_RECEIPT_KEYS = ("source", "mode", "columns_sent", "sample_rows_sent", "values_per_column", "lookups_sent")
+
+
+@router.get("/files/{file_id}/rows")
+async def file_rows(
+    request: Request, file_id: str, offset: int = 0, limit: int = 500,
+    sort: str | None = None, dir: str = "asc", q: str | None = None,
+    empty: str | None = None, upto: int | None = None,
+):
+    """A page of the grid: the file as its steps left it (or as step
+    `upto` left it), sorted, filtered or narrowed to empty cells as a view.
+    Nothing is saved; a sort or filter the person wants to keep is a step."""
+    from app.engine import page_rows
+
+    user_id = getattr(request.state, "user_id", "anonymous")
+    file_rec = db.get_file(file_id, user_id)
+    if not file_rec:
+        return _json_response(404, "FILE_NOT_FOUND", "File not found")
+    if q is not None and len(q) > 100:
+        return _json_response(400, "INVALID_ARGS", "The filter is too long.")
+    steps = db.get_transformations(file_id)
+    if upto is not None:
+        steps = [s for s in steps if int(s.get("step_number") or 0) <= upto]
+    lookups.use(file_id, user_id)
+    try:
+        local_path = await asyncio.to_thread(get_local_parquet, file_rec["r2_key"])
+        page = await asyncio.to_thread(
+            page_rows, local_path, steps, offset=offset, limit=limit,
+            sort=sort or None, descending=(dir == "desc"), q=(q or "").strip() or None, empty=empty or None,
+        )
+    except ValueError as exc:
+        return _json_response(400, "UNKNOWN_COLUMN", str(exc))
+    except Exception as exc:
+        logger.warning("rows failed for %s: %s", file_id, exc)
+        return _json_response(400, "EXECUTION_FAILED", "Couldn't read the rows of this file.")
+    return {"file_id": file_id, "upto": upto, **page}
+
+
 @router.post("/files/{file_id}/steps")
 async def add_step(request: Request, file_id: str):
     """Redo: re-apply a step from its stored SQL. Validated exactly as a
@@ -304,12 +343,30 @@ async def add_step(request: Request, file_id: str):
     except Exception as exc:
         return _json_response(400, "EXECUTION_FAILED", f"That step no longer runs on this file: {exc}")
 
+    # A Chef proposal applied: the step keeps the receipt of what the AI was
+    # sent when it wrote it, limited to the receipt's own fields
+    proposal = body.get("sent") if isinstance(body.get("sent"), dict) else None
+    sent = {"source": "redo"}
+    explain = "redo"
+    if proposal and proposal.get("source") == "llm":
+        sent = {k: proposal[k] for k in _RECEIPT_KEYS if k in proposal}
+        sent["source"] = "llm"
+        explain = "chef"
     db.create_transformation(
         file_id=file_id, step_number=step_number, instruction=instruction, sql_query=sql,
-        explain="redo", row_count_after=result["total_rows"],
+        explain=explain, row_count_after=result["total_rows"],
         column_count_after=result["total_columns"], columns_after=result["columns"],
-        sent={"source": "redo"},
+        sent=sent,
     )
+    if explain == "chef":
+        try:
+            db.create_chat_message(
+                file_id=file_id, role="assistant", content=f"Applied as step {step_number}.",
+                message_type="transform", metadata={"sql": sql, "step_number": step_number, "sent": sent},
+            )
+        except Exception:
+            pass
+        events.record(user_id, "chef_proposal_applied")
     try:
         db.update_file(file_id, user_id, row_count=result["total_rows"], column_count=result["total_columns"])
     except Exception:

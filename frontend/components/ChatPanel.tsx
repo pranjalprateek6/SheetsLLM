@@ -259,6 +259,43 @@ export default function ChatPanel({
     );
   }, [fileId, onLateStep, clearLateChecks]);
 
+  // Apply a proposal: the step route saves it from its SQL, no second AI call
+  const [applyingAt, setApplyingAt] = useState<number | null>(null);
+  const setProposalStatus = (i: number, status: string, extra: Record<string, unknown> = {}) =>
+    setMessages((prev) => prev.map((m, j) => (j === i ? { ...m, metadata: { ...(m.metadata ?? {}), status, ...extra } } : m)));
+  const applyProposal = async (i: number) => {
+    const m = messages[i];
+    if (!fileId || !m?.metadata?.sql || applyingAt !== null) return;
+    setApplyingAt(i);
+    try {
+      const r = await fetchWithAuth(`/api/files/${encodeURIComponent(fileId)}/steps`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ instruction: m.metadata.instruction, sql: m.metadata.sql, sent: m.metadata.sent }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        toast.error(explainError(d).text);
+        return;
+      }
+      setProposalStatus(i, "applied", { step_number: d.step_number });
+      if (d.preview) {
+        onPreview({
+          columns: d.preview.columns,
+          rows: d.preview.rows,
+          totalRows: d.preview.total_rows,
+          totalColumns: d.preview.total_columns,
+          stepNumber: d.step_number,
+          instruction: String(m.metadata.instruction ?? ""),
+        });
+      }
+    } catch {
+      toast.error("Couldn't apply that step. Try again.");
+    } finally {
+      setApplyingAt(null);
+    }
+  };
+
   const sendMessage = useCallback(
     async (text?: string) => {
       const msg = text || input.trim();
@@ -282,12 +319,18 @@ export default function ChatPanel({
         const res = await fetchWithAuth("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ file_id: fileId, message: msg }),
+          body: JSON.stringify({ file_id: fileId, message: msg, propose: true }),
           signal: controller.signal,
         });
         const data = await res.json();
 
-        if (data.type === "transform") {
+        if (data.type === "proposal") {
+          // A step to look at before it lands: the SQL, the counts, a few rows
+          setMessages((prev) => [...prev, {
+            role: "assistant", content: data.message, message_type: "proposal",
+            metadata: { sql: data.sql, sent: data.sent, instruction: msg, preview: data.preview, before: data.before, status: "pending" },
+          }]);
+        } else if (data.type === "transform") {
           setMessages((prev) => [...prev, {
             role: "assistant", content: data.message || `Applied: ${msg}`,
             message_type: "transform", metadata: { sql: data.sql, step_number: data.step_number, sent: data.sent },
@@ -521,6 +564,7 @@ export default function ChatPanel({
             const isError = msg.message_type === "error";
             const isStep = msg.message_type === "transform";
             const isAnswer = msg.message_type === "answer";
+            const isProposal = msg.message_type === "proposal";
             const stepNumber = typeof msg.metadata?.step_number === "number" ? (msg.metadata.step_number as number) : null;
             return (
               <div key={i} className="group">
@@ -580,6 +624,73 @@ export default function ChatPanel({
                       </div>
                     )}
                   </div>
+                ) : isProposal ? (
+                  // A step Chef would make: shown, not applied, until the person says so
+                  (() => {
+                    const status = String(msg.metadata?.status ?? "earlier");
+                    const preview = msg.metadata?.preview as
+                      | { columns: string[]; rows: Record<string, unknown>[]; total_rows: number }
+                      | undefined;
+                    return (
+                      <div className="overflow-hidden rounded-xl border bg-card shadow-xs">
+                        <div className="px-3 py-2.5 text-[13px] leading-relaxed">
+                          <p className="text-[11px] font-medium text-muted-foreground">
+                            {status === "applied"
+                              ? `Applied as step ${String(msg.metadata?.step_number ?? "")}`
+                              : status === "discarded"
+                                ? "Discarded"
+                                : status === "pending"
+                                  ? "Preview: not applied yet"
+                                  : "Proposed earlier, not applied"}
+                          </p>
+                          <ChatText text={msg.content} />
+                          {status === "pending" && preview && (
+                            <AnswerTable columns={preview.columns} rows={preview.rows.slice(0, 5)} totalRows={preview.total_rows} />
+                          )}
+                        </div>
+                        {!!msg.metadata?.sql && (
+                          <div className="border-t px-3 py-1.5">
+                            <div className="flex flex-wrap items-center gap-x-3">
+                              <SentDisclosure sent={msg.metadata.sent as SentReceipt | undefined} />
+                              <button
+                                onClick={() => setExpandedSql(expandedSql === String(i) ? null : String(i))}
+                                aria-expanded={expandedSql === String(i) || (status === "pending" && expandedSql === null)}
+                                aria-controls={`sql-${i}`}
+                                className="inline-flex min-h-6 items-center gap-1 text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+                              >
+                                <Code2 className="h-3 w-3" /> SQL
+                              </button>
+                            </div>
+                            {(expandedSql === String(i) || (status === "pending" && expandedSql === null)) && (
+                              <SqlBlock sql={String(msg.metadata.sql)} id={`sql-${i}`} />
+                            )}
+                          </div>
+                        )}
+                        {status === "pending" && (
+                          <div className="flex items-center gap-2 border-t px-3 py-2">
+                            <Button size="sm" className="h-7" onClick={() => applyProposal(i)} disabled={applyingAt !== null}>
+                              {applyingAt === i ? "Applying…" : "Apply"}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              className="h-7"
+                              onClick={() => {
+                                setInput(String(msg.metadata?.instruction ?? ""));
+                                setProposalStatus(i, "discarded");
+                                setTimeout(() => inputRef.current?.focus(), 0);
+                              }}
+                            >
+                              Edit
+                            </Button>
+                            <Button size="sm" variant="ghost" className="h-7 text-muted-foreground" onClick={() => setProposalStatus(i, "discarded")}>
+                              Discard
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()
                 ) : isAnswer ? (
                   // A question answered from the data: the answer, the rows behind it, and the query
                   <div className="text-[13px] leading-relaxed">

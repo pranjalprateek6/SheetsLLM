@@ -46,7 +46,7 @@ describe("ChatPanel suggestions", () => {
     expect(screen.getByRole("button", { name: /^Drop rows where Region is empty21\.5% of Region is empty/ })).toBeInTheDocument();
 
     await userEvent.click(chip);
-    await waitFor(() => expect(sent).toEqual({ file_id: "f1", message: "remove duplicate rows" }));
+    await waitFor(() => expect(sent).toEqual({ file_id: "f1", message: "remove duplicate rows" , propose: true }));
   });
 
   it("uses the upload's insights without fetching", async () => {
@@ -299,7 +299,7 @@ describe("ChatPanel without AI", () => {
     expect(box).toHaveValue("");
 
     await userEvent.type(box, "trim Email{Enter}");
-    await waitFor(() => expect(sent).toEqual({ file_id: "f1", message: "trim Email" }));
+    await waitFor(() => expect(sent).toEqual({ file_id: "f1", message: "trim Email" , propose: true }));
   });
 });
 
@@ -395,5 +395,31 @@ describe("ChatPanel privacy and receipts", () => {
     render(<ChatPanel fileId="f1" open onPreview={noop} />);
     await userEvent.type(screen.getByRole("textbox", { name: "Ask Chef anything" }), "how many?{Enter}");
     expect(await screen.findByText("From column names and types only")).toBeInTheDocument();
+  });
+
+  it("shows Chef's step as a proposal, and applies it without asking the AI again", async () => {
+    let applied: unknown = null;
+    server.use(
+      http.post("/api/chat", () => HttpResponse.json({
+        type: "proposal", message: "Removed 2 rows.", instruction: "drop empty regions",
+        sql: "SELECT * FROM data WHERE region IS NOT NULL", sent: { source: "llm", mode: "strict" },
+        before: { total_rows: 5, columns: ["a"] },
+        preview: { columns: ["a"], rows: [{ a: 1 }, { a: 2 }], total_rows: 3, total_columns: 1 },
+      })),
+      http.post("/api/files/:id/steps", async ({ request }) => {
+        applied = await request.json();
+        return HttpResponse.json({ step_number: 1, preview: { columns: ["a"], rows: [{ a: 1 }], total_rows: 3, total_columns: 1 } });
+      }),
+    );
+    const onPreview = vi.fn();
+    render(<ChatPanel fileId="f1" open onPreview={onPreview} />);
+    await userEvent.type(await screen.findByLabelText("Ask Chef anything"), "drop empty regions{Enter}");
+    expect(await screen.findByText("Preview: not applied yet")).toBeInTheDocument();
+    expect(screen.getByText(/WHERE region IS NOT NULL/)).toBeInTheDocument();
+    expect(onPreview).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("button", { name: "Apply" }));
+    await waitFor(() => expect(onPreview).toHaveBeenCalledWith(expect.objectContaining({ stepNumber: 1, totalRows: 3 })));
+    expect(applied).toEqual({ instruction: "drop empty regions", sql: "SELECT * FROM data WHERE region IS NOT NULL", sent: { source: "llm", mode: "strict" } });
+    expect(await screen.findByText("Applied as step 1")).toBeInTheDocument();
   });
 });
