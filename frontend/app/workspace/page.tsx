@@ -3,7 +3,7 @@ import dynamic from "next/dynamic";
 import { Suspense, useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import {
-  AlertTriangle, ArrowRight, BarChart3, BookMarked, CalendarClock, Check, ChefHat, ChevronDown, ChevronRight, Columns3, FileSpreadsheet, History, Lightbulb, Link2, MessageSquare, Pencil, Redo2, Undo2, Upload,
+  AlertTriangle, ArrowRight, BarChart3, BookMarked, CalendarClock, Check, ChefHat, ChevronDown, ChevronRight, Columns3, FileSpreadsheet, History, Link2, MessageSquare, Pencil, Redo2, Undo2, Upload,
 } from "lucide-react";
 import ColumnHealth, { type HealthColumn } from "@/components/ColumnHealth";
 import PipelineSpine from "@/components/PipelineSpine";
@@ -35,8 +35,8 @@ const LookupsPanel = dynamic(() => import("@/components/LookupsPanel"));
 const SchemaPanel = dynamic(() => import("@/components/SchemaPanel"));
 const ChartPanel = dynamic(() => import("@/components/ChartPanel"));
 const CommandPalette = dynamic(() => import("@/components/CommandPalette"));
-import GettingStarted, { markOnboardingStep, ONBOARDING_FLAGS, type OnboardingStep } from "@/components/GettingStarted";
-import OnboardingIntent, { INTENT_LABELS, loadIntents, type Intent } from "@/components/OnboardingIntent";
+import GettingStarted, { markOnboardingStep, NextStepPill, type OnboardingStep } from "@/components/GettingStarted";
+import { track } from "@/lib/track";
 const KeyboardShortcuts = dynamic(() => import("@/components/KeyboardShortcuts"));
 import ErrorBoundary from "@/components/ErrorBoundary";
 import AuthGuard from "@/components/AuthGuard";
@@ -67,19 +67,7 @@ export default function Workspace() {
 
 // What Chef is for. Trims, dedupes, renames, sorts and fills are one click
 // in the column menu, with no AI request.
-const EXAMPLE_PROMPTS = [
-  "Add column Profit = Revenue - Cost",
-  "Flag rows where Status is Paid but Amount is 0",
-  "Which column has the most nulls?",
-  "Split Name into First and Last",
-];
 
-// Intent → the sample dataset that matches it (ids from SAMPLE_DATASETS)
-const INTENT_TO_SAMPLE: Partial<Record<Intent, string>> = {
-  sales: "sales",
-  hr: "employees",
-  survey: "survey",
-};
 
 function WorkspaceContent() {
   // The open file lives in the URL; a URL naming another file opens it.
@@ -109,6 +97,8 @@ function WorkspaceContent() {
   const [exportStrip, setExportStrip] = useState<{ name: string; steps: number } | null>(null);
   // Saved recipes, for the start screen's rail
   const [recipes, setRecipes] = useState<Recipe[]>([]);
+  // Bumped when a milestone lands, so the next-step pill rereads the account
+  const [onboardingNonce, setOnboardingNonce] = useState(0);
   const armedRecipeId = useSearchParams().get("recipe_id");
   // The recipe the next file runs: armed from the Recipes page's link, or
   // picked in the rail; the one intake says so and the file runs it
@@ -265,23 +255,6 @@ function WorkspaceContent() {
       }
     } catch {}
   }, []);
-  // null = question not yet answered; [] = skipped
-  const [intents, setIntents] = useState<Intent[] | null>(null);
-  const [intentsLoaded, setIntentsLoaded] = useState(false);
-  // True only in the render right after answering — powers the visible
-  // "here's what your answer changed" confirmation where the question was.
-  const [justAnswered, setJustAnswered] = useState(false);
-
-  useEffect(() => {
-    setIntents(loadIntents());
-    setIntentsLoaded(true);
-  }, []);
-
-  const handleIntentsDone = (chosen: Intent[]) => {
-    setIntents(chosen);
-    if (chosen.length > 0) setJustAnswered(true);
-  };
-
   // Per-column dtype/null stats for the grid headers (from the upload-time
   // schema; columns created by later transforms simply have no meta yet).
   const columnMetaMap = useMemo(() => {
@@ -301,28 +274,10 @@ function WorkspaceContent() {
     return columns.map((name) => meta.get(name) ?? { name });
   }, [columns, schema]);
 
-  // Answers unlock something visible: matching samples float to the top
-  // and the starter prompts speak the user's domain.
-  const matchedSampleIds = (intents ?? [])
-    .map((i) => INTENT_TO_SAMPLE[i])
-    .filter((id): id is string => !!id);
-  const orderedSamples = [
-    ...SAMPLE_DATASETS.filter((s) => matchedSampleIds.includes(s.id)),
-    ...SAMPLE_DATASETS.filter((s) => !matchedSampleIds.includes(s.id)),
-  ];
-  const personalizedPrompts =
-    matchedSampleIds.length > 0
-      ? Array.from(
-          new Set(
-            SAMPLE_DATASETS.filter((s) => matchedSampleIds.includes(s.id))
-              .flatMap((s) => s.suggestions)
-          )
-        ).slice(0, 4)
-      : (intents ?? []).includes("other")
-        ? // "All sorts" = no routing preference — answer with variety:
-          // one starter idea from each domain plus a generic cleanup.
-          [...SAMPLE_DATASETS.flatMap((s) => s.suggestions.slice(0, 1)), EXAMPLE_PROMPTS[0]]
-        : EXAMPLE_PROMPTS;
+  // Monthly orders first: it is the one sample that walks the whole loop,
+  // October, a lookup, and November waiting for the recipe
+  const startSample = SAMPLE_DATASETS.find((d) => d.id === "orders") ?? SAMPLE_DATASETS[0];
+  const moreSamples = SAMPLE_DATASETS.filter((d) => d.id !== startSample.id);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -525,6 +480,7 @@ function WorkspaceContent() {
   const loadSample = async (sampleId: string) => {
     const sample = SAMPLE_DATASETS.find((s) => s.id === sampleId);
     if (!sample || loading) return;
+    track("sample_opened", { sample_id: sample.id });
     setLoading(true);
     try {
       const res = await fetch(sample.file);
@@ -788,24 +744,9 @@ function WorkspaceContent() {
     if (typeof p.totalColumns === "number") setColumnCount(p.totalColumns);
     setExportStrip(null);
     setHealthNonce((n) => n + 1);
-    // Celebrate the aha moment once — and point at the step that makes
-    // this product different (the recipe), while the win is fresh.
-    let firstTransform = false;
-    try {
-      firstTransform = localStorage.getItem(ONBOARDING_FLAGS.transform) !== "true";
-    } catch {}
+    // The toolbar's next-step pill moves on to "Save the steps as a recipe"
     markOnboardingStep("transform");
-    if (firstTransform) {
-      toast.success("That was your first step. It's saved as step 1, and you can undo it anytime.", {
-        description:
-          "When your cleanup is done, save these steps as a recipe: next month's file becomes one click.",
-        duration: 9000,
-        action: {
-          label: "See recipes",
-          onClick: () => setRecipesOpen(true),
-        },
-      });
-    }
+    setOnboardingNonce((n) => n + 1);
   }, []);
 
   // Chef was stopped, but the server saved the step anyway: load the grid
@@ -1048,7 +989,26 @@ function WorkspaceContent() {
   const actOnChecklist = (step: OnboardingStep) => {
     if (step === "upload") void loadSample("orders");
     else if (step === "rerun") void runMonthTwo();
+    else if (step === "transform") {
+      setChatOpen(true);
+      setChatPrefill({ text: "", nonce: Date.now() });
+    } else if (step === "recipe") {
+      setRecipesFrom("rail");
+      setRecipesOpen(true);
+    }
   };
+
+  // From the dashboard's checklist: /workspace?checklist=upload|rerun
+  const checklistParam = useSearchParams().get("checklist");
+  const checklistRan = useRef(false);
+  useEffect(() => {
+    if (checklistRan.current || fileReady) return;
+    if (checklistParam === "upload" || checklistParam === "rerun") {
+      checklistRan.current = true;
+      actOnChecklist(checklistParam);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checklistParam, fileReady]);
 
   // Recipes for the start screen's rail
   useEffect(() => {
@@ -1164,28 +1124,6 @@ function WorkspaceContent() {
                 </div>
               </div>
 
-              {justAnswered && intents && intents.length > 0 && (
-                <div className="mt-6 flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-muted/40 px-4 py-3">
-                  <p className="text-[13px]">
-                    <span className="font-medium">
-                      Set up for {intents.map((i) => INTENT_LABELS[i]).join(" + ")}.
-                    </span>{" "}
-                    <span className="text-muted-foreground">
-                      {matchedSampleIds.length > 0
-                        ? "Your samples and starter ideas below are ready. Your first cleaned file is about 2 minutes away."
-                        : "Starter ideas below now cover a bit of everything. Your first cleaned file is about 2 minutes away."}
-                    </span>
-                  </p>
-                  <button
-                    onClick={() => setJustAnswered(false)}
-                    className="text-[12px] text-muted-foreground underline-offset-2 hover:underline"
-                    aria-label="Dismiss confirmation"
-                  >
-                    Got it
-                  </button>
-                </div>
-              )}
-
               <div className="mt-8 grid gap-10 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)] lg:gap-14">
                 <div>
                   <FileIntake
@@ -1205,19 +1143,33 @@ function WorkspaceContent() {
                   )}
 
                   <div className="mt-10">
-                    {intentsLoaded && intents === null ? (
-                      <OnboardingIntent onDone={handleIntentsDone} />
-                    ) : (
-                      <div className="border-b pb-3">
-                        <h2 className="text-[13px] font-medium">No file handy? Try a sample</h2>
-                      </div>
-                    )}
-                    {/* One-frame gate: render the list only after saved intents
-                        are read, so returning users never see it reorder */}
-                    <ul className="divide-y">
-                      {intentsLoaded && orderedSamples.map((sample) => {
-                        const picked = matchedSampleIds.includes(sample.id);
-                        return (
+                    <div className="border-b pb-3">
+                      <h2 className="text-[13px] font-medium">No file handy? Start here</h2>
+                    </div>
+                    <button
+                      onClick={() => loadSample(startSample.id)}
+                      disabled={loading}
+                      className="group mt-3 flex w-full items-center justify-between gap-4 rounded-xl border border-primary/30 bg-primary/[0.04] px-4 py-3.5 text-left transition-colors duration-150 hover:border-primary/50 hover:bg-primary/[0.07] disabled:opacity-50"
+                    >
+                      <span className="min-w-0">
+                        <span className="flex items-center gap-2 text-[14px] font-medium">
+                          {startSample.name}
+                          <span className="rounded-full border border-primary/30 bg-primary/10 px-1.5 py-px text-[11px] font-medium text-primary-accent">
+                            2 minutes
+                          </span>
+                        </span>
+                        <span className="mt-0.5 block text-[12px] leading-relaxed text-muted-foreground">{startSample.description}</span>
+                      </span>
+                      <span className="inline-flex flex-shrink-0 items-center gap-1 text-[12px] font-medium text-primary-accent">
+                        Open <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+                      </span>
+                    </button>
+                    <details className="group/more mt-4">
+                      <summary className="cursor-pointer list-none text-[12px] font-medium text-muted-foreground hover:text-foreground coarse:py-2">
+                        More samples <ChevronRight className="inline h-3.5 w-3.5 transition-transform group-open/more:rotate-90" aria-hidden />
+                      </summary>
+                      <ul className="mt-1 divide-y">
+                        {moreSamples.map((sample) => (
                           <li key={sample.id}>
                             <button
                               onClick={() => loadSample(sample.id)}
@@ -1225,14 +1177,7 @@ function WorkspaceContent() {
                               className="group flex w-full items-center justify-between gap-4 py-3 text-left transition-colors duration-150 hover:bg-accent/40 disabled:opacity-50 sm:-mx-2 sm:w-[calc(100%+1rem)] sm:rounded-lg sm:px-2"
                             >
                               <span className="min-w-0">
-                                <span className="flex items-center gap-2 text-[14px] font-medium">
-                                  {sample.name}
-                                  {picked && (
-                                    <span className="rounded-full border border-primary/30 bg-primary/10 px-1.5 py-px text-[11px] font-medium text-primary-accent">
-                                      Picked for you
-                                    </span>
-                                  )}
-                                </span>
+                                <span className="block text-[14px] font-medium">{sample.name}</span>
                                 <span className="mt-0.5 block text-[12px] leading-relaxed text-muted-foreground">{sample.description}</span>
                               </span>
                               <span className="inline-flex flex-shrink-0 items-center gap-1 text-[12px] font-medium text-muted-foreground transition-colors group-hover:text-foreground">
@@ -1240,9 +1185,9 @@ function WorkspaceContent() {
                               </span>
                             </button>
                           </li>
-                        );
-                      })}
-                    </ul>
+                        ))}
+                      </ul>
+                    </details>
                   </div>
                 </div>
 
@@ -1286,16 +1231,6 @@ function WorkspaceContent() {
                     </section>
                   )}
                   <GettingStarted onAct={actOnChecklist} />
-                  <section>
-                    <h2 className="flex items-center gap-2 text-[13px] font-medium">
-                      <Lightbulb className="h-4 w-4 text-primary-accent" aria-hidden /> Things you can say
-                    </h2>
-                    <ul className="mt-2 divide-y">
-                      {personalizedPrompts.map((p) => (
-                        <li key={p} className="py-2 text-[13px] text-muted-foreground">&ldquo;{p}&rdquo;</li>
-                      ))}
-                    </ul>
-                  </section>
                   {/* Keyboard-shortcuts card lives in the transform view via the
                       command palette: every shortcut it listed only works after
                       a file is loaded, so it earned no place on this screen. */}
@@ -1373,6 +1308,7 @@ function WorkspaceContent() {
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
+                <NextStepPill onAct={actOnChecklist} refreshKey={onboardingNonce} />
                 <CommandBarMeter refreshKey={healthNonce} className="hidden md:inline-flex" />
                 <TooltipProvider>
                   <div className="flex items-center gap-0.5">
@@ -1521,6 +1457,7 @@ function WorkspaceContent() {
                   offered stale. */}
               <RecipeHint
                 fileId={fileId}
+                columns={columns}
                 enabled={fileReady && showTransform && steps.length === 0 && !lastChange && !recipesOpen}
                 onApplied={(r) => handleRecipeApplied(r)}
                 onNeedsMatch={(need, from) => setMatchNeed({ need, from })}

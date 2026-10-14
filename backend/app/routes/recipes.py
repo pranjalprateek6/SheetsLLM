@@ -100,7 +100,10 @@ async def create_recipe(request: Request):
 
     # Recipe count is the Pro gate: free tier is capped, Pro is unlimited.
     limit = usage.recipe_limit(user_id)
-    if limit and len(db.list_recipes(user_id)) >= limit:
+    # A recipe saved from a bundled sample is practice: it never takes a slot
+    from app import onboarding
+
+    if limit and len(onboarding.counted_recipes(db.list_recipes(user_id))) >= limit:
         events.record(user_id, "paywall_hit", action="recipes", limit=limit)
         return _json_response(
             402, "RECIPE_LIMIT_REACHED",

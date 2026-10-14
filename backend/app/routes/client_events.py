@@ -19,6 +19,8 @@ router = APIRouter()
 # name → the property keys it may carry
 CLIENT_EVENTS: dict[str, tuple[str, ...]] = {
     "recipe_hint_shown": ("recipe_id",),
+    "checklist_dismissed": ("next",),
+    "sample_opened": ("sample_id",),
 }
 
 _MAX_VALUE = 120

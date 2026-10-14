@@ -49,3 +49,12 @@ async def update_settings(request: Request):
     if "privacy_mode" in changes:
         events.record(user_id, "privacy_mode_changed", strict=changes["privacy_mode"])
     return {"privacy_mode": db.privacy_mode_from_row(row), "email_reminders": (row or {}).get("email_reminders") is not False}
+
+
+@router.get("/onboarding")
+def get_onboarding(request: Request):
+    """The four first-loop milestones, read from the account."""
+    from app import onboarding
+
+    user_id = getattr(request.state, "user_id", "anonymous")
+    return onboarding.milestones(user_id)

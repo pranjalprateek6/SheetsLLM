@@ -533,6 +533,21 @@ def delete_auth_user(user_id: str) -> None:
 # ── Events (funnel analytics) ────────────────────────────────────────
 
 
+def user_events(user_id: str, names: list[str], limit: int = 2000) -> list[dict]:
+    """One user's events of the given names, newest first."""
+    resp = (
+        get_client()
+        .table("events")
+        .select("event,properties,created_at")
+        .eq("user_id", user_id)
+        .in_("event", names)
+        .order("created_at", desc=True)
+        .limit(limit)
+        .execute()
+    )
+    return resp.data or []
+
+
 def list_events(since_iso: str, names: list[str], limit: int = 20000) -> list[dict]:
     """Event rows of the given names since a time, oldest first, for the
     metrics page. Capped; the page says so if the cap is reached."""
