@@ -83,9 +83,16 @@ function AuthContent() {
     // Back to where the session ran out, when the page said so. Only a
     // path on this site: never an absolute or protocol-relative URL.
     const next = searchParams.get("next");
-    if (next && next.startsWith("/") && !next.startsWith("//")) {
-      router.replace(next);
-      return;
+    if (next) {
+      try {
+        // Resolve it and pin the origin: "//host", a backslash host and
+        // control characters all resolve elsewhere or are rejected
+        const u = new URL(next, window.location.origin);
+        if (u.origin === window.location.origin && next.startsWith("/") && !/[\\\t\n\r]/.test(next)) {
+          router.replace(u.pathname + u.search + u.hash);
+          return;
+        }
+      } catch {}
     }
     destinationAfterAuth().then((dest) => router.replace(dest));
   }, [user, router, searchParams]);
