@@ -11,21 +11,22 @@
 @layer base {
   :root {
     color-scheme: light;
-    /* Neutrals: cool zinc on pure white. Panels are white on a barely-grey
-       canvas, separated by a hairline and a soft two-layer shadow; the only
-       colour in the chrome is the violet of the mark. */
-    --background: 0 0% 100%;
-    --canvas: 240 5% 98.5%;
+    /* Neutrals: cool zinc on a soft grey page. Cards and popovers stay
+       white so they lift off it, separated by a hairline and a soft
+       two-layer shadow; the only colour in the chrome is the violet of
+       the mark. */
+    --background: 240 5% 96%;
+    --canvas: 240 5% 95%;
     --foreground: 240 10% 4%;
-    --muted: 240 5% 96%;
+    --muted: 240 5% 92.5%;
     --muted-foreground: 240 4% 42%;
     --soft: 240 6% 22%;
-    --faint: 240 4% 46%;
+    --faint: 240 4% 42%;
     --card: 0 0% 100%;
     --card-foreground: 240 10% 4%;
     --popover: 0 0% 100%;
     --popover-foreground: 240 10% 4%;
-    --border: 240 6% 90%;
+    --border: 240 6% 87%;
     /* 3.2:1 on white, the WCAG 1.4.11 bound for a control's outline */
     --input: 240 5% 58%;
     --ring: 251 70% 57%;
@@ -36,9 +37,9 @@
     --primary: 251 70% 57%;
     --primary-accent: 251 62% 52%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 240 5% 96%;
+    --secondary: 240 5% 92.5%;
     --secondary-foreground: 240 10% 4%;
-    --accent: 240 5% 96%;
+    --accent: 240 5% 92.5%;
     --accent-foreground: 240 10% 4%;
 
     /* Semantic fills carry white text; semantic text has its own step,
