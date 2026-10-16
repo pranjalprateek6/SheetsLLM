@@ -3,7 +3,7 @@ import { useRef, useState, useMemo, useCallback, useEffect } from "react";
 import type { GridView } from "@/lib/rows";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
-  ArrowDown, ArrowUp, ArrowUpDown, Calendar, CalendarDays, Check, ChevronDown, Copy, Filter, Link2, Hash,
+  ArrowDown, ArrowUp, ArrowUpDown, Calendar, CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, Copy, Filter, Link2, Hash,
   PaintBucket, Pencil, Replace, Rows3, Rows4, Scissors, ChefHat, ToggleLeft, Trash2, Type,
   X,
 } from "lucide-react";
@@ -233,6 +233,30 @@ export default function DataGrid({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [head.join("|"), colWidths, density, onColumnWidths]);
 
+  // Columns past either edge: a file wider than the frame says so with a
+  // fade and an arrow on that side, not only with a scrollbar at the bottom
+  const [edges, setEdges] = useState({ left: false, right: false });
+  const readEdges = useCallback(() => {
+    const el = parentRef.current;
+    if (!el) return;
+    const left = el.scrollLeft > 1;
+    const right = el.scrollLeft + el.clientWidth < el.scrollWidth - 1;
+    setEdges((e) => (e.left === left && e.right === right ? e : { left, right }));
+  }, []);
+  useEffect(() => {
+    readEdges();
+    const el = parentRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(readEdges);
+    ro.observe(el);
+    if (el.firstElementChild) ro.observe(el.firstElementChild);
+    return () => ro.disconnect();
+  }, [readEdges, head.length, colWidths]);
+  const pageSideways = (dir: 1 | -1) => {
+    const el = parentRef.current;
+    if (el) el.scrollBy({ left: dir * Math.max(200, (el.clientWidth - 50) * 0.7), behavior: "smooth" });
+  };
+
   // A column reads as numeric if its schema dtype says so, or (for
   // transform-created columns with no schema yet) its first value is a number.
   // Numbers right-align so decimal places line up for comparison.
@@ -435,9 +459,11 @@ export default function DataGrid({
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-card">
+      <div className="group/grid relative flex min-h-0 flex-1 flex-col">
       <div
         ref={parentRef}
-        className="overflow-auto flex-1"
+        onScroll={readEdges}
+        className="grid-scroll overflow-auto flex-1"
       >
         <table className="min-w-full border-separate border-spacing-0 text-sm font-sans" style={{ tableLayout: "fixed" }}>
           {/* Column letter row. The table keeps separate borders, drawn on the
@@ -891,6 +917,33 @@ export default function DataGrid({
             )}
           </tbody>
         </table>
+      </div>
+      {edges.left && (
+        <>
+          <div aria-hidden className="pointer-events-none absolute bottom-3 left-[50px] top-0 z-20 w-10 bg-gradient-to-r from-card to-transparent" />
+          <button
+            type="button"
+            onClick={() => pageSideways(-1)}
+            aria-label="Scroll to the columns on the left"
+            className="absolute left-[58px] top-1/2 z-30 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border bg-card/95 text-muted-foreground opacity-70 shadow-sm transition-opacity hover:text-foreground group-hover/grid:opacity-100"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+        </>
+      )}
+      {edges.right && (
+        <>
+          <div aria-hidden className="pointer-events-none absolute bottom-3 right-3 top-0 z-20 w-10 bg-gradient-to-l from-card to-transparent" />
+          <button
+            type="button"
+            onClick={() => pageSideways(1)}
+            aria-label="Scroll to the columns on the right"
+            className="absolute right-5 top-1/2 z-30 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border bg-card/95 text-muted-foreground opacity-70 shadow-sm transition-opacity hover:text-foreground group-hover/grid:opacity-100"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        </>
+      )}
       </div>
       {cellHint && onOp && rows.length > 0 && (
         <div className="flex flex-shrink-0 items-center justify-between gap-2 border-t bg-muted/40 px-3 py-1 text-[11px] text-muted-foreground">
