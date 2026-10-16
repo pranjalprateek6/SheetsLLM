@@ -15,6 +15,7 @@ import asyncio
 import json
 import threading
 import time
+from collections import OrderedDict
 
 from fastapi import APIRouter, Request, Response
 
@@ -33,22 +34,23 @@ _running = asyncio.Semaphore(MAX_RUNNING)
 # Each (visitor, event) is recorded at most once in this many seconds
 FUNNEL_WINDOW = 600
 _FUNNEL_MAX_KEYS = 5000
-_funnel_seen: dict[tuple[str, str], float] = {}
+# Least recently seen first: a full table evicts the oldest key, never refuses
+# a new one, so flooding it can only over-count, not silence the funnel
+_funnel_seen: OrderedDict[tuple[str, str], float] = OrderedDict()
 _funnel_lock = threading.Lock()
 
 
 def _first_in_window(visitor: str, event: str) -> bool:
     now = time.monotonic()
     with _funnel_lock:
-        if len(_funnel_seen) >= _FUNNEL_MAX_KEYS:
-            for key in [k for k, t in _funnel_seen.items() if now - t > FUNNEL_WINDOW]:
-                del _funnel_seen[key]
-            if len(_funnel_seen) >= _FUNNEL_MAX_KEYS:
-                return False
-        last = _funnel_seen.get((visitor, event))
+        key = (visitor, event)
+        last = _funnel_seen.get(key)
         if last is not None and now - last < FUNNEL_WINDOW:
             return False
-        _funnel_seen[(visitor, event)] = now
+        _funnel_seen[key] = now
+        _funnel_seen.move_to_end(key)
+        while len(_funnel_seen) > _FUNNEL_MAX_KEYS:
+            _funnel_seen.popitem(last=False)
         return True
 
 

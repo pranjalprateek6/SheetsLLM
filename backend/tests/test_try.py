@@ -146,3 +146,14 @@ def test_the_limiter_forgets_idle_keys(monkeypatch):
     security._rate_store["try:old"] = [0.0]
     security.check_rate_limit("try:new")
     assert "try:old" not in security._rate_store and "try:new" in security._rate_store
+
+
+def test_a_flooded_funnel_table_evicts_the_oldest_and_keeps_counting(monkeypatch):
+    monkeypatch.setattr(route, "_FUNNEL_MAX_KEYS", 3)
+    route._funnel_seen.clear()
+    for i in range(10):
+        assert route._first_in_window(f"try:forged{i}", "try_started")
+    assert len(route._funnel_seen) == 3
+    # A real visitor arriving after the flood is still counted
+    assert route._first_in_window("try:real", "try_started")
+    assert not route._first_in_window("try:real", "try_started")
