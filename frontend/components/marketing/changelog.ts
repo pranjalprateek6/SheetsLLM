@@ -10,6 +10,18 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: "2026-10-16",
+    title: "Try it without signing up, light and dark everywhere, and a grid that shows its width",
+    items: [
+      "Try it with no account: clean a month of messy orders with a few clicks, then run the same steps on November's file. Sign up and the steps come with you.",
+      "Every page follows a light or dark choice, the home page and sign-in included, and light mode sits on a soft grey.",
+      "A file wider than the grid fades on the side with more columns and has an arrow to page across.",
+      "The grid's header stays solid while rows scroll under it.",
+      "Next step in the step list puts the cursor in Chef's box.",
+      "A chart groups rows with nothing in the column under (empty).",
+    ],
+  },
+  {
     date: "2026-10-14",
     title: "Recipes that run themselves, Chef steps you see before they land, and every row in the grid",
     items: [
@@ -22,6 +34,8 @@ export const CHANGELOG: ChangelogEntry[] = [
       "Click a step to see the file as it was then, without going back.",
       "Sign in from the email link, or ask for a sign-in link instead of a password.",
       "The Free plan holds three recipes, and a practice recipe from the sample does not count.",
+      "Ctrl or Cmd K opens a command palette that reaches every page and action, and ? lists every shortcut.",
+      "Download a record of your account: settings, recipes, and every file with its steps.",
     ],
   },
   {
