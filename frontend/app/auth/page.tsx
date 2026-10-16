@@ -7,6 +7,7 @@ import { motion } from "framer-motion";
 import { AlertCircle, Check, CheckCircle2, MailCheck, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { ThemeToggle } from "@/components/Header";
+import { peekTrySteps } from "@/lib/try";
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
 import { track } from "@/lib/track";
 import { cn } from "@/lib/utils";
@@ -31,6 +32,9 @@ function GoogleIcon() {
  *  workspace onboarding is the right first screen; files mean this is a
  *  returning user who wants the dashboard. */
 async function destinationAfterAuth(): Promise<string> {
+  // Fixes kept on the try page come along, even when the email
+  // confirmation lost the ?next= that carried them
+  if (peekTrySteps()) return "/workspace?try=1";
   // Until the first recipe is saved the workspace is where the next step
   // is; after that the Files list, with its due recipes, is home
   try {

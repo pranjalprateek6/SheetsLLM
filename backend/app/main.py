@@ -44,6 +44,7 @@ _ROUTE_TIMEOUTS = {
     "/files": 90,
     "/shared": 60,
     "/schedules": 300,  # fetches and runs every recipe due today
+    "/try": 30,  # the try page replays its steps on a 1,000-row sample
 }
 _DEFAULT_TIMEOUT = 10
 
@@ -51,6 +52,7 @@ _DEFAULT_TIMEOUT = 10
 # not the number of seconds.
 _TIMEOUT_WHAT = {
     "/upload": "The upload",
+    "/try": "That fix",
     "/transform/op": "That fix",
     "/download": "The export",
     "/chat": "Chef",

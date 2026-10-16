@@ -75,6 +75,8 @@ EVENTS = frozenset({
     "signed_up_from", "tool_cta_clicked", "tool_run",
     # a copy of the account taken from the account page
     "account_exported",
+    # the try page: opened, a fix applied, the steps run on next month's file
+    "try_started", "try_fix_applied", "try_replayed", "try_carried_over",
 })
 
 

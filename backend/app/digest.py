@@ -41,12 +41,14 @@ TROUBLE = [
 ]
 # Read for the loop numbers, not listed as lines of their own
 LOOP_EVENTS = ["reminder_sent", "signed_up_from", "tool_cta_clicked"]
+# The try page's funnel, recorded under a hashed visitor key ("try:...")
+TRY_EVENTS = ["try_started", "try_fix_applied", "try_replayed"]
 MONEY = [
     ("checkout_started", "checkouts started"),
     ("subscription_activated", "subscriptions activated"),
     ("waitlist_joined", "waitlist joins"),
 ]
-EVENT_NAMES = [name for name, _ in ACTIVITY + TROUBLE + MONEY] + LOOP_EVENTS
+EVENT_NAMES = [name for name, _ in ACTIVITY + TROUBLE + MONEY] + LOOP_EVENTS + TRY_EVENTS
 # Enough history to tell a new user from a returning one
 LOOKBACK_DAYS = 60
 
@@ -60,6 +62,9 @@ def summarise(rows: list[dict], now: _dt.datetime, *, recipes_total: int | None 
     seven days before. `rows` should reach back LOOKBACK_DAYS."""
     # The anonymous user is the dev and end-to-end account, not a person
     rows = [r for r in rows if r.get("user_id") != "anonymous"]
+    # A try-page visitor has no account, so is not one of the people below
+    tried = [r for r in rows if str(r.get("user_id") or "").startswith("try:")]
+    rows = [r for r in rows if not str(r.get("user_id") or "").startswith("try:")]
     this_start, last_start = now - _dt.timedelta(days=7), now - _dt.timedelta(days=14)
     this_week, last_week = _week(rows, this_start, now), _week(rows, last_start, this_start)
 
@@ -128,6 +133,18 @@ def summarise(rows: list[dict], now: _dt.datetime, *, recipes_total: int | None 
     )
     tool_clicks = sum(1 for r in this_week if r.get("event") == "tool_cta_clicked")
 
+    # The try page: visitors who opened it, fixed something, ran the steps
+    # on next month's file, and the signups it sent
+    tried_week = _week(tried, this_start, now)
+
+    def visitors(name: str) -> int:
+        return len({r.get("user_id") for r in tried_week if r.get("event") == name})
+
+    try_signups = sum(
+        1 for r in this_week
+        if r.get("event") == "signed_up_from" and (r.get("properties") or {}).get("from") == "try"
+    )
+
     return {
         "loop": {
             "recipes_run_twice": sum(1 for n in runs_per_recipe.values() if n >= 2),
@@ -136,6 +153,10 @@ def summarise(rows: list[dict], now: _dt.datetime, *, recipes_total: int | None 
             "reminders_converted": converted,
             "tool_clicks": tool_clicks,
             "tool_signups": tool_signups,
+            "try_started": visitors("try_started"),
+            "try_fixed": visitors("try_fix_applied"),
+            "try_replayed": visitors("try_replayed"),
+            "try_signups": try_signups,
         },
         "activation": {"cohort": len(cohort), "activated": len(activated)},
         "from": this_start.date().isoformat(),
@@ -193,6 +214,11 @@ def email_text(summary: dict) -> tuple[str, str]:
             lines.append(f"  {loop.get('reminders_converted', 0)} of {loop.get('reminders')} reminders in the last two weeks led to a run within 7 days.")
         if loop.get("tool_clicks") or loop.get("tool_signups"):
             lines.append(f"  The free tools: {loop.get('tool_clicks', 0)} clicks to the app, {loop.get('tool_signups', 0)} signups this week.")
+        if loop.get("try_started") or loop.get("try_signups"):
+            lines.append(
+                f"  The try page: {loop.get('try_started', 0)} opened it, {loop.get('try_fixed', 0)} fixed something, "
+                f"{loop.get('try_replayed', 0)} ran it on November, {loop.get('try_signups', 0)} signed up this week."
+            )
     trouble = [p for p in summary["trouble"] if p["this"] or p["last"]]
     lines += ["", "Trouble"]
     lines += [_line(p["label"], p["this"], p["last"]) for p in trouble] if trouble else ["- nothing this week or last"]

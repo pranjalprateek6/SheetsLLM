@@ -32,20 +32,21 @@ const REGIONS = ["North", "South", "East", "West"];
 const STATUSES = ["Paid", "Paid", "Paid", "Pending", "Refunded"];
 const NAMES = ["ada", "grace", "linus", "ken", "dennis", "margaret", "barbara", "tim", "alan", "radia"];
 
-function row(i, r) {
+function row(i, r, month = 10) {
   const region = r() < 0.23 ? "" : (r() < 0.3 ? REGIONS[Math.floor(r() * 4)].toLowerCase() : REGIONS[Math.floor(r() * 4)]);
   const day = 1 + Math.floor(r() * 28);
-  const date = r() < 0.2 ? `${String(day).padStart(2, "0")}/10/2026` : `2026-10-${String(day).padStart(2, "0")}`;
+  const mm = String(month).padStart(2, "0");
+  const date = r() < 0.2 ? `${String(day).padStart(2, "0")}/${mm}/2026` : `2026-${mm}-${String(day).padStart(2, "0")}`;
   const mrp = 100 + Math.floor(r() * 2900);
   const cost = Math.floor(mrp * (0.6 + r() * 0.3));
   const email = `${NAMES[Math.floor(r() * NAMES.length)]}${Math.floor(r() * 400)}@example.com`;
   return [`ORD${String(1000 + i).padStart(5, "0")}`, email, region, date, String(mrp), String(cost), STATUSES[Math.floor(r() * STATUSES.length)]];
 }
 
-function build(count, seed, extraDuplicates) {
+function build(count, seed, extraDuplicates, month = 10) {
   const r = rng(seed);
   const rows = [];
-  for (let i = 0; i < count; i++) rows.push(row(i, r));
+  for (let i = 0; i < count; i++) rows.push(row(i, r, month));
   // exact duplicates of existing rows, spread through the file
   for (let d = 0; d < extraDuplicates; d++) {
     const src = rows[Math.floor(r() * count)];
@@ -79,6 +80,17 @@ if (process.argv.includes("--samples")) {
       ["North", "Ann Kapoor", 42000], ["South", "Ben Iyer", 38000], ["East", "Cyrus Mehta", 45000], ["West", "Dee Nair", 40000],
     ]),
   );
+}
+
+// The try page's November (--try): a month of its own, new orders and
+// November dates with the same kinds of mess, so the replay shows a
+// different file cleaned by the same steps. October is the shared sample.
+if (process.argv.includes("--try")) {
+  const tryNov = build(1028, 20261102, 12, 11).map((r) => { r[0] = `ORD${String(Number(r[0].slice(3)) + 2000).padStart(5, "0")}`; return r; });
+  const backend = join(here, "..", "..", "..", "backend", "app", "samples");
+  writeFileSync(join(backend, "orders_oct.csv"), csv(HEADERS, oct));
+  writeFileSync(join(backend, "orders_nov.csv"), csv(HEADERS, tryNov));
+  console.log(`backend/app/samples/orders_nov.csv: ${tryNov.length} rows of November`);
 }
 
 const empty = oct.filter((r) => r[2] === "").length;

@@ -50,8 +50,8 @@ export default function LandingPage() {
                   <Link href="/auth?mode=signup">Start free</Link>
                 </Button>
                 <Button variant="glass" className="group h-9 gap-1.5 px-4" asChild>
-                  <Link href="/tools">
-                    Free CSV tools
+                  <Link href="/try">
+                    Try it, no sign-up
                     <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
                   </Link>
                 </Button>
