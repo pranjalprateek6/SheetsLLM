@@ -31,6 +31,21 @@ function GoogleIcon() {
 /** Route by what the account actually contains: no files yet means the
  *  workspace onboarding is the right first screen; files mean this is a
  *  returning user who wants the dashboard. */
+/** Whether the Supabase project has Google sign-in on, from its public
+ *  settings. Off when the settings can't be read. */
+async function googleEnabled(): Promise<boolean> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !key) return false;
+  try {
+    const r = await fetch(`${url}/auth/v1/settings`, { headers: { apikey: key } });
+    const d = await r.json();
+    return d?.external?.google === true;
+  } catch {
+    return false;
+  }
+}
+
 async function destinationAfterAuth(): Promise<string> {
   // Fixes kept on the try page come along, even when the email
   // confirmation lost the ?next= that carried them
@@ -132,6 +147,17 @@ function AuthContent() {
     setSuccess(null);
     setConfirmationSent(false);
   };
+
+  // Google shows only when the project has it switched on: a disabled
+  // provider sends the browser to a bare JSON error page on Supabase
+  const [googleOn, setGoogleOn] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    googleEnabled().then((on) => alive && setGoogleOn(on));
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const handleGoogle = async () => {
     setError(null);
@@ -279,7 +305,7 @@ function AuthContent() {
                 )}
               </p>
 
-              {mode !== "forgot" && (
+              {mode !== "forgot" && googleOn && (
                 <>
                   <Button
                     type="button"
@@ -304,7 +330,7 @@ function AuthContent() {
                 </>
               )}
 
-              <form onSubmit={handleSubmit} className={cn("space-y-4", mode === "forgot" && "mt-6")}>
+              <form onSubmit={handleSubmit} className={cn("space-y-4", (mode === "forgot" || !googleOn) && "mt-6")}>
                 <div className="space-y-1.5">
                   <Label htmlFor="email">Email</Label>
                   <Input
