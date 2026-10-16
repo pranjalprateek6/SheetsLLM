@@ -143,7 +143,7 @@ def test_the_sample_copy_is_private_to_the_process():
 def test_the_limiter_forgets_idle_keys(monkeypatch):
     monkeypatch.setattr(security, "_SWEEP_EVERY", 1)
     security._rate_store.clear()
-    security._rate_store["try:old"] = [0.0]
+    security._rate_store["try:old"] = [__import__("time").monotonic() - 2 * security._IDLE_AFTER]
     security.check_rate_limit("try:new")
     assert "try:old" not in security._rate_store and "try:new" in security._rate_store
 
