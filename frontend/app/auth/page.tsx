@@ -6,6 +6,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { AlertCircle, Check, CheckCircle2, MailCheck, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import { ThemeToggle } from "@/components/Header";
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
 import { track } from "@/lib/track";
 import { cn } from "@/lib/utils";
@@ -220,7 +221,10 @@ function AuthContent() {
   const passwordLongEnough = password.length >= 6;
 
   return (
-    <div className="flex min-h-[100dvh] items-center justify-center px-4">
+    <div className="relative flex min-h-[100dvh] items-center justify-center px-4">
+      <div className="absolute right-4 top-4">
+        <ThemeToggle />
+      </div>
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}

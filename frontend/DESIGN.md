@@ -15,9 +15,10 @@ and that one disagree, that file is right and this one is stale. Fix it.
 ## The organizing idea: one world, two densities
 
 Signed out (landing, `/product/*`, pricing, `/tools`, auth) and signed in
-(workspace, files, recipes, account) share every token. The public site is
-always dark (`forcedTheme` in `theme-provider.tsx`); the app defaults to dark
-and keeps the reader's toggle.
+(workspace, files, recipes, account) share every token. Every page defaults
+to dark and follows the reader's toggle, which sits in the header on the
+public site and in the corner of the sign-in page. Hover fills use
+`foreground` at low alpha, never white, so they read in both themes.
 
 - **Signed out** has air: a 64px hero, 48px two-line section heads with the copy
   on the right, py-20 to py-28 sections split by full-width hairlines, and live
@@ -42,7 +43,8 @@ flipped.
 `#23252a` hairlines. Text steps down in four: `--foreground` `#f7f8f8`, `--soft`
 `#d0d6e0` for lead copy, `--muted-foreground` `#8a8f98`, and `--faint` `#62666d`,
 which is decorative only (figure labels, separators; it is under 4.5:1). Light is
-pure white with a barely-grey `--canvas` and near-black ink, for the app only.
+a soft zinc grey page (`240 5% 96%`) with white cards and near-black ink, never
+bare white.
 
 **Primary: the violet of the mark.** `--primary` (`251 70% 57%` light,
 `251 72% 60%` dark) is the fill white text sits on. `--primary-accent`

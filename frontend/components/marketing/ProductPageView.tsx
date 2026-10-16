@@ -20,8 +20,8 @@ export default function ProductPageView({ page }: { page: ProductPage }) {
             tilted and drifting, and a scrim only where the words sit, so the
             picture reads on the right and the headline stays crisp on the left */}
         <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-          <div className="absolute right-[4%] top-[6%] h-[70%] w-[52%] rounded-full bg-primary/30 blur-[120px] dark:bg-primary/40" />
-          <div className="absolute right-[-4%] top-[10%] w-[64%] origin-top-right rotate-[-4deg] scale-105 opacity-30 [mask-image:radial-gradient(95%_90%_at_60%_45%,black_65%,transparent_100%)] sm:opacity-100">
+          <div className="absolute right-[4%] top-[6%] h-[70%] w-[52%] rounded-full bg-primary/[0.15] blur-[120px] dark:bg-primary/[0.2]" />
+          <div className="absolute right-[-4%] top-[10%] w-[64%] origin-top-right rotate-[-4deg] scale-105 opacity-[0.15] [mask-image:radial-gradient(95%_90%_at_60%_45%,black_65%,transparent_100%)] sm:opacity-50">
             <div className="animate-hero-drift drop-shadow-[0_30px_60px_rgba(0,0,0,0.35)]">
               <Visual name={first.visual} />
             </div>

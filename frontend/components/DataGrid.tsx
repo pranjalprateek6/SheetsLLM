@@ -439,10 +439,12 @@ export default function DataGrid({
         ref={parentRef}
         className="overflow-auto flex-1"
       >
-        <table className="min-w-full text-sm font-sans border-collapse" style={{ tableLayout: "fixed" }}>
-          {/* Column letter row */}
+        <table className="min-w-full border-separate border-spacing-0 text-sm font-sans" style={{ tableLayout: "fixed" }}>
+          {/* Column letter row. The table keeps separate borders, drawn on the
+              cells: with collapsed borders Chrome paints a sticky header's
+              rows short, and the rows scrolling under it show through. */}
           <thead className="sticky top-0 z-10 bg-card">
-            <tr className="border-b bg-muted/50">
+            <tr className="[background:linear-gradient(hsl(var(--muted)/.5),hsl(var(--muted)/.5)),hsl(var(--card))] [&>th]:border-b">
               <th className="w-[50px] min-w-[50px] text-center text-[11px] text-muted-foreground py-1 sticky left-0 z-20 [background:linear-gradient(hsl(var(--muted)/.5),hsl(var(--muted)/.5)),hsl(var(--card))]">
                 &nbsp;
               </th>
@@ -457,7 +459,7 @@ export default function DataGrid({
               ))}
             </tr>
             {/* Column name row */}
-            <tr ref={headRowRef} className="border-b bg-muted/50">
+            <tr ref={headRowRef} className="[background:linear-gradient(hsl(var(--muted)/.5),hsl(var(--muted)/.5)),hsl(var(--card))] [&>th]:border-b">
               <th className="w-[50px] min-w-[50px] sticky left-0 z-20 [background:linear-gradient(hsl(var(--muted)/.5),hsl(var(--muted)/.5)),hsl(var(--card))]">&nbsp;</th>
               {head.map((h) => {
                 const meta = columnMeta?.[h];
@@ -763,7 +765,7 @@ export default function DataGrid({
               })}
             </tr>
             {showStats && (
-              <tr className="border-b bg-muted/30">
+              <tr className="[background:linear-gradient(hsl(var(--muted)/.3),hsl(var(--muted)/.3)),hsl(var(--card))] [&>th]:border-b">
                 <th className="w-[50px] min-w-[50px] sticky left-0 z-20 py-1 text-[10px] font-normal text-muted-foreground [background:linear-gradient(hsl(var(--muted)/.3),hsl(var(--muted)/.3)),hsl(var(--card))]">stats</th>
                 {head.map((h) => {
                   const meta = columnMeta?.[h];
@@ -836,7 +838,7 @@ export default function DataGrid({
                   return (
                     <tr
                       key={virtualRow.index}
-                      className="group/row border-b border-border/60 transition-colors"
+                      className="group/row transition-colors [&>td]:border-b [&>td]:border-b-border/60"
                       style={{ height: virtualRow.size }}
                     >
                       <td className="w-[46px] min-w-[46px] border-r bg-card text-center text-[11px] text-muted-foreground tabular-nums select-none sticky left-0 z-[5] group-hover/row:bg-accent">

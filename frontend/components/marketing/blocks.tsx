@@ -134,8 +134,8 @@ export function CrossLinks({ current }: { current?: string }) {
           href={p.href}
           aria-current={p.slug === current ? "page" : undefined}
           className={cn(
-            "group flex min-h-[180px] flex-col justify-between gap-6 border-b p-6 transition-colors hover:bg-white/[0.02] lg:border-b-0",
-            p.slug === current && "bg-white/[0.02]",
+            "group flex min-h-[180px] flex-col justify-between gap-6 border-b p-6 transition-colors hover:bg-foreground/[0.02] lg:border-b-0",
+            p.slug === current && "bg-foreground/[0.02]",
           )}
         >
           <span className="text-[19px] font-medium leading-snug tracking-[-0.01em]">{p.headline}</span>

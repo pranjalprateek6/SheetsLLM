@@ -173,8 +173,11 @@ async def auth_middleware(request: Request, call_next):
         request.state.user_id = user["user_id"]
         request.state.email = user.get("email", "")
     except Exception as exc:
-        if ALLOW_ANONYMOUS:
-            # Explicit dev-mode opt-in: proceed as "anonymous"
+        sent_token = request.headers.get("authorization", "").lower().startswith("bearer ")
+        if ALLOW_ANONYMOUS and not sent_token:
+            # Explicit dev-mode opt-in: a request with no token proceeds as
+            # "anonymous". One that sent a token which failed is still a 401,
+            # so a signed-in person never lands in the empty anonymous account.
             request.state.user_id = "anonymous"
             request.state.email = ""
         else:
