@@ -33,6 +33,7 @@ import { type SchemaColumn } from "@/components/SchemaPanel";
 import { listLookups, uploadAndLink, type Lookup } from "@/lib/lookups";
 import { fetchRows, isViewActive, PAGE_SIZE, type GridView } from "@/lib/rows";
 import { takeToolResult } from "@/lib/loops";
+import { takeTrySteps } from "@/lib/try";
 const LookupsPanel = dynamic(() => import("@/components/LookupsPanel"));
 const SchemaPanel = dynamic(() => import("@/components/SchemaPanel"));
 const ChartPanel = dynamic(() => import("@/components/ChartPanel"));
@@ -1088,6 +1089,56 @@ function WorkspaceContent() {
     if (file) void onUpload(file);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [importParam, fileReady]);
+
+  // From the try page: /workspace?try=1 opens the same sample and applies
+  // the fixes made there, as ordinary one-click steps, then offers to save
+  // them as a recipe
+  const tryParam = useSearchParams().get("try");
+  const tryRan = useRef(false);
+  useEffect(() => {
+    if (tryRan.current || tryParam !== "1" || fileReady) return;
+    tryRan.current = true;
+    const kept = takeTrySteps();
+    if (!kept?.length) return;
+    void (async () => {
+      const sample = SAMPLE_DATASETS.find((s) => s.id === "orders");
+      if (!sample) return;
+      setLoading(true);
+      try {
+        const res = await fetch(sample.file);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const file = new File([await res.blob()], sample.uploadName, { type: "text/csv" });
+        const id = await onUpload(file, undefined, sample.suggestions);
+        if (!id) return;
+        setOpenSample(sample);
+        let applied = 0;
+        for (const req of kept) {
+          const r = await applyOp(id, req, "try");
+          previewHandler({
+            columns: r.preview.columns,
+            rows: r.preview.rows,
+            totalRows: r.preview.total_rows,
+            totalColumns: r.preview.total_columns,
+            stepNumber: r.step_number,
+            instruction: r.instruction,
+          });
+          applied += 1;
+        }
+        track("try_carried_over", { steps: applied });
+        toast.success(`Your ${applied} step${applied === 1 ? "" : "s"} from the try page are here.`, {
+          description: "Save them as a recipe and next month's file is one drop.",
+          action: { label: "Save recipe", onClick: () => setRecipesOpen(true) },
+          duration: 12000,
+        });
+      } catch (e) {
+        console.error("Carrying the try page's steps failed:", e);
+        toast.error("Your steps from the try page didn't all apply. The sample is open to fix by hand.");
+      } finally {
+        setLoading(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tryParam, fileReady]);
 
   // From the dashboard's checklist: /workspace?checklist=upload|rerun
   const checklistParam = useSearchParams().get("checklist");

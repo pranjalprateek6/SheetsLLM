@@ -14,6 +14,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     ...PRODUCT_PAGES.map((p) => ({ url: `${BASE}${p.href}`, changeFrequency: "monthly" as const, priority: 0.8 })),
     { url: `${BASE}/pricing`, changeFrequency: "monthly", priority: 0.8 },
     { url: `${BASE}/tools`, changeFrequency: "monthly", priority: 0.9 },
+    { url: `${BASE}/try`, changeFrequency: "monthly", priority: 0.9 },
     ...TOOLS.map((t) => ({ url: `${BASE}${t.href}`, changeFrequency: "monthly" as const, priority: 0.9 })),
     ...LEGAL_DOCS.map((d) => ({ url: `${BASE}${d.href}`, changeFrequency: "yearly" as const, priority: 0.3 })),
     { url: `${BASE}/help`, changeFrequency: "monthly", priority: 0.6 },

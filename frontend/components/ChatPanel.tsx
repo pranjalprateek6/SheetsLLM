@@ -167,10 +167,12 @@ export default function ChatPanel({
     if (open) setTimeout(() => inputRef.current?.focus(), 100);
   }, [open]);
 
-  // Seed the input from outside (grid column menu → "Ask Chef")
+  // Seed the input from outside (grid column menu → "Ask Chef"). An empty
+  // prefill is the step rail's "Next step": no text, just the cursor in
+  // the box, which matters most when the panel is already open
   useEffect(() => {
-    if (!prefill?.text) return;
-    setInput(prefill.text);
+    if (!prefill) return;
+    if (prefill.text) setInput(prefill.text);
     setTimeout(() => {
       const el = inputRef.current;
       if (el) {

@@ -79,7 +79,8 @@ def test_the_digest_measures_the_habit():
     ]
     loop = digest.summarise(rows, now)["loop"]
     assert loop == {"recipes_run_twice": 1, "recipes_run": 2, "reminders": 2, "reminders_converted": 1,
-                    "tool_clicks": 1, "tool_signups": 1}
+                    "tool_clicks": 1, "tool_signups": 1,
+                    "try_started": 0, "try_fixed": 0, "try_replayed": 0, "try_signups": 0}
     _, text = digest.email_text(digest.summarise(rows, now))
     assert "1 of 2 recipes run in the last 60 days ran on two or more files." in text
     assert "1 of 2 reminders in the last two weeks led to a run within 7 days." in text

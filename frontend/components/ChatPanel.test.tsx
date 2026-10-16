@@ -423,3 +423,24 @@ describe("ChatPanel privacy and receipts", () => {
     expect(await screen.findByText("Applied as step 1")).toBeInTheDocument();
   });
 });
+
+describe("ChatPanel prefill", () => {
+  beforeEach(() => server.use(chatHistory(), insights([])));
+
+  it("an empty prefill (the step rail's Next step) puts the cursor in the box of an open panel", async () => {
+    const { rerender } = render(<ChatPanel fileId="f1" open onPreview={noop} />);
+    const box = await screen.findByRole("textbox");
+    box.blur();
+    expect(box).not.toHaveFocus();
+    rerender(<ChatPanel fileId="f1" open onPreview={noop} prefill={{ text: "", nonce: 1 }} />);
+    await waitFor(() => expect(box).toHaveFocus());
+    expect(box).toHaveValue("");
+  });
+
+  it("a prefill with text fills the box and focuses it", async () => {
+    render(<ChatPanel fileId="f1" open onPreview={noop} prefill={{ text: "Trim Region", nonce: 2 }} />);
+    const box = await screen.findByRole("textbox");
+    await waitFor(() => expect(box).toHaveFocus());
+    expect(box).toHaveValue("Trim Region");
+  });
+});

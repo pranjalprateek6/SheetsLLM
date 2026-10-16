@@ -24,6 +24,7 @@ CLIENT_EVENTS: dict[str, tuple[str, ...]] = {
     "signed_up_from": ("from",),
     "tool_cta_clicked": ("tool",),
     "tool_run": ("tool",),
+    "try_carried_over": ("steps",),
 }
 
 _MAX_VALUE = 120
