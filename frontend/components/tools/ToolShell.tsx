@@ -33,7 +33,7 @@ export function ToolRow({ current, tools: given }: { current?: string; tools?: T
         <Link
           key={t.href}
           href={t.href}
-          className="group flex min-h-[220px] flex-col border-b p-6 transition-colors hover:bg-white/[0.02] lg:border-b-0"
+          className="group flex min-h-[220px] flex-col border-b p-6 transition-colors hover:bg-foreground/[0.02] lg:border-b-0"
         >
           {/* Icon, then every title on the same line across the row, and Open
               pinned to the foot however long the description runs */}

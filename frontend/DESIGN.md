@@ -15,9 +15,10 @@ and that one disagree, that file is right and this one is stale. Fix it.
 ## The organizing idea: one world, two densities
 
 Signed out (landing, `/product/*`, pricing, `/tools`, auth) and signed in
-(workspace, files, recipes, account) share every token. The public site is
-always dark (`forcedTheme` in `theme-provider.tsx`); the app defaults to dark
-and keeps the reader's toggle.
+(workspace, files, recipes, account) share every token. Every page defaults
+to dark and follows the reader's toggle, which sits in the header on the
+public site and in the corner of the sign-in page. Hover fills use
+`foreground` at low alpha, never white, so they read in both themes.
 
 - **Signed out** has air: a 64px hero, 48px two-line section heads with the copy
   on the right, py-20 to py-28 sections split by full-width hairlines, and live

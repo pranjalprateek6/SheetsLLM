@@ -40,7 +40,7 @@ const MARKETING_LINKS = [
 const navItem =
   "inline-flex h-8 items-center rounded-full px-3 text-[13px] transition-colors duration-100 ease-[cubic-bezier(0.25,0.46,0.45,0.94)]";
 
-function ThemeToggle() {
+export function ThemeToggle() {
   const { resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -107,7 +107,7 @@ function ProductMenu({ pathname }: { pathname: string }) {
         onClick={() => setOpen((o) => !o)}
         className={cn(
           navItem,
-          open || active ? "bg-white/[0.06] text-foreground" : "text-muted-foreground hover:bg-white/[0.04] hover:text-foreground",
+          open || active ? "bg-foreground/[0.06] text-foreground" : "text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground",
         )}
       >
         Product
@@ -127,7 +127,7 @@ function ProductMenu({ pathname }: { pathname: string }) {
                   <li key={p.href}>
                     <Link
                       href={p.href}
-                      className="block rounded-lg px-3 py-2.5 transition-colors hover:bg-white/[0.04]"
+                      className="block rounded-lg px-3 py-2.5 transition-colors hover:bg-foreground/[0.04]"
                     >
                       <span className="block text-[13px] font-medium text-foreground">{p.name}</span>
                       <span className="mt-0.5 block max-w-[210px] text-[13px] leading-snug text-muted-foreground">{p.menu}</span>
@@ -144,7 +144,7 @@ function ProductMenu({ pathname }: { pathname: string }) {
                 ["/auth", "Sign in"],
               ].map(([href, label]) => (
                 <li key={href}>
-                  <Link href={href} className="block rounded-lg px-3 py-2 text-[13px] text-foreground transition-colors hover:bg-white/[0.04]">
+                  <Link href={href} className="block rounded-lg px-3 py-2 text-[13px] text-foreground transition-colors hover:bg-foreground/[0.04]">
                     {label}
                   </Link>
                 </li>
@@ -302,7 +302,7 @@ export default function Header() {
                   aria-current={pathname === l.href ? "page" : undefined}
                   className={cn(
                     navItem,
-                    pathname === l.href ? "text-foreground" : "text-muted-foreground hover:bg-white/[0.04] hover:text-foreground",
+                    pathname === l.href ? "text-foreground" : "text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground",
                   )}
                 >
                   {l.label}
@@ -312,7 +312,7 @@ export default function Header() {
           )}
           {!user && <span className="mx-2 h-4 w-px bg-border" aria-hidden />}
           {user && <FeedbackWidget />}
-          {!marketing && <ThemeToggle />}
+          <ThemeToggle />
           {loading ? null : user ? (
             <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
               <DropdownMenuTrigger asChild>
@@ -368,7 +368,7 @@ export default function Header() {
             </DropdownMenu>
           ) : (
             <>
-              <Link href="/auth" className={cn(navItem, "text-muted-foreground hover:bg-white/[0.04] hover:text-foreground")}>
+              <Link href="/auth" className={cn(navItem, "text-muted-foreground hover:bg-foreground/[0.04] hover:text-foreground")}>
                 Sign in
               </Link>
               <Button variant="inverse" size="sm" className="ml-1 h-8 px-3.5" asChild>
@@ -380,7 +380,7 @@ export default function Header() {
 
         {/* Mobile: theme + menu */}
         <div className="flex items-center gap-1 md:hidden">
-          {!marketing && <ThemeToggle />}
+          <ThemeToggle />
           <button
             onClick={() => setMobileOpen(!mobileOpen)}
             className="inline-flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground hover:bg-accent"
