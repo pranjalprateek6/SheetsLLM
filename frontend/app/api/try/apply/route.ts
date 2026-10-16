@@ -2,10 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { BACKEND_URL } from "@/lib/api-helpers";
 
 // The try page's one call. No account, so no token: the visitor's address
-// goes along instead, for the backend's per-visitor rate limit.
+// goes along instead, for the backend's per-visitor rate limit. Vercel sets
+// x-real-ip itself and overwrites any x-forwarded-for the browser sent, so
+// prefer it; the left-most forwarded entry is the fallback off Vercel.
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
-  const ip = (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || req.headers.get("x-real-ip") || "";
+  const ip = req.headers.get("x-real-ip") || (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || "";
   try {
     const resp = await fetch(`${BACKEND_URL()}/try/apply`, {
       method: "POST",

@@ -26,6 +26,7 @@ def client(monkeypatch):
     recorded: list[tuple] = []
     monkeypatch.setattr(events, "record", lambda *a, **k: recorded.append((a, k)))
     security._rate_store.clear()
+    route._funnel_seen.clear()
     c = TestClient(app, raise_server_exceptions=False)
     c.recorded = recorded
     return c
@@ -113,3 +114,35 @@ def test_digest_counts_try_visitors_apart_from_people():
     assert (s["loop"]["try_started"], s["loop"]["try_fixed"], s["loop"]["try_signups"]) == (2, 1, 1)
     _, text = digest.email_text(s)
     assert "The try page: 2 opened it, 1 fixed something, 0 ran it on November, 1 signed up this week." in text
+
+
+def test_each_funnel_event_counts_once_per_visitor(client):
+    for _ in range(3):
+        client.post("/try/apply", json={"steps": [], "event": "start"})
+    assert [a[1] for a, _ in client.recorded] == ["try_started"]
+
+
+def test_busy_when_too_many_run_at_once(client, monkeypatch):
+    import asyncio
+
+    monkeypatch.setattr(route, "_running", asyncio.Semaphore(0))
+    r = client.post("/try/apply", json={})
+    assert r.status_code == 503 and r.json()["code"] == "TRY_BUSY"
+
+
+def test_the_sample_copy_is_private_to_the_process():
+    import os
+    import tempfile
+
+    path = route.try_demo.sample_path("oct")
+    assert path.parent != __import__("pathlib").Path(tempfile.gettempdir())
+    if os.name != "nt":
+        assert (path.parent.stat().st_mode & 0o777) == 0o700
+
+
+def test_the_limiter_forgets_idle_keys(monkeypatch):
+    monkeypatch.setattr(security, "_SWEEP_EVERY", 1)
+    security._rate_store.clear()
+    security._rate_store["try:old"] = [0.0]
+    security.check_rate_limit("try:new")
+    assert "try:old" not in security._rate_store and "try:new" in security._rate_store

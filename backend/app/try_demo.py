@@ -35,6 +35,7 @@ PREVIEW_ROWS = 200
 
 _lock = threading.Lock()
 _parquet: dict[str, Path] = {}
+_private_dir: Path | None = None
 
 
 class TryError(Exception):
@@ -47,12 +48,17 @@ def sample_path(month: str) -> Path:
     """The month's sample as Parquet, converted on first use."""
     if month not in MONTHS:
         raise TryError("UNKNOWN_SAMPLE", "That sample isn't one the try page has.")
+    global _private_dir
     with _lock:
         path = _parquet.get(month)
         if path is None or not path.exists():
             data = (SAMPLES_DIR / MONTHS[month]).read_bytes()
             parquet, _rows, _cols = convert_to_parquet(data, MONTHS[month])
-            path = Path(tempfile.gettempdir()) / f"sllm_try_{month}.parquet"
+            # A directory only this process can write (mkdtemp makes it 0700),
+            # never a fixed name in the shared temp folder
+            if _private_dir is None or not _private_dir.exists():
+                _private_dir = Path(tempfile.mkdtemp(prefix="sllm_try_"))
+            path = _private_dir / f"{month}.parquet"
             path.write_bytes(parquet)
             _parquet[month] = path
         return path
@@ -107,7 +113,7 @@ def run(month: str, requests: list) -> dict:
         logger.warning("try: replay failed: %s", exc)
         raise TryError("EXECUTION_FAILED", "Those steps didn't run on this file.") from exc
     try:
-        insights = generate_insights(path, steps, budget=4.0)
+        insights = generate_insights(path, steps, budget=2.0)
     except Exception as exc:
         logger.warning("try: insights failed: %s", exc)
         insights = {"suggestions": [], "null_columns": [], "duplicate_rows": 0}

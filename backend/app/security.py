@@ -124,6 +124,11 @@ _rate_lock = threading.Lock()
 # Default: 30 requests per 60 seconds
 RATE_LIMIT_MAX = 30
 RATE_LIMIT_WINDOW = 60  # seconds
+# Keys idle this long are dropped, checked every so many calls, so a
+# caller inventing a new key per request cannot grow the store for good
+_IDLE_AFTER = 3600
+_SWEEP_EVERY = 1000
+_calls = 0
 
 
 class RateLimitExceeded(Exception):
@@ -144,8 +149,14 @@ def check_rate_limit(
     Check if user is within rate limits.
     Raises RateLimitExceeded if over the limit.
     """
+    global _calls
     now = time.monotonic()
     with _rate_lock:
+        _calls += 1
+        if _calls % _SWEEP_EVERY == 0:
+            idle = now - _IDLE_AFTER
+            for key in [k for k, ts in _rate_store.items() if not ts or ts[-1] < idle]:
+                del _rate_store[key]
         timestamps = _rate_store[user_id]
         # Prune expired entries
         cutoff = now - window
