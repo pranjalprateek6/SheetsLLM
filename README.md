@@ -6,9 +6,11 @@
 
 **Clean the same spreadsheet once. Never again.**
 
-Describe your cleanup in plain English, save it as a recipe, and re-run it on every new export in one click. Your data never goes to the AI.
+Describe a cleanup in plain English or fix it in one click. SheetsLLM keeps every step as a recipe, and next month's export runs through it with no AI call.
 
-[**Open the app**](https://sheets-llm.vercel.app) &nbsp;·&nbsp; [Pricing](https://sheets-llm.vercel.app/pricing) &nbsp;·&nbsp; [Free tools](https://sheets-llm.vercel.app/tools)
+[**Open the app**](https://sheets-llm.vercel.app) &nbsp;·&nbsp; [Try it, no sign-up](https://sheets-llm.vercel.app/try) &nbsp;·&nbsp; [Pricing](https://sheets-llm.vercel.app/pricing) &nbsp;·&nbsp; [Free tools](https://sheets-llm.vercel.app/tools) &nbsp;·&nbsp; [What's new](https://sheets-llm.vercel.app/changelog)
+
+<img src="docs/images/landing.png" alt="The SheetsLLM home page: the promise, and the product at work on a monthly orders export" width="900" />
 
 </div>
 
@@ -16,35 +18,54 @@ Describe your cleanup in plain English, save it as a recipe, and re-run it on ev
 
 ## The problem it solves
 
-Every month the same messy export lands on your desk, and you spend the same 30 to 40 minutes fixing it by hand: trimming whitespace, standardizing dates, removing duplicates, totaling by region. SheetsLLM lets you describe that cleanup once in plain English. It turns your words into a validated database query, runs it on your file, and shows the result live. Save the steps as a **recipe**, and next month's file becomes a single click with no AI call and no drift.
+Every month the same messy export lands on your desk, and you spend the same half hour fixing it by hand: duplicate rows, missing regions, dates written two ways, numbers stored as text. SheetsLLM lets you fix it once, with a click or a sentence, and keeps the steps. Next month's file runs through the same recipe in one drop, deterministically, with a report of what changed.
+
+## See it before you sign up
+
+The [try page](https://sheets-llm.vercel.app/try) opens a month of messy orders in the real engine. Click the fixes it finds, then run the same steps on November's file. No account, no AI call. Sign up and your steps come with you into the workspace.
+
+<img src="docs/images/try.png" alt="The try page: November's orders cleaned in one run by the three steps made on October's file, 1,040 rows down to 793" width="900" />
 
 ## Features
 
-- **Plain-English cleanups.** Upload a file and type what you want. "Remove rows with missing region", "standardize the dates to ISO", "total revenue by region". SheetsLLM writes and runs the query for you.
-- **Reusable recipes.** Save any chain of steps once. Re-apply it to future uploads in one click. The steps run exactly the same every time, with no AI involved on replay, so results never drift.
-- **Sage, your data chat.** A conversational assistant that transforms your file, answers questions about it, or asks for clarification when a request is ambiguous.
-- **Live preview with full history.** Every step is recorded with the exact query it ran and the row counts before and after. Undo a step, reset everything, or revert to any point. Your original file is never touched.
-- **Automatic insights.** On every upload you get a data-quality read: null percentages, duplicate rows, and numeric summaries, with one-click fixes.
-- **Built-in charts.** Bar, line, and pie charts with aggregation and PNG export, right next to your data.
-- **Every format in and out.** Import CSV, Excel (single or multi-sheet), TSV, JSON, and Parquet. Export to CSV, Excel, TSV, JSON, or Parquet.
-- **Handles real files.** Up to one million rows per file, with large transforms processed in the background so the app stays responsive.
+**Cleaning**
+- **One-click fixes.** Every upload is read for duplicates, empty cells, mixed date formats and numbers stored as text, and each finding comes with a fix that runs without AI. Every column menu has the rest: trim, fill empty cells, drop empty rows, remove duplicates, standardise dates, clean numbers ("$1,234.50", "(12)", "12%"), change type, keep rows where, replace a value, rename, sort, drop.
+- **Chef, in plain English.** Ask for a change ("keep orders over 500 from the North") or a question about the data. Chef writes a validated, read-only query, shows the step and a few rows before anything changes, and applies it when you say so.
+- **Lookup tables.** Link another file under a short name and add its columns by a key, from the column menu or by asking Chef.
+- **The grid.** Sort and filter across every row, column health at a glance, stats per column, a fixed header, and wide files that show which way the rest of the columns are.
+- **Charts.** Bar, line and pie with sum, average, count, min or max, exported as PNG.
+
+<img src="docs/images/workspace.png" alt="The workspace: a step applied in one click, the step rail, the grid, and Chef with the remaining fixes" width="900" />
+
+**Recipes**
+- **Save the steps once.** A recipe replays every step exactly, with no AI call, so the result never drifts.
+- **Run reports.** Each run says how many rows each step took, and checks you set (for example "no empty Region") pass or fail on the new file.
+- **Columns that moved.** When next month's export renames a column, the run matches it and remembers the match.
+- **Runs on a schedule.** Give a recipe a link and a day of the month, and the cleaned file arrives by email. Reminders say when a recipe's file is due.
+- **Edit and share.** Rename, reorder or remove steps, and share a recipe with a link anyone can add to their own account.
+
+**History and trust**
+- **Every step is kept** with the query it ran and the rows before and after. Undo, redo, view the file as it was at any step, or go back to it. The original is never touched.
+- **Share a cleaned file** with a link that serves it for a week.
+- **Every format in and out.** CSV, TSV, Excel (any sheet), JSON and Parquet, up to a million rows per file.
+- **A keyboard that reaches everything.** Ctrl or Cmd K opens the command palette; "?" lists every shortcut.
+- **Light and dark**, on every page.
+
+<img src="docs/images/chart.png" alt="The quick chart: the sum of MRP by Region, with the empty regions grouped under (empty)" width="900" />
 
 ## How it works
 
-1. **Upload any export.** CSV, Excel, JSON, or Parquet. The schema is detected instantly and you see a preview in seconds.
-2. **Describe the cleanup.** Type it in plain English. Sage writes a validated, read-only query and shows you the result live before anything is saved.
-3. **Save it as a recipe.** Next month's file re-applies every step in one click, deterministically, with no AI call at all.
+1. **Upload an export** or open a sample. The schema and the fixes worth making show up in seconds.
+2. **Clean it** with one-click fixes or by asking Chef. Every change is a step you can see, undo or take back to.
+3. **Save the steps as a recipe.** Next month, drop the new file on it: same steps, a report of what changed, no AI.
 
 ## Privacy and security
 
-Privacy is the core of the product, not an afterthought.
-
-- **Strict privacy by default.** The AI is sent a schema summary only: column names, types and counts, never a value from your file. It is a guarantee you can show an auditor.
-- **Sample rows, only if you ask.** Switch strict mode off and the AI also sees a handful of sample rows (at most three, plus a few example values per column), never the whole file. Every step records exactly what it sent, and recipes and one-click fixes send nothing.
+- **Strict privacy by default.** The AI is sent column names, types and counts, never a value from your file.
+- **Sample rows only if you ask.** Switch strict mode off and the AI also sees a handful of sample rows, never the whole file. Every step records exactly what it sent. Recipes and one-click fixes send nothing.
 - **Your data never trains any AI model.**
-- **Read-only queries only.** The AI can produce a single read query, checked against a strict allowlist before it runs. It can never modify, delete, or reach outside your file.
-- **Immutable originals.** Your uploaded file is stored once and never changed. Every transformation is a separate, reversible step.
-- **Isolated per account.** Files, history, and recipes are private to your account and survive restarts.
+- **Read-only queries only.** Every query, from Chef or a template, is checked against a strict allowlist before it runs. It can read your file and nothing else.
+- **Immutable originals and private accounts.** Uploads are stored once and never changed; files, history and recipes belong to your account. Download a record of the account (settings, recipes, and every file with its steps), or delete the account with everything in it.
 
 ## Pricing
 
@@ -54,38 +75,35 @@ Start free. Upgrade when the cleanups become a routine.
 | --- | --- | --- |
 | Price | Rs 0 / month | Rs 499 / month |
 | Uploads | 50 / month | 1,000 / month |
-| AI transforms | 200 / month | 5,000 / month |
-| Chat messages | 200 / month | 5,000 / month |
+| AI requests | 200 / month | 5,000 / month |
+| Saved recipes | 3 | Unlimited |
 | Rows per file | 1M | 1M |
-| Saved recipes | 1 | Unlimited |
+| One-click fixes and recipe runs | Unlimited, no AI | Unlimited, no AI |
 | History, undo and revert | Yes | Yes |
 | Strict privacy mode | Yes | Yes |
-| Insights and charts | Yes | Yes |
-| Support | Community | Priority email |
 
-No credit card to start, and you can cancel anytime in one click. Your files, recipes, and history are never deleted when you move between plans.
+No credit card to start, and you can cancel anytime. Your files, recipes and history are kept when you move between plans.
 
 ## Free tools
 
-A set of fast, private, in-browser utilities that need no signup and never upload your file:
+Twelve in-browser tools that need no sign-up and never upload your file:
 
-- **CSV Duplicate Remover:** match on the whole row or specific columns.
-- **JSON to CSV Converter:** nested objects flatten to dot-path columns.
-- **CSV Splitter:** break a large CSV into smaller files that open cleanly in Excel.
-- **CSV Cleaner:** trim whitespace and drop empty rows and columns.
+- **Clean:** CSV cleaner, CSV duplicate remover, find and replace, change text case.
+- **Reshape:** merge CSV files, CSV splitter, remove or reorder columns, split a column.
+- **Convert:** Excel to CSV, JSON to CSV, CSV to JSON, CSV delimiter converter.
 
 Try them at [sheets-llm.vercel.app/tools](https://sheets-llm.vercel.app/tools).
 
 ## Tech stack
 
-- **Frontend:** Next.js (App Router), React, TypeScript, Tailwind CSS.
-- **Backend:** FastAPI on Python, with DuckDB doing the query work.
-- **Platform:** Supabase for authentication, database, and file storage. Frontend on Vercel, backend on Render.
-- **AI:** provider-agnostic, running on Google Gemini by default.
+- **Frontend:** Next.js 14 (App Router), React, TypeScript, Tailwind CSS, on Vercel.
+- **Backend:** FastAPI on Python 3.12, with DuckDB running every query, on Render.
+- **Platform:** Supabase for sign-in, Postgres, file storage and scheduled jobs (pg_cron). Resend for email.
+- **AI:** provider-agnostic, on Google Gemini by default. One-click fixes and recipe runs never call it.
 
 ## Run it locally
 
-You need Python 3.12, Node.js 18 or newer, a free Supabase project, and a Gemini key.
+You need Python 3.12, Node.js 18.17 or newer, a free Supabase project, and a Gemini key.
 
 ```bash
 # Backend
@@ -100,9 +118,24 @@ npm install
 npm run dev
 ```
 
-Create `backend/.env` with your Supabase project URL and keys, your Gemini key, and `LLM_PROVIDER=gemini`. Create `frontend/.env` with `BACKEND_URL`, `NEXT_PUBLIC_SUPABASE_URL`, and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. Run the SQL migrations in `backend/migrations/` against your Supabase project, then open http://localhost:3000, create an account, and upload a file.
+Create `backend/.env` with your Supabase project URL and keys, your Gemini key and `LLM_PROVIDER=gemini`. Create `frontend/.env` with `BACKEND_URL`, `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. Run the SQL migrations in `backend/migrations/` against your Supabase project, then open http://localhost:3000.
 
-A `docker compose up --build` is also available and starts both services together.
+`docker compose up --build` starts both services together.
+
+## Tests
+
+```bash
+# Backend
+cd backend && .venv/Scripts/python.exe -m pytest
+
+# Frontend: types and unit tests
+cd frontend && npx tsc --noEmit && npx vitest run
+
+# End to end, against a backend on :8000 started with LLM_PROVIDER=fake
+cd frontend && E2E_BACKEND=1 npx playwright test
+```
+
+Two more suites run on demand against a local backend with `ALLOW_ANONYMOUS=true`: `E2E_SWEEP=1` clicks every control on every page and flags any that do nothing, and `README_SHOTS=1` regenerates the screenshots in this file from the running app.
 
 ## Contact
 
