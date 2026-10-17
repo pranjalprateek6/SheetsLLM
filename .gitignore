@@ -10,6 +10,8 @@ __pycache__/
 # bundled sample datasets are shipped assets, not user data
 !frontend/public/samples/*.csv
 !backend/app/samples/*.csv
+# the end-to-end workbook: three sheets of made-up orders and an empty one
+!frontend/e2e/fixtures/*.xlsx
 
 
 # local tooling / environments

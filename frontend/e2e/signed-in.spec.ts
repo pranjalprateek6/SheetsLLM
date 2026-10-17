@@ -3,6 +3,8 @@ import { join } from "node:path";
 import { createClient } from "@supabase/supabase-js";
 import { expect, test } from "@playwright/test";
 
+import { uploadThreeSheets } from "./workbook";
+
 /* The signed-in workspace, driven like a person would: upload, a one-click
    fix with no AI, the change bar, the export menu's header. Runs in CI only
    when a dedicated test account exists (secrets E2E_EMAIL, E2E_PASSWORD and
@@ -60,6 +62,29 @@ test("signed in: upload, a fix with no AI, the change bar, the export header", a
       await page.request.delete(`${BACKEND}/files/${fileId}`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
+    }
+    await context.close();
+  }
+});
+
+test("signed in: three sheets of a workbook become three files, counted as one upload", async ({ browser }) => {
+  const supabase = createClient(SUPABASE_URL, ANON, { auth: { persistSession: false } });
+  const { data, error } = await supabase.auth.signInWithPassword({ email: EMAIL, password: PASSWORD });
+  expect(error).toBeNull();
+  const session = data.session!;
+  const storageKey = `sb-${new URL(SUPABASE_URL).hostname.split(".")[0]}-auth-token`;
+  const context = await browser.newContext();
+  await context.addInitScript(
+    ([key, value]) => window.localStorage.setItem(key, value),
+    [storageKey, JSON.stringify(session)] as const,
+  );
+  const page = await context.newPage();
+  let ids: string[] = [];
+  try {
+    ids = await uploadThreeSheets(page);
+  } finally {
+    for (const id of ids) {
+      await page.request.delete(`${BACKEND}/files/${id}`, { headers: { Authorization: `Bearer ${session.access_token}` } });
     }
     await context.close();
   }

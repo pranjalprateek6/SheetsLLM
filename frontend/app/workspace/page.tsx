@@ -1,7 +1,7 @@
 "use client";
 import dynamic from "next/dynamic";
 import { Suspense, useState, useEffect, useCallback, useMemo, useRef } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   AlertTriangle, ArrowRight, BarChart3, BookMarked, CalendarClock, Check, ChefHat, ChevronDown, ChevronRight, Columns3, FileSpreadsheet, History, Link2, MessageSquare, Pencil, Redo2, Undo2, Upload, X,
 } from "lucide-react";
@@ -89,6 +89,9 @@ function WorkspaceContent() {
   const [showUpload, setShowUpload] = useState(true);
   const [showSheetSelector, setShowSheetSelector] = useState(false);
   const [availableSheets, setAvailableSheets] = useState<string[]>([]);
+  const [sheetRows, setSheetRows] = useState<Record<string, number | null>>({});
+  const [maxSheets, setMaxSheets] = useState(10);
+  const router = useRouter();
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [pendingUploadId, setPendingUploadId] = useState<string | null>(null);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -422,6 +425,8 @@ function WorkspaceContent() {
       }
       if (data.requires_sheet_selection && data.sheets) {
         setAvailableSheets(data.sheets);
+        setSheetRows(data.sheet_rows ?? {});
+        setMaxSheets(data.max_sheets ?? 10);
         setPendingFile(new File([], data.name || "workbook.xlsx"));
         setPendingUploadId(data.file_id ?? null);
         setShowSheetSelector(true);
@@ -474,13 +479,15 @@ function WorkspaceContent() {
 
       if (data.requires_sheet_selection && data.sheets) {
         setAvailableSheets(data.sheets);
+        setSheetRows(data.sheet_rows ?? {});
+        setMaxSheets(data.max_sheets ?? 10);
         setPendingFile(file);
         setPendingUploadId(data.file_id ?? null);
         setShowSheetSelector(true);
         return false;
       }
 
-      return await adoptUpload(data, file.name);
+      return await adoptUpload(data, data.name || file.name);
     } catch (error) {
       console.error("Upload error:", error);
       setUploadError("Upload failed. Check your connection and try again.");
@@ -490,11 +497,55 @@ function WorkspaceContent() {
     return false;
   };
 
-  const handleSheetSelect = (sheetName: string) => {
-    if (pendingFile) {
-      setShowSheetSelector(false);
-      onUpload(pendingFile, sheetName, undefined, pendingUploadId);
-      setPendingUploadId(null);
+  const handleSheetSelect = (sheetNames: string[]) => {
+    if (!pendingFile || !sheetNames.length) return;
+    setShowSheetSelector(false);
+    if (sheetNames.length === 1) void onUpload(pendingFile, sheetNames[0], undefined, pendingUploadId);
+    else void onUploadSheets(pendingFile, sheetNames, pendingUploadId);
+    setPendingUploadId(null);
+  };
+
+  // Several sheets of one workbook: each becomes a file of its own, and
+  // Files is where they are seen together, so that is where this lands
+  const onUploadSheets = async (file: File, sheetNames: string[], pendingId?: string | null): Promise<void> => {
+    setLoading(true);
+    setUploadError(null);
+    try {
+      const params = new URLSearchParams();
+      for (const n of sheetNames) params.append("sheet_names", n);
+      let r: Response;
+      if (pendingId) {
+        params.set("pending_id", pendingId);
+        r = await fetchWithAuth(`/api/upload?${params}`, { method: "POST" });
+        if (r.status === 410 && file.size > 0) {
+          // The stash expired: send the workbook once more
+          return await onUploadSheets(file, sheetNames);
+        }
+      } else {
+        const form = new FormData();
+        form.append("file", file);
+        r = await fetchWithAuth(`/api/upload?${params}`, { method: "POST", body: form });
+      }
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok || !Array.isArray(data.files)) {
+        setUploadError(data.message || "Those sheets didn't upload. Try again.");
+        return;
+      }
+      const added = data.files as { file_id: string; name: string }[];
+      const failed = (data.failed ?? []) as { sheet: string; message: string }[];
+      toast.success(`${added.length} sheet${added.length === 1 ? "" : "s"} added from ${data.workbook ?? file.name}`, {
+        description: failed.length
+          ? `${failed.map((f) => f.sheet).join(", ")} didn't read: ${failed[0].message}`
+          : "Each is a file of its own. Open one to start cleaning.",
+        duration: 8000,
+      });
+      markOnboardingStep("upload");
+      router.push(`/dashboard?added=${added.map((f) => f.file_id).join(",")}`);
+    } catch (e) {
+      console.error("Workbook upload failed:", e);
+      setUploadError("Those sheets didn't upload. Check your connection and try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -1981,7 +2032,7 @@ function WorkspaceContent() {
           confirmText={revertShown === 0 ? "Go back to the original" : "Go back"}
           cancelText="Cancel"
         />
-        <SheetSelector isOpen={showSheetSelector} sheets={availableSheets} onSelect={handleSheetSelect} onCancel={() => { setShowSheetSelector(false); setPendingFile(null); setPendingUploadId(null); setLoading(false); }} />
+        <SheetSelector isOpen={showSheetSelector} sheets={availableSheets} sheetRows={sheetRows} maxSheets={maxSheets} workbookName={pendingFile?.name} onSelect={handleSheetSelect} onCancel={() => { setShowSheetSelector(false); setPendingFile(null); setPendingUploadId(null); setLoading(false); }} />
         <ChartPanel columns={columns} rows={rows} open={chartOpen} onClose={() => setChartOpen(false)} />
         <CommandPalette
           open={paletteOpen}
