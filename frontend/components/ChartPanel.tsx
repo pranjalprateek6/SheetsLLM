@@ -85,7 +85,9 @@ export default function ChartPanel({
     if (!xCol || !yCol) return [];
     const grouped = new Map<string, number[]>();
     for (const row of rows) {
-      const key = String(row[xCol] ?? "null");
+      // Rows with nothing in the column group under one label a person reads
+      const x = row[xCol];
+      const key = x === null || x === undefined || String(x).trim() === "" ? "(empty)" : String(x);
       const val = Number(row[yCol]) || 0;
       if (!grouped.has(key)) grouped.set(key, []);
       grouped.get(key)!.push(val);
