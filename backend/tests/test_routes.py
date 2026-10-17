@@ -401,6 +401,75 @@ class TestUpload:
         assert body["preview"]["total_rows"] == 2
         assert [c["name"] for c in body["schema"]["columns"]] == ["a", "b"]
 
+    def _ask(self, client, xlsx: bytes, name: str = "book.xlsx") -> dict:
+        first = client.post(
+            "/upload", content=xlsx,
+            headers={"X-Filename": name, "Content-Type": "application/octet-stream"},
+        )
+        assert first.status_code == 200, first.text
+        return first.json()
+
+    def test_the_sheet_question_carries_row_counts_and_the_cap(self, client, upload_seams):
+        body = self._ask(client, _multi_sheet_xlsx())
+        assert body["sheet_rows"] == {"Sales": 1, "Costs": 1}
+        assert body["max_sheets"] == upload_module.MAX_SHEETS
+
+    def test_one_sheet_is_named_for_it_and_sized_as_kept(self, client, upload_seams, monkeypatch):
+        from app import db
+
+        made: list[dict] = []
+        monkeypatch.setattr(db, "create_file", lambda **kw: made.append(kw) or kw)
+        xlsx = _multi_sheet_xlsx()
+        pending = self._ask(client, xlsx, "sales_q3.xlsx")["file_id"]
+        r = client.post(f"/upload?pending_id={pending}&sheet_names=Costs")
+        assert r.status_code == 200, r.text
+        assert r.json()["name"] == "sales_q3 - Costs.xlsx"
+        assert made[0]["name"] == "sales_q3 - Costs.xlsx"
+        # The sheet that was kept, not the whole workbook
+        assert made[0]["size_bytes"] < len(xlsx)
+
+    def test_several_sheets_become_files_and_count_as_one_upload(self, client, upload_seams, monkeypatch):
+        from app import db, usage
+
+        made: list[dict] = []
+        counted: list[dict] = []
+        monkeypatch.setattr(db, "create_file", lambda **kw: made.append(kw) or kw)
+        monkeypatch.setattr(usage, "record", lambda user, **kw: counted.append(kw))
+        pending = self._ask(client, _multi_sheet_xlsx(), "sales_q3.xlsx")["file_id"]
+        r = client.post(f"/upload?pending_id={pending}&sheet_names=Sales&sheet_names=Costs")
+        assert r.status_code == 200, r.text
+        body = r.json()
+        assert body["workbook"] == "sales_q3.xlsx" and body["failed"] == []
+        assert [f["name"] for f in body["files"]] == ["sales_q3 - Sales.xlsx", "sales_q3 - Costs.xlsx"]
+        assert [f["rows"] for f in body["files"]] == [1, 1]
+        assert len({f["file_id"] for f in body["files"]}) == 2
+        assert [m["name"] for m in made] == ["sales_q3 - Sales.xlsx", "sales_q3 - Costs.xlsx"]
+        assert counted == [{"uploads": 1, "rows_processed": 2}]
+        # The stash has served its purpose
+        assert client.post(f"/upload?pending_id={pending}&sheet_names=Sales").status_code == 410
+
+    def test_a_sheet_that_will_not_read_is_reported_and_the_rest_kept(self, client, upload_seams, monkeypatch):
+        real = upload_module.convert_to_parquet
+
+        def _convert(data, filename, *, sheet_name=None):
+            if sheet_name == "Costs":
+                raise upload_module.UnreadableFileError("That sheet has no table in it.")
+            return real(data, filename, sheet_name=sheet_name)
+
+        monkeypatch.setattr(upload_module, "convert_to_parquet", _convert)
+        pending = self._ask(client, _multi_sheet_xlsx())["file_id"]
+        body = client.post(f"/upload?pending_id={pending}&sheet_names=Sales&sheet_names=Costs").json()
+        assert [f["sheet"] for f in body["files"]] == ["Sales"]
+        assert body["failed"] == [{"sheet": "Costs", "message": "That sheet has no table in it."}]
+
+    def test_an_unknown_sheet_or_too_many_is_400(self, client, upload_seams, monkeypatch):
+        pending = self._ask(client, _multi_sheet_xlsx())["file_id"]
+        r = client.post(f"/upload?pending_id={pending}&sheet_names=Sales&sheet_names=Nope")
+        assert r.status_code == 400 and r.json()["code"] == "UNKNOWN_SHEET"
+        monkeypatch.setattr(upload_module, "MAX_SHEETS", 1)
+        r = client.post(f"/upload?pending_id={pending}&sheet_names=Sales&sheet_names=Costs")
+        assert r.status_code == 400 and r.json()["code"] == "TOO_MANY_SHEETS"
+
     def test_empty_upload_400(self, client, upload_seams):
         resp = client.post(
             "/upload", content=b"",

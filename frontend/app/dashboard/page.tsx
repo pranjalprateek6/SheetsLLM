@@ -78,6 +78,17 @@ export default function DashboardPage() {
   const emptyUploadIconRef = useRef<UploadIconHandle>(null);
   const [renameValue, setRenameValue] = useState("");
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  // Files that just arrived from a workbook (/dashboard?added=id,id),
+  // marked for a moment so they are easy to find
+  const [added, setAdded] = useState<string[]>([]);
+  useEffect(() => {
+    const ids = new URLSearchParams(window.location.search).get("added");
+    if (!ids) return;
+    setAdded(ids.split(",").filter(Boolean).slice(0, 20));
+    window.history.replaceState(null, "", "/dashboard");
+    const t = setTimeout(() => setAdded([]), 6000);
+    return () => clearTimeout(t);
+  }, []);
   const [deleteTarget, setDeleteTarget] = useState<FileItem | null>(null);
   const [loadError, setLoadError] = useState(false);
 
@@ -421,7 +432,8 @@ export default function DashboardPage() {
                 {files.map((file) => (
                   <TableRow
                     key={file.id}
-                    className="cursor-pointer"
+                    className={`cursor-pointer transition-colors duration-700 ${added.includes(file.id) ? "bg-primary/[0.07]" : ""}`}
+                    data-added={added.includes(file.id) || undefined}
                     onClick={() => handleOpen(file.id)}
                   >
                     <TableCell>
@@ -469,7 +481,8 @@ export default function DashboardPage() {
             {gridFiles.map((file) => (
               <div
                 key={file.id}
-                className="group cursor-pointer rounded-xl border bg-card p-4 shadow-xs transition-[border-color,box-shadow] duration-150 hover:border-foreground/20 hover:shadow-md"
+                data-added={added.includes(file.id) || undefined}
+                className={`group cursor-pointer rounded-xl border bg-card p-4 shadow-xs transition-[border-color,box-shadow] duration-150 hover:border-foreground/20 hover:shadow-md ${added.includes(file.id) ? "border-primary/50 ring-2 ring-primary/15" : ""}`}
                 onClick={() => handleOpen(file.id)}
               >
                 <div className="mb-3 flex items-start justify-between">

@@ -10,6 +10,8 @@ export async function POST(req: NextRequest) {
 
   const params = new URLSearchParams();
   if (sheetName) params.set("sheet_name", sheetName);
+  // Several sheets of one workbook, each to become a file
+  for (const name of searchParams.getAll("sheet_names").slice(0, 50)) params.append("sheet_names", name);
   if (pendingId) params.set("pending_id", pendingId);
   // Sample files are tagged so the metrics can tell them from real uploads
   if (searchParams.get("source") === "sample") params.set("source", "sample");

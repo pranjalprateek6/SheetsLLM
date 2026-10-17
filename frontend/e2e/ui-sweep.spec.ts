@@ -3,6 +3,8 @@ import { join } from "node:path";
 
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 
+import { uploadThreeSheets } from "./workbook";
+
 /* A click sweep: every page, every visible button and link, clicked once on
    a fresh load. A click that changes nothing (no navigation, no DOM change,
    no focus moved, no request, no popup) is a dead control, the kind of bug
@@ -245,5 +247,14 @@ test("signed in: the chart draws each kind", async ({ browser }) => {
   }
   report("chart", 3);
   await dropFile(page, fileUrl);
+  await context.close();
+});
+
+test("signed in: a workbook's sheets become files", async ({ browser }) => {
+  const { context, page } = await signedInPage(browser);
+  watch(page, () => "workbook");
+  const ids = await uploadThreeSheets(page);
+  report("workbook", ids.length);
+  for (const id of ids) await page.request.delete(`http://localhost:8000/files/${id}`).catch(() => {});
   await context.close();
 });

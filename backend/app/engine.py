@@ -841,6 +841,29 @@ def detect_sheets(file_bytes: bytes, filename: str) -> list[str] | None:
     return None
 
 
+def sheet_row_counts(file_bytes: bytes, filename: str) -> dict[str, int | None]:
+    """Rows per sheet of an .xlsx, below a header row, read from each
+    sheet's recorded dimensions without loading the cells. None where a
+    sheet does not record them; {} for anything that is not an .xlsx."""
+    if not filename.lower().endswith(".xlsx"):
+        return {}
+    try:
+        from openpyxl import load_workbook
+
+        wb = load_workbook(io.BytesIO(file_bytes), read_only=True, data_only=True)
+    except Exception as exc:
+        logger.warning("Sheet row count failed for %s: %s", filename, exc)
+        return {}
+    counts: dict[str, int | None] = {}
+    try:
+        for ws in wb.worksheets:
+            rows = ws.max_row
+            counts[ws.title] = None if rows is None else max(rows - 1, 0)
+    finally:
+        wb.close()
+    return counts
+
+
 # ── Fuzzy Column Matching ─────────────────────────────────────────────
 
 
