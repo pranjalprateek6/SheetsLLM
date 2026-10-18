@@ -329,8 +329,12 @@ function sqlIdent(name: string, dialect: SqlDialect): string {
   return dialect === "mysql" ? "`" + clean.replace(/`/g, "``") + "`" : '"' + clean.replace(/"/g, '""') + '"';
 }
 
-function sqlString(v: string): string {
-  return "'" + v.replace(/'/g, "''") + "'";
+/** A quoted string literal. MySQL also reads backslash escapes inside
+ *  quotes, so there backslashes are doubled first, or a value ending in a
+ *  backslash would end the string early. */
+function sqlString(v: string, dialect: SqlDialect): string {
+  const body = dialect === "mysql" ? v.replace(/\\/g, "\\\\") : v;
+  return "'" + body.replace(/'/g, "''") + "'";
 }
 
 /** The SQL type a column's filled values fit: whole numbers, decimals, true
@@ -364,11 +368,11 @@ export function toSql(
   const literal = (v: string, i: number) => {
     if (v === "") return "NULL";
     const t = types[i];
-    if (t === "TEXT") return sqlString(v);
+    if (t === "TEXT") return sqlString(v, dialect);
     const x = inferValue(v);
     if (typeof x === "boolean") return dialect === "sqlite" ? (x ? "1" : "0") : x ? "TRUE" : "FALSE";
     if (typeof x === "number") return String(x);
-    return sqlString(v);
+    return sqlString(v, dialect);
   };
   for (let i = 0; i < table.rows.length; i += batch) {
     const chunk = table.rows.slice(i, i + batch);
@@ -380,9 +384,10 @@ export function toSql(
 
 /* ------------------------------------------------ markdown and HTML */
 
-/** A Markdown table. Pipes are escaped and line breaks become <br>. */
+/** A Markdown table. Markdown renders HTML, so each cell is HTML-escaped;
+ *  then pipes are escaped and line breaks become <br>. */
 export function toMarkdown(table: Grid, { alignNumbers = true } = {}): string {
-  const cell = (v: string) => (v ?? "").replace(/\|/g, "\\|").replace(/\r?\n/g, "<br>").trim();
+  const cell = (v: string) => esc(v ?? "").replace(/\|/g, "\\|").replace(/\r?\n/g, "<br>").trim();
   const numeric = table.headers.map((_, c) => {
     const vs = table.rows.map((r) => r[c] ?? "").filter((v) => v.trim() !== "");
     return alignNumbers && vs.length > 0 && vs.every((v) => sortNumber(v) !== null);

@@ -188,3 +188,22 @@ describe("toSheetRows", () => {
     ]);
   });
 });
+
+describe("output escaping", () => {
+  it("MySQL doubles backslashes so a value cannot end its own string", () => {
+    const BS = String.fromCharCode(92);
+    const sql = toSql(t(["v"], [[`a${BS}`], [`x${BS}'); DROP TABLE t; --`]]), { dialect: "mysql", create: false });
+    expect(sql).toContain(`('a${BS}${BS}')`);
+    // The backslash is doubled and the quote doubled, so the value stays one string
+    expect(sql).toContain(`('x${BS}${BS}''); DROP TABLE t; --')`);
+    // PostgreSQL and SQLite take backslashes literally, so they stay single
+    expect(toSql(t(["v"], [[`a${BS}`]]), { create: false })).toContain(`('a${BS}')`);
+  });
+
+  it("Markdown cells are HTML-escaped", () => {
+    const md = toMarkdown(t(["Note"], [['<img src=x onerror="alert(1)">'], ["a & b"]]));
+    expect(md).not.toContain("<img");
+    expect(md).toContain("&lt;img src=x onerror=&quot;alert(1)&quot;&gt;");
+    expect(md).toContain("a &amp; b");
+  });
+});
