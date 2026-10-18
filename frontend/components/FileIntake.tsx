@@ -143,7 +143,8 @@ export default function FileIntake({
             }}
           >
             <label htmlFor="file-link" className="block text-[12px] text-muted-foreground">
-              A link to a CSV, Excel or JSON file, or a Google Sheet shared with anyone who has the link.
+              A link to a CSV, Excel or JSON file, a Google Sheet, or a file in Google Drive, OneDrive, SharePoint or
+              Dropbox, shared with anyone who has the link.
             </label>
             <div className="flex gap-2">
               <input

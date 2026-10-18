@@ -1,7 +1,9 @@
 """Fetch a file from a link, safely.
 
 A link is the second way in after a file drop: a CSV on a server, an
-export someone shared, a Google Sheet shared with anyone who has the link.
+export someone shared, a Google Sheet shared with anyone who has the link,
+or a file shared from Google Drive, OneDrive, SharePoint or Dropbox (each
+share link is turned into its direct download).
 The server fetches it, which is where the care goes: only http and https,
 never a private or local address (so a link cannot read this server's own
 network), redirects followed by hand with every hop checked, and the same
@@ -23,6 +25,11 @@ MAX_HOPS = 4
 TIMEOUT_SECONDS = 30.0
 
 _SHEETS = re.compile(r"^https?://docs\.google\.com/spreadsheets/d/([A-Za-z0-9_-]+)")
+# A sheet published to the web: /d/e/<id>/pubhtml or /pub
+_PUBLISHED = re.compile(r"^https?://docs\.google\.com/spreadsheets/d/e/([A-Za-z0-9_-]+)/pub(html)?")
+# A Drive file: /file/d/<id>/..., /open?id=<id>, /uc?id=<id>
+_DRIVE_FILE = re.compile(r"^https?://drive\.google\.com/file/d/([A-Za-z0-9_-]+)")
+_DRIVE_ID = re.compile(r"^https?://drive\.google\.com/(open|uc)\b")
 
 _BY_CONTENT_TYPE = {
     "text/csv": "csv",
@@ -51,13 +58,47 @@ def normalise_url(raw: str) -> str:
         raise FetchError("BAD_URL", "Paste a link to a file.")
     if not re.match(r"^[a-z][a-z0-9+.-]*://", url, re.IGNORECASE):
         url = "https://" + url
+    return _direct(url)
+
+
+def _set_query(url: str, **params: str) -> str:
+    """The URL with these query parameters set (replacing any already there)."""
+    from urllib.parse import urlencode
+
+    parsed = urlparse(url)
+    query = {k: v[-1] for k, v in parse_qs(parsed.query, keep_blank_values=True).items()}
+    query.update(params)
+    return parsed._replace(query=urlencode(query)).geturl()
+
+
+def _direct(url: str) -> str:
+    """A share link turned into the link that downloads the file itself."""
+    m = _PUBLISHED.match(url)
+    if m:
+        parsed = urlparse(url)
+        gid = parse_qs(parsed.query).get("gid", [None])[0]
+        return f"https://docs.google.com/spreadsheets/d/e/{m.group(1)}/pub?output=csv" + (f"&gid={gid}" if gid else "")
     m = _SHEETS.match(url)
     if m:
         parsed = urlparse(url)
         gid = parse_qs(parsed.query).get("gid", [None])[0]
         if not gid and parsed.fragment.startswith("gid="):
             gid = parsed.fragment[4:]
-        url = f"https://docs.google.com/spreadsheets/d/{m.group(1)}/export?format=csv" + (f"&gid={gid}" if gid else "")
+        return f"https://docs.google.com/spreadsheets/d/{m.group(1)}/export?format=csv" + (f"&gid={gid}" if gid else "")
+    m = _DRIVE_FILE.match(url)
+    if m:
+        return f"https://drive.google.com/uc?export=download&id={m.group(1)}"
+    if _DRIVE_ID.match(url):
+        file_id = parse_qs(urlparse(url).query).get("id", [None])[0]
+        if file_id and re.fullmatch(r"[A-Za-z0-9_-]+", file_id):
+            return f"https://drive.google.com/uc?export=download&id={file_id}"
+    host = (urlparse(url).hostname or "").lower()
+    # Dropbox: dl=0 shows a preview page, dl=1 sends the file
+    if host in ("www.dropbox.com", "dropbox.com"):
+        return _set_query(url, dl="1")
+    # SharePoint and OneDrive share links send the file with download=1
+    if host.endswith(".sharepoint.com") or host in ("onedrive.live.com", "1drv.ms"):
+        return _set_query(url, download="1")
     return url
 
 
@@ -140,6 +181,13 @@ def fetch_bytes(url: str, *, max_bytes: int = UPLOAD_MAX_BYTES, client: httpx.Cl
                 data = b"".join(chunks)
                 if not data:
                     raise FetchError("EMPTY", "The link answered with an empty file.")
+                ctype = response.headers.get("content-type", "").split(";")[0].strip().lower()
+                if ctype in ("text/html", "application/xhtml+xml") or data[:512].lstrip().lower().startswith((b"<!doctype html", b"<html")):
+                    raise FetchError(
+                        "NOT_A_FILE",
+                        "That link opens a web page, not a file. Share it with anyone who has the link, "
+                        "or use the file's download link.",
+                    )
                 return data, _filename(url, response)
         raise FetchError("FETCH_FAILED", "The link redirected too many times.")
     except httpx.HTTPError as exc:

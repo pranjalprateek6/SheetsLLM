@@ -9,6 +9,7 @@ import EmptyState from "@/components/EmptyState";
 import DueRecipes from "@/components/DueRecipes";
 import RecipeChecks from "@/components/RecipeChecks";
 import { RecipeSchedule, ShareRecipeButton } from "@/components/RecipeLoops";
+import RecipeLiveLink from "@/components/RecipeLiveLink";
 import { ordinal } from "@/lib/loops";
 import RecipeStepsEditor, { type RecipeStep } from "@/components/RecipeStepsEditor";
 import type { Recipe } from "@/components/RecipesDrawer";
@@ -188,6 +189,9 @@ function RecipesContent() {
                     suggestedUrl={r.source_url}
                     onChange={(next) => setRecipes((list) => list?.map((x) => (x.id === r.id ? { ...x, schedule: next } : x)) ?? list)}
                   />
+                </div>
+                <div className="border-t px-4 py-3">
+                  <RecipeLiveLink recipeId={r.id} />
                 </div>
                 {steps[r.id] && (
                   <div className="border-t px-4 py-3">

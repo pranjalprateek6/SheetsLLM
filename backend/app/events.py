@@ -77,6 +77,8 @@ EVENTS = frozenset({
     "account_exported",
     # the try page: opened, a fix applied, the steps run on next month's file
     "try_started", "try_fix_applied", "try_replayed", "try_carried_over",
+    # a recipe's live link, for a sheet that keeps up with every run
+    "live_link_created",
 })
 
 
