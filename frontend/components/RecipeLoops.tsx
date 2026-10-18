@@ -97,7 +97,7 @@ export function RecipeSchedule({
       <p className="text-sm font-medium">Run it on a schedule</p>
       <p className="text-[13px] leading-relaxed text-muted-foreground">
         On the day, SheetsLLM fetches the link, runs the steps with no AI call, and emails you the cleaned file.
-        A Google Sheet needs to be shared with anyone who has the link.
+        Google Sheets, Drive, OneDrive, SharePoint and Dropbox links work when shared with anyone who has the link.
       </p>
       <label htmlFor={`schedule-url-${recipeId}`} className="block text-[12px] text-muted-foreground">
         The link to this month&apos;s file

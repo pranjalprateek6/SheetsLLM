@@ -41,7 +41,8 @@ The [try page](https://sheets-llm.vercel.app/try) opens a month of messy orders 
 - **Save the steps once.** A recipe replays every step exactly, with no AI call, so the result never drifts.
 - **Run reports.** Each run says how many rows each step took, and checks you set (for example "no empty Region") pass or fail on the new file.
 - **Columns that moved.** When next month's export renames a column, the run matches it and remembers the match.
-- **Runs on a schedule.** Give a recipe a link and a day of the month, and the cleaned file arrives by email. Reminders say when a recipe's file is due.
+- **Runs on a schedule.** Give a recipe a link (a Google Sheet, or a file shared from Google Drive, OneDrive, SharePoint or Dropbox) and a day of the month, and the cleaned file arrives by email. Reminders say when a recipe's file is due.
+- **A live link into your sheet.** A recipe's live link always serves the latest file it cleaned, so `=IMPORTDATA(link)` in Google Sheets, or Data, From Web in Excel, keeps a sheet current with every run. Turn it off and the link stops.
 - **Edit, share and keep.** Rename, reorder or remove steps, and share a recipe with a link anyone can add to their own account. Every change is kept as a version you can bring back, and a recipe exports as a file you can import into any account.
 
 **History and trust**

@@ -43,6 +43,7 @@ _ROUTE_TIMEOUTS = {
     "/reset": 90,
     "/files": 90,
     "/shared": 60,
+    "/live": 60,  # a live link serves a recipe's latest cleaned file
     "/schedules": 300,  # fetches and runs every recipe due today
     "/try": 30,  # the try page replays its steps on a 1,000-row sample
 }

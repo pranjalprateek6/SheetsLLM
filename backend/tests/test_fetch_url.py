@@ -152,3 +152,37 @@ def test_the_request_goes_to_the_checked_address_with_the_name_kept(monkeypatch)
 
     fetch_bytes("https://example.com:8443/x.csv", client=httpx.Client(transport=httpx.MockTransport(handler)))
     assert seen == {"url_host": "93.184.216.34", "host_header": "example.com:8443", "sni": "example.com"}
+
+
+# ── Share links from the usual places ────────────────────────────────
+
+
+@pytest.mark.parametrize("pasted,direct", [
+    # Google Drive: the file page, open?id= and uc?id= all become the download
+    ("https://drive.google.com/file/d/1aB-c_9/view?usp=sharing", "https://drive.google.com/uc?export=download&id=1aB-c_9"),
+    ("drive.google.com/open?id=1aB-c_9", "https://drive.google.com/uc?export=download&id=1aB-c_9"),
+    ("https://drive.google.com/uc?id=1aB-c_9&export=view", "https://drive.google.com/uc?export=download&id=1aB-c_9"),
+    # A sheet published to the web
+    ("https://docs.google.com/spreadsheets/d/e/2PACX-1vX/pubhtml", "https://docs.google.com/spreadsheets/d/e/2PACX-1vX/pub?output=csv"),
+    ("https://docs.google.com/spreadsheets/d/e/2PACX-1vX/pubhtml?gid=5&single=true", "https://docs.google.com/spreadsheets/d/e/2PACX-1vX/pub?output=csv&gid=5"),
+    # Dropbox: the preview link becomes the file
+    ("https://www.dropbox.com/scl/fi/abc/orders.csv?rlkey=k1&dl=0", "https://www.dropbox.com/scl/fi/abc/orders.csv?rlkey=k1&dl=1"),
+    ("https://www.dropbox.com/s/abc/orders.csv", "https://www.dropbox.com/s/abc/orders.csv?dl=1"),
+    # SharePoint and OneDrive share links
+    ("https://contoso.sharepoint.com/:x:/s/Finance/EaBc?e=xyz", "https://contoso.sharepoint.com/:x:/s/Finance/EaBc?e=xyz&download=1"),
+    ("https://1drv.ms/x/c/abc123/EXyz", "https://1drv.ms/x/c/abc123/EXyz?download=1"),
+    # Anything else is left as it is
+    ("https://example.com/exports/orders.csv", "https://example.com/exports/orders.csv"),
+])
+def test_share_links_become_the_file_itself(pasted, direct):
+    assert normalise_url(pasted) == direct
+
+
+def test_a_web_page_where_a_file_was_expected_says_so(monkeypatch):
+    _public(monkeypatch)
+    page = b"<!DOCTYPE html><html><head><title>Sign in</title></head><body>...</body></html>"
+    for headers in ({"content-type": "text/html; charset=utf-8"}, {"content-type": "application/octet-stream"}):
+        client = httpx.Client(transport=httpx.MockTransport(lambda r, h=headers: httpx.Response(200, content=page, headers=h)))
+        with pytest.raises(FetchError) as exc:
+            fetch_bytes("https://drive.google.com/uc?export=download&id=private", client=client)
+        assert exc.value.code == "NOT_A_FILE"

@@ -150,4 +150,4 @@ PUBLIC_PATHS = frozenset(
      "/try/apply"}
 )
 # Paths whose token is in the URL itself: a share link carries its own proof
-PUBLIC_PREFIXES = ("/shared/", "/shared-recipes/")
+PUBLIC_PREFIXES = ("/shared/", "/shared-recipes/", "/live/")
