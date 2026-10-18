@@ -86,11 +86,12 @@ No credit card to start, and you can cancel anytime. Your files, recipes and his
 
 ## Free tools
 
-Twelve in-browser tools that need no sign-up and never upload your file:
+Twenty-two in-browser tools that need no sign-up and never upload your file:
 
-- **Clean:** CSV cleaner, CSV duplicate remover, find and replace, change text case.
-- **Reshape:** merge CSV files, CSV splitter, remove or reorder columns, split a column.
-- **Convert:** Excel to CSV, JSON to CSV, CSV to JSON, CSV delimiter converter.
+- **Check:** CSV viewer, compare two CSV files, CSV validator.
+- **Clean:** CSV cleaner, CSV duplicate remover, find and replace, change text case, fill down blank cells, extract emails, links and phone numbers.
+- **Reshape:** merge CSV files, CSV splitter, remove or reorder columns, split a column, sort, transpose.
+- **Convert:** Excel to CSV, CSV to Excel, JSON to CSV, CSV to JSON, CSV delimiter converter, CSV to SQL, CSV to Markdown or HTML table.
 
 Try them at [sheets-llm.vercel.app/tools](https://sheets-llm.vercel.app/tools).
 
