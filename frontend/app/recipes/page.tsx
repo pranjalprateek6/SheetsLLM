@@ -1,13 +1,16 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { BookMarked, ChevronDown, FileSpreadsheet, Play, Upload } from "lucide-react";
+import { BookMarked, ChevronDown, Download, FileSpreadsheet, FileUp, Play, Upload } from "lucide-react";
+import { toast } from "sonner";
 
 import AuthGuard from "@/components/AuthGuard";
 import EmptyState from "@/components/EmptyState";
 import DueRecipes from "@/components/DueRecipes";
 import RecipeChecks from "@/components/RecipeChecks";
+import RecipeHistory from "@/components/RecipeHistory";
+import { exportRecipe, importRecipeFile } from "@/lib/recipe-files";
 import { RecipeSchedule, ShareRecipeButton } from "@/components/RecipeLoops";
 import { ordinal } from "@/lib/loops";
 import RecipeStepsEditor, { type RecipeStep } from "@/components/RecipeStepsEditor";
@@ -45,6 +48,12 @@ function RecipesContent() {
   const [applyFor, setApplyFor] = useState<Recipe | null>(null);
   const [files, setFiles] = useState<FileRow[] | null>(null);
   const [applying, setApplying] = useState<string | null>(null);
+  // Bumped when a recipe changes, so its history reloads and its editors
+  // start again from the version that is now current
+  const [changed, setChanged] = useState<Record<string, number>>({});
+  const bump = (id: string) => setChanged((c) => ({ ...c, [id]: (c[id] ?? 0) + 1 }));
+  const importInput = useRef<HTMLInputElement>(null);
+  const [importing, setImporting] = useState(false);
 
   const load = useCallback(() => {
     setFailed(false);
@@ -75,6 +84,36 @@ function RecipesContent() {
     }
   };
 
+  const reloadDetail = async (id: string) => {
+    try {
+      const res = await fetchWithAuth(`/api/recipes/${id}`);
+      if (!res.ok) return;
+      const d = await res.json();
+      setSteps((s) => ({ ...s, [id]: d.recipe?.steps ?? [] }));
+      setChecksOf((c) => ({ ...c, [id]: Array.isArray(d.recipe?.checks) ? d.recipe.checks : [] }));
+    } catch {}
+  };
+
+  const onImport = async (file: File | undefined) => {
+    if (!file) return;
+    setImporting(true);
+    try {
+      const r = await importRecipeFile(file);
+      const steps = `${r.steps} step${r.steps === 1 ? "" : "s"}`;
+      toast.success(`Imported "${r.name}"`, {
+        description: r.lookups.length
+          ? `${steps}. It uses ${r.lookups.join(", ")}: link a file under that name when you run it.`
+          : `${steps}, ready to run on a file.`,
+      });
+      load();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't import that file.");
+    } finally {
+      setImporting(false);
+      if (importInput.current) importInput.current.value = "";
+    }
+  };
+
   const pickFile = async (r: Recipe) => {
     setApplyFor(r);
     if (files) return;
@@ -102,6 +141,19 @@ function RecipesContent() {
           <p className="mt-1 text-sm text-muted-foreground">
             Steps you saved once, to run on next month&apos;s file in one click, with no AI call.
           </p>
+        </div>
+        <div>
+          <input
+            ref={importInput}
+            type="file"
+            accept=".json,application/json"
+            className="sr-only"
+            aria-label="Import a recipe file"
+            onChange={(e) => void onImport(e.target.files?.[0])}
+          />
+          <Button variant="outline" size="sm" disabled={importing} onClick={() => importInput.current?.click()}>
+            <FileUp className="mr-1.5 h-3.5 w-3.5" /> {importing ? "Importing…" : "Import a recipe"}
+          </Button>
         </div>
       </div>
 
@@ -156,6 +208,14 @@ function RecipesContent() {
                     Steps <ChevronDown className={cn("ml-1 h-3.5 w-3.5 transition-transform", open === r.id && "rotate-180")} />
                   </Button>
                   <ShareRecipeButton recipeId={r.id} />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    aria-label={`Export ${r.name} as a file`}
+                    onClick={() => void exportRecipe(r.id, r.name).catch((e) => toast.error(e instanceof Error ? e.message : "Couldn't export the recipe."))}
+                  >
+                    <Download className="mr-1.5 h-3.5 w-3.5" /> Export
+                  </Button>
                   <Button variant="outline" size="sm" onClick={() => pickFile(r)}>
                     <Play className="mr-1.5 h-3.5 w-3.5" /> Apply to…
                   </Button>
@@ -172,11 +232,13 @@ function RecipesContent() {
                 {stepsFailed[r.id] && <p className="px-4 py-3 text-sm text-muted-foreground">Couldn&apos;t load the steps. Close and open the recipe to try again.</p>}
                 {steps[r.id] && (
                   <RecipeStepsEditor
+                    key={`steps-${changed[r.id] ?? 0}`}
                     recipeId={r.id}
                     name={r.name}
                     steps={steps[r.id]}
                     onSaved={({ name, steps: next }) => {
                       setSteps((s) => ({ ...s, [r.id]: next }));
+                      bump(r.id);
                       setRecipes((list) => list?.map((x) => (x.id === r.id ? { ...x, name, steps: next.length } : x)) ?? list);
                     }}
                   />
@@ -191,9 +253,20 @@ function RecipesContent() {
                 </div>
                 {steps[r.id] && (
                   <div className="border-t px-4 py-3">
-                    <RecipeChecks recipeId={r.id} columns={r.required_columns ?? []} initial={checksOf[r.id] ?? []} />
+                    <RecipeChecks key={`checks-${changed[r.id] ?? 0}`} recipeId={r.id} columns={r.required_columns ?? []} initial={checksOf[r.id] ?? []} />
                   </div>
                 )}
+                <div className="border-t px-4 py-3">
+                  <RecipeHistory
+                    recipeId={r.id}
+                    refreshKey={changed[r.id] ?? 0}
+                    onRestored={async ({ name, steps: restored }) => {
+                      setRecipes((list) => list?.map((x) => (x.id === r.id ? { ...x, name, steps: restored.length } : x)) ?? list);
+                      await reloadDetail(r.id);
+                      bump(r.id);
+                    }}
+                  />
+                </div>
                 </div>
               )}
             </li>
