@@ -207,7 +207,11 @@ export function downloadText(filename: string, text: string, mime = "text/csv") 
   // Excel on Windows reads a BOM-less CSV in the system code page and mojibakes
   // anything non-Latin; the MIME charset is not stored in the file.
   const body = mime.startsWith("text/csv") ? "\ufeff" + text : text;
-  const blob = new Blob([body], { type: `${mime};charset=utf-8` });
+  downloadBlob(filename, new Blob([body], { type: `${mime};charset=utf-8` }));
+}
+
+/** Hands a file to the browser as a download. */
+export function downloadBlob(filename: string, blob: Blob) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
