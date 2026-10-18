@@ -6,7 +6,7 @@ import { GROUPS, TOOLS } from "@/components/tools/catalog";
 export const metadata: Metadata = {
   title: "Free CSV, Excel & JSON Tools: Private, In-Browser, No Signup",
   description:
-    "Twelve free tools for spreadsheet files: clean, dedupe, find and replace, merge, split, reorder columns, and convert between CSV, Excel, JSON and delimiters. Everything runs in your browser.",
+    `${TOOLS.length} free tools for spreadsheet files: view, compare and validate, clean, dedupe, fill down, sort, transpose, merge and split, and convert between CSV, Excel, JSON, SQL and Markdown. Everything runs in your browser.`,
   alternates: { canonical: "/tools" },
 };
 
@@ -21,7 +21,7 @@ export default function ToolsIndex() {
             </h1>
             <div className="max-w-[560px]">
               <p className="text-[17px] leading-relaxed text-soft">
-                Twelve quick fixes for messy data files: clean, reshape and convert. No signup, and nothing
+                {TOOLS.length} quick fixes for messy data files: check, clean, reshape and convert. No signup, and nothing
                 is uploaded anywhere.
               </p>
               <BrowserOnly className="mt-4" />

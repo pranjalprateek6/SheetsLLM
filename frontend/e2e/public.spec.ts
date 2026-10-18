@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+import { TOOLS } from "../components/tools/catalog";
+
 /* The pages anyone can reach. These need only the frontend. */
 
 test("the landing page leads with the promise", async ({ page }) => {
@@ -15,14 +17,17 @@ test("pricing shows both plans", async ({ page }) => {
   await expect(page.getByText("₹499", { exact: false })).toBeVisible();
 });
 
-test("the tools index lists all twelve free tools", async ({ page }) => {
+test("the tools index lists every free tool, and each tool page opens", async ({ page }) => {
+  expect(TOOLS.length).toBe(22);
   await page.goto("/tools");
-  for (const href of [
-    "/tools/csv-cleaner", "/tools/csv-deduplicate", "/tools/csv-find-replace", "/tools/change-case",
-    "/tools/merge-csv", "/tools/csv-splitter", "/tools/csv-columns", "/tools/split-column",
-    "/tools/excel-to-csv", "/tools/json-to-csv", "/tools/csv-to-json", "/tools/csv-delimiter",
-  ]) {
+  for (const { href } of TOOLS) {
     await expect(page.locator(`a[href="${href}"]`).first()).toBeVisible();
+  }
+  for (const { href, name } of TOOLS) {
+    await page.goto(href);
+    await expect(page.getByRole("heading", { level: 1 }), href).toBeVisible();
+    // Every tool starts from a file
+    await expect(page.locator('input[type="file"]').first(), `${href} (${name})`).toBeAttached();
   }
 });
 

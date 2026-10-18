@@ -6,7 +6,7 @@ import { Switch } from "@/components/ui/switch";
 import { formatCount, type Table } from "@/lib/csv-tools";
 import { cn } from "@/lib/utils";
 
-/* Small pieces every free tool's panel is built from, so the twelve tools
+/* Small pieces every free tool's panel is built from, so every free tool
    read as one family: the file line, warnings, a field label, column pills,
    option toggles, choice pills and the result line. */
 
