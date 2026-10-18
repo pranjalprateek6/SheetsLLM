@@ -24,7 +24,9 @@ test.setTimeout(6 * 60_000);
 
 // Controls a sweep must not press: they leave the session, spend money, or
 // destroy the account the rest of the sweep runs on
-const SKIP = /sign out|log out|delete (my )?account|delete everything|checkout|upgrade|subscribe|pay |razorpay|cancel (my )?(plan|subscription)/i;
+// Billing and account-security controls refuse the dev account the sweep
+// signs in as, by design, so they are left to tests with a real account
+const SKIP = /sign out|log out|delete (my )?account|delete everything|checkout|upgrade|subscribe|pay |razorpay|cancel (my )?(plan|subscription)|waitlist|notify me|password|change (my )?email/i;
 // A click on these opens the OS or another site; their href is checked instead
 const EXTERNAL = /^(mailto:|tel:|https?:\/\/(?!localhost))/i;
 
