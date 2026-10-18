@@ -42,7 +42,7 @@ The [try page](https://sheets-llm.vercel.app/try) opens a month of messy orders 
 - **Run reports.** Each run says how many rows each step took, and checks you set (for example "no empty Region") pass or fail on the new file.
 - **Columns that moved.** When next month's export renames a column, the run matches it and remembers the match.
 - **Runs on a schedule.** Give a recipe a link and a day of the month, and the cleaned file arrives by email. Reminders say when a recipe's file is due.
-- **Edit and share.** Rename, reorder or remove steps, and share a recipe with a link anyone can add to their own account.
+- **Edit, share and keep.** Rename, reorder or remove steps, and share a recipe with a link anyone can add to their own account. Every change is kept as a version you can bring back, and a recipe exports as a file you can import into any account.
 
 **History and trust**
 - **Every step is kept** with the query it ran and the rows before and after. Undo, redo, view the file as it was at any step, or go back to it. The original is never touched.

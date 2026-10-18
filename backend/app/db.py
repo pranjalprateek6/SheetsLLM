@@ -793,6 +793,81 @@ def save_recipe_checks(recipe_id: str, user_id: str, checks: list[dict]) -> dict
         raise
 
 
+# ── Recipe versions (migration 019) ──────────────────────────────────
+
+_VERSION_FIELDS = "id,recipe_id,version,reason,restored_from,name,steps,required_columns,checks,required_lookups,created_at"
+
+
+def _versions_missing(exc: Exception) -> bool:
+    return "recipe_versions" in str(exc)
+
+
+def list_recipe_versions(recipe_id: str, user_id: str, limit: int = 50) -> list[dict]:
+    """A recipe's versions, newest first."""
+    if not is_uuid(recipe_id):
+        return []
+    try:
+        resp = (
+            get_client()
+            .table("recipe_versions")
+            .select(_VERSION_FIELDS)
+            .eq("recipe_id", recipe_id)
+            .eq("user_id", user_id)
+            .order("version", desc=True)
+            .limit(limit)
+            .execute()
+        )
+    except Exception as exc:
+        if _versions_missing(exc):
+            raise MigrationMissing("Run migration 019 to keep a recipe's history") from exc
+        raise
+    return resp.data or []
+
+
+def get_recipe_version(recipe_id: str, user_id: str, version: int) -> dict | None:
+    if not is_uuid(recipe_id):
+        return None
+    try:
+        resp = (
+            get_client()
+            .table("recipe_versions")
+            .select(_VERSION_FIELDS)
+            .eq("recipe_id", recipe_id)
+            .eq("user_id", user_id)
+            .eq("version", version)
+            .limit(1)
+            .execute()
+        )
+    except Exception as exc:
+        if _versions_missing(exc):
+            raise MigrationMissing("Run migration 019 to keep a recipe's history") from exc
+        raise
+    return resp.data[0] if resp.data else None
+
+
+def add_recipe_version(**row: Any) -> dict:
+    try:
+        resp = get_client().table("recipe_versions").insert(row).execute()
+    except Exception as exc:
+        if _versions_missing(exc):
+            raise MigrationMissing("Run migration 019 to keep a recipe's history") from exc
+        raise
+    return resp.data[0] if resp.data else row
+
+
+def prune_recipe_versions(recipe_id: str, user_id: str, below_version: int) -> None:
+    """Drop a recipe's versions older than `below_version`."""
+    (
+        get_client()
+        .table("recipe_versions")
+        .delete()
+        .eq("recipe_id", recipe_id)
+        .eq("user_id", user_id)
+        .lt("version", below_version)
+        .execute()
+    )
+
+
 def count_audit_actions(user_id: str, action: str, since_iso: str) -> int:
     """Count a user's audit entries of one action type since a timestamp.
     Powers the dashboard's 'manual cleanups avoided' insight."""

@@ -258,3 +258,49 @@ test("signed in: a workbook's sheets become files", async ({ browser }) => {
   for (const id of ids) await page.request.delete(`http://localhost:8000/files/${id}`).catch(() => {});
   await context.close();
 });
+
+test("signed in: a recipe goes out as a file and comes back, with its history", async ({ browser }) => {
+  const { context, page } = await signedInPage(browser);
+  watch(page, () => "recipe file");
+  const api = "http://localhost:8000";
+  // A recipe to export: the sample, one one-click fix, saved
+  const csv = readFileSync(join(__dirname, "fixtures", "orders_oct.csv"));
+  const up = await (await page.request.post(`${api}/upload`, { data: csv, headers: { "X-Filename": "orders_oct.csv", "Content-Type": "application/octet-stream" } })).json();
+  await page.request.post(`${api}/transform/op`, { data: { file_id: up.file_id, op: "dedupe" } });
+  const name = `Sweep recipe ${Date.now()}`;
+  const saved = await (await page.request.post(`${api}/recipes`, { data: { file_id: up.file_id, name } })).json();
+  const made: string[] = [saved.recipe_id];
+  try {
+    await page.goto("/recipes");
+    const row = page.locator("li").filter({ hasText: name }).first();
+    await expect(row).toBeVisible({ timeout: 20_000 });
+
+    const download = page.waitForEvent("download");
+    await row.getByRole("button", { name: `Export ${name} as a file` }).click();
+    const file = await download;
+    expect(file.suggestedFilename()).toMatch(/^sweep-recipe-\d+\.sllm-recipe\.json$/);
+    const exported = JSON.parse(readFileSync(await file.path(), "utf8"));
+    expect(exported.format).toBe("sheetsllm-recipe");
+    expect(exported.steps[0].sql_query).toMatch(/SELECT/i);
+
+    const answer = page.waitForResponse((r) => r.url().includes("/api/recipes/import-file"));
+    await page.getByLabel("Import a recipe file").setInputFiles(await file.path());
+    const imported = await (await answer).json();
+    made.push(imported.recipe_id);
+    await expect(page.getByText(`Imported "${name}"`)).toBeVisible();
+    // Rows of the recipe list, not the toast (which is a list item too)
+    await expect(page.locator("main ul > li").filter({ hasText: name })).toHaveCount(2, { timeout: 15_000 });
+    if (process.env.SWEEP_SHOTS) await page.screenshot({ path: `${process.env.SWEEP_SHOTS}/recipes-imported.png`, fullPage: true });
+
+    // History: versions, or a plain note where the database has no history yet
+    await row.getByRole("button", { name: /^Steps/ }).click();
+    await expect(page.getByText("History").first()).toBeVisible();
+    await expect(page.getByText(/^v1$|History starts being kept once the database is updated/).first()).toBeVisible({ timeout: 15_000 });
+    if (process.env.SWEEP_SHOTS) await page.screenshot({ path: `${process.env.SWEEP_SHOTS}/recipes-history.png`, fullPage: true });
+    report("recipe file", 3);
+  } finally {
+    for (const id of made) await page.request.delete(`${api}/recipes/${id}`).catch(() => {});
+    await page.request.delete(`${api}/files/${up.file_id}`).catch(() => {});
+    await context.close();
+  }
+});

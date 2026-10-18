@@ -128,6 +128,9 @@ async def create_recipe(request: Request):
         )
     except Exception:
         logger.warning("Audit entry failed for recipe_create %s", recipe["id"])
+    from app import recipe_versions
+
+    recipe_versions.record(user_id, recipe, "saved")
     source = body.get("from") if body.get("from") in ("export_strip", "rail", "drawer") else None
     events.record(user_id, "recipe_saved", recipe_id=recipe["id"], steps=len(recipe_steps),
                   **({"from": source} if source else {}))
@@ -225,9 +228,14 @@ async def update_recipe(request: Request, recipe_id: str):
             400, "NO_FIELDS", "Provide name and/or description to update"
         )
 
+    before = db.get_recipe(recipe_id, user_id)
     updated = db.update_recipe(recipe_id, user_id, **updates)
     if not updated:
         return _json_response(404, "RECIPE_NOT_FOUND", "Recipe not found")
+    if before and "name" in updates and updates["name"] != before.get("name"):
+        from app import recipe_versions
+
+        recipe_versions.record(user_id, updated, "renamed", before=before)
 
     try:
         db.create_audit_entry(
@@ -618,6 +626,9 @@ async def put_recipe_steps(request: Request, recipe_id: str):
         )
     except Exception:
         logger.warning("Audit entry failed for recipe_update %s", recipe_id)
+    from app import recipe_versions
+
+    recipe_versions.record(user_id, updated, "steps_replaced" if "from_file" in change else "steps_edited", before=recipe)
     events.record(user_id, "recipe_steps_edited", recipe_id=recipe_id, steps=len(updates["steps"]), **change)
     return {
         "recipe_id": recipe_id,
@@ -646,7 +657,8 @@ async def put_recipe_checks(request: Request, recipe_id: str):
         checks = validate_checks(body.get("checks"))
     except RecipeError as exc:
         return _json_response(400, "INVALID_CHECKS", str(exc))
-    if not db.get_recipe(recipe_id, user_id):
+    before = db.get_recipe(recipe_id, user_id)
+    if not before:
         return _json_response(404, "RECIPE_NOT_FOUND", "Recipe not found")
     try:
         updated = db.save_recipe_checks(recipe_id, user_id, checks)
@@ -654,6 +666,10 @@ async def put_recipe_checks(request: Request, recipe_id: str):
         return _json_response(503, "MIGRATION_REQUIRED", str(exc))
     if not updated:
         return _json_response(404, "RECIPE_NOT_FOUND", "Recipe not found")
+    if (before.get("checks") or []) != checks:
+        from app import recipe_versions
+
+        recipe_versions.record(user_id, updated, "checks_changed", before=before)
     events.record(user_id, "recipe_checks_saved", recipe_id=recipe_id, checks=len(checks))
     return {
         "recipe_id": recipe_id,

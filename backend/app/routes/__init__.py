@@ -26,6 +26,7 @@ from .digest import router as digest_router
 from .loops import router as loops_router
 from .account import router as account_router
 from .try_demo import router as try_router
+from .recipe_history import router as recipe_history_router
 
 
 def register_routes(app: FastAPI) -> None:
@@ -51,6 +52,7 @@ def register_routes(app: FastAPI) -> None:
     app.include_router(digest_router)
     app.include_router(account_router)
     app.include_router(try_router)
+    app.include_router(recipe_history_router)
     if LLM_PROVIDER == "fake":
         from .fake_llm import router as fake_llm_router
         app.include_router(fake_llm_router)
