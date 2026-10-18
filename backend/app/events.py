@@ -79,6 +79,8 @@ EVENTS = frozenset({
     "try_started", "try_fix_applied", "try_replayed", "try_carried_over",
     # a recipe's live link, for a sheet that keeps up with every run
     "live_link_created",
+    # a recipe's history and recipe files
+    "recipe_version_restored", "recipe_exported",
 })
 
 

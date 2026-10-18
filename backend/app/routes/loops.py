@@ -155,5 +155,8 @@ async def import_recipe(request: Request):
         steps=source.get("steps") or [],
         required_columns=source.get("required_columns") or [],
     )
+    from app import recipe_versions
+
+    recipe_versions.record(user_id, recipe, "imported")
     events.record(user_id, "recipe_imported")
     return {"recipe_id": recipe["id"], "name": recipe.get("name")}

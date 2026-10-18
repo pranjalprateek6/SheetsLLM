@@ -10,6 +10,14 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: "2026-10-18",
+    title: "Ten more free tools, and a workbook's sheets as files of their own",
+    items: [
+      "Pick several sheets of an Excel workbook when you upload it: each becomes its own file, named for the workbook and the sheet, and the workbook counts as one upload.",
+      "New free tools that run in your browser: a CSV viewer, compare two CSV files, a CSV validator, fill down, extract emails, links and phone numbers, sort, transpose, and CSV to Excel, SQL, or a Markdown or HTML table.",
+    ],
+  },
+  {
     date: "2026-10-16",
     title: "Try it without signing up, light and dark everywhere, and a grid that shows its width",
     items: [

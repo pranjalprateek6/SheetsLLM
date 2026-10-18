@@ -11,6 +11,9 @@ const nextConfig = {
             value: [
               "default-src 'self'",
               "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+              // The free CSV to Excel tool zips in a worker made from a blob
+              // of this page's own code (fflate); without this it waits forever
+              "worker-src 'self' blob:",
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob:",
               "font-src 'self' data:",

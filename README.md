@@ -43,7 +43,7 @@ The [try page](https://sheets-llm.vercel.app/try) opens a month of messy orders 
 - **Columns that moved.** When next month's export renames a column, the run matches it and remembers the match.
 - **Runs on a schedule.** Give a recipe a link (a Google Sheet, or a file shared from Google Drive, OneDrive, SharePoint or Dropbox) and a day of the month, and the cleaned file arrives by email. Reminders say when a recipe's file is due.
 - **A live link into your sheet.** A recipe's live link always serves the latest file it cleaned, so `=IMPORTDATA(link)` in Google Sheets, or Data, From Web in Excel, keeps a sheet current with every run. Turn it off and the link stops.
-- **Edit and share.** Rename, reorder or remove steps, and share a recipe with a link anyone can add to their own account.
+- **Edit, share and keep.** Rename, reorder or remove steps, and share a recipe with a link anyone can add to their own account. Every change is kept as a version you can bring back, and a recipe exports as a file you can import into any account.
 
 **History and trust**
 - **Every step is kept** with the query it ran and the rows before and after. Undo, redo, view the file as it was at any step, or go back to it. The original is never touched.
@@ -87,11 +87,12 @@ No credit card to start, and you can cancel anytime. Your files, recipes and his
 
 ## Free tools
 
-Twelve in-browser tools that need no sign-up and never upload your file:
+Twenty-two in-browser tools that need no sign-up and never upload your file:
 
-- **Clean:** CSV cleaner, CSV duplicate remover, find and replace, change text case.
-- **Reshape:** merge CSV files, CSV splitter, remove or reorder columns, split a column.
-- **Convert:** Excel to CSV, JSON to CSV, CSV to JSON, CSV delimiter converter.
+- **Check:** CSV viewer, compare two CSV files, CSV validator.
+- **Clean:** CSV cleaner, CSV duplicate remover, find and replace, change text case, fill down blank cells, extract emails, links and phone numbers.
+- **Reshape:** merge CSV files, CSV splitter, remove or reorder columns, split a column, sort, transpose.
+- **Convert:** Excel to CSV, CSV to Excel, JSON to CSV, CSV to JSON, CSV delimiter converter, CSV to SQL, CSV to Markdown or HTML table.
 
 Try them at [sheets-llm.vercel.app/tools](https://sheets-llm.vercel.app/tools).
 
