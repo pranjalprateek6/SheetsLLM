@@ -1,4 +1,5 @@
 import { fetchWithAuth } from "@/lib/fetch-with-auth";
+import { sendFile } from "@/lib/upload";
 
 /** A lookup table linked to the open file: another file of yours, under a
  *  short name a step or a question can use. */
@@ -37,9 +38,7 @@ export async function addLookup(fileId: string, lookupFileId: string, alias?: st
  *  Used when a sample opens with its lookup beside it. The upload counts
  *  as one of the month's uploads, like any file. */
 export async function uploadAndLink(fileId: string, file: File, alias: string): Promise<Lookup> {
-  const form = new FormData();
-  form.append("file", file);
-  const r = await fetchWithAuth("/api/upload?source=sample", { method: "POST", body: form });
+  const r = await sendFile(file, file.name, new URLSearchParams({ source: "sample" }));
   const d = await r.json().catch(() => ({}));
   if (!r.ok || !d.file_id) throw new LookupFailure(d.code ?? "UPLOAD_FAILED", d.message ?? `Couldn't upload ${file.name}.`);
   try {

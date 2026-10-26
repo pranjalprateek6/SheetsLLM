@@ -159,7 +159,10 @@ def test_admin_metrics_is_owner_only(client):
 
 def test_admin_metrics_for_the_owner(monkeypatch):
     monkeypatch.setattr(admin_route, "ADMIN_EMAILS", frozenset({"owner@example.com"}))
-    monkeypatch.setattr(db, "list_events", lambda since, names, limit=0: [ev("chat_sent", 0.1, kind="error")])
+    # The route reads the last 14 days from the real clock, so the event is
+    # dated from it too (a fixed date stops counting two weeks later)
+    recent = {**ev("chat_sent", 0, kind="error"), "created_at": (dt.datetime.now(dt.timezone.utc) - dt.timedelta(hours=2)).isoformat()}
+    monkeypatch.setattr(db, "list_events", lambda since, names, limit=0: [recent])
     monkeypatch.setattr(db, "count_recipes", lambda: 3)
     monkeypatch.setattr(db, "step_counts", lambda ids: {})
     req = types.SimpleNamespace(state=types.SimpleNamespace(email="Owner@Example.com"))

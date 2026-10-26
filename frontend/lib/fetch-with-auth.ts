@@ -44,8 +44,12 @@ function slowEnded() {
 /** How long a request may take before it is called stalled. Uploads and
  *  Chef get the room their server routes have; everything else a little
  *  more than the longest route. */
+/** An upload, through the proxy or straight to the backend */
+export const isUpload = (url: string) => url.startsWith("/api/upload") || /\/upload(\?|$)/.test(url);
+
 export function timeoutFor(url: string): number {
-  if (url.startsWith("/api/upload")) return 180_000;
+  // A large file can take minutes to send; the server allows 10
+  if (isUpload(url)) return 600_000;
   if (url.startsWith("/api/chat")) return 100_000;
   return 100_000;
 }
@@ -62,11 +66,14 @@ export async function fetchWithAuth(
     headers.set("Authorization", `Bearer ${token}`);
   }
 
+  // A long upload is the file travelling, not the server waking up
   let slow = false;
-  const timer = setTimeout(() => {
-    slow = true;
-    slowStarted();
-  }, WAKING_AFTER_MS);
+  const timer = isUpload(url)
+    ? undefined
+    : setTimeout(() => {
+        slow = true;
+        slowStarted();
+      }, WAKING_AFTER_MS);
 
   // A request that never answers ends, with a message, rather than spinning
   const limitMs = timeoutFor(url);

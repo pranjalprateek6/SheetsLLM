@@ -712,110 +712,118 @@ class TooManyRowsError(UnreadableFileError):
     """The file is over the per-file row limit. Refused whole: keeping the
     first MAX_ROWS rows would quietly drop the rest of someone's data."""
 
-    def __init__(self, rows: int):
+    def __init__(self, rows: int | None = None):
+        size = f"{rows:,} rows" if rows and rows > MAX_ROWS + 1 else f"more than {MAX_ROWS:,} rows"
         super().__init__(
-            f"This file has {rows:,} rows, over the {MAX_ROWS:,} row limit per file. "
-            "Split it into smaller files and upload each one."
+            f"This file has {size}, over the {MAX_ROWS:,} row limit per file. "
+            "Upload its first rows, or split it into smaller files and upload each one."
         )
 
 
-def _read_csv_lenient(con, tmp_path: str, *, delim: str | None = None) -> None:
-    """CSV ingest with a lenient second attempt.
-
-    Real-world exports (mixed line endings, ragged rows) can fail DuckDB's
-    strict sniffer with a wall-of-text error. Retry with strict mode off and
-    null padding before giving up with a message a human can act on.
-    """
+def _csv_source(path: str, delim: str | None, *, lenient: bool) -> str:
     delim_arg = f", delim='{delim}'" if delim else ""
+    extra = ", strict_mode=false, null_padding=true" if lenient else ""
+    return f"SELECT * FROM read_csv_auto('{path}'{delim_arg}{extra})"
+
+
+_UNREADABLE_CSV = (
+    "We couldn't read this file as a CSV. It may use inconsistent "
+    "formatting: mixed line endings, uneven columns, or an unusual "
+    "delimiter. Re-saving it as a standard CSV from your spreadsheet "
+    "tool usually fixes this."
+)
+
+
+def _quote(name: str) -> str:
+    return '"' + name.replace('"', '""') + '"'
+
+
+def convert_path_to_parquet(
+    src_path: str | Path, filename: str, *, sheet_name: str | None = None
+) -> tuple[bytes, int, int]:
+    """Convert a CSV/TSV/JSON/XLSX/Parquet file on disk to Parquet.
+    Returns (parquet_bytes, row_count, column_count).
+
+    DuckDB reads the file and writes the Parquet straight to disk, so a
+    large upload is never held whole in memory (a 1M-row CSV used to peak
+    at over 500 MB this way). It reads at most MAX_ROWS + 1 rows: a file
+    over the cap is refused as soon as that is known, not after a full read.
+    Column names get the same cleaning as before.
+    """
+    lower = filename.lower()
+    src = str(src_path)
+    sql_src = _sql_path(src)
+
+    if lower.endswith(".parquet") or lower.endswith(".pq"):
+        meta = pq.ParquetFile(src).metadata
+        if meta.num_rows > MAX_ROWS:
+            raise TooManyRowsError(meta.num_rows)
+        names = [str(n) for n in pq.ParquetFile(src).schema_arrow.names]
+        if sanitize_column_names(names) == names:
+            return Path(src).read_bytes(), meta.num_rows, meta.num_columns
+
+    out = tempfile.NamedTemporaryFile(delete=False, suffix=".parquet")
+    out.close()
+    con = get_connection(read=(src,), write=(out.name,))
     try:
-        con.execute(
-            f"CREATE TABLE staging AS SELECT * FROM read_csv_auto('{tmp_path}'{delim_arg})"
-        )
-        return
-    except Exception as first_exc:
-        logger.warning("csv strict parse failed, retrying leniently: %s", first_exc)
-        try:
-            con.execute(
-                "CREATE TABLE staging AS SELECT * FROM read_csv_auto("
-                f"'{tmp_path}'{delim_arg}, strict_mode=false, null_padding=true)"
-            )
-            return
-        except Exception:
-            raise UnreadableFileError(
-                "We couldn't read this file as a CSV. It may use inconsistent "
-                "formatting: mixed line endings, uneven columns, or an unusual "
-                "delimiter. Re-saving it as a standard CSV from your spreadsheet "
-                "tool usually fixes this."
-            ) from first_exc
+        if lower.endswith(".parquet") or lower.endswith(".pq"):
+            sources = [f"SELECT * FROM read_parquet('{sql_src}')"]
+        elif lower.endswith(".xlsx") or lower.endswith(".xls"):
+            import pandas as pd
+
+            df = pd.read_excel(src, sheet_name=sheet_name or 0)
+            con.register("staging", df)
+            sources = ["SELECT * FROM staging"]
+        elif lower.endswith(".json") or lower.endswith(".jsonl"):
+            sources = [f"SELECT * FROM read_json_auto('{sql_src}')"]
+        else:
+            delim = "\\t" if lower.endswith(".tsv") else None
+            # Strict first; real-world exports (mixed line endings, ragged
+            # rows) get a lenient second attempt
+            sources = [_csv_source(sql_src, delim, lenient=False), _csv_source(sql_src, delim, lenient=True)]
+
+        last_exc: Exception | None = None
+        for i, source in enumerate(sources):
+            try:
+                names = [str(r[0]) for r in con.execute(f"DESCRIBE {source}").fetchall()]
+                clean = sanitize_column_names(names)
+                select = ", ".join(f"{_quote(n)} AS {_quote(c)}" for n, c in zip(names, clean))
+                con.execute(
+                    f"COPY (SELECT {select} FROM ({source}) LIMIT {MAX_ROWS + 1}) "
+                    f"TO '{_sql_path(out.name)}' (FORMAT parquet, COMPRESSION zstd)"
+                )
+                break
+            except Exception as exc:
+                last_exc = exc
+                if i + 1 < len(sources):
+                    logger.warning("csv strict parse failed, retrying leniently: %s", exc)
+        else:
+            if lower.endswith((".csv", ".tsv", ".txt")) or not lower.endswith((".json", ".jsonl", ".xlsx", ".xls", ".parquet", ".pq")):
+                raise UnreadableFileError(_UNREADABLE_CSV) from last_exc
+            raise last_exc  # type: ignore[misc]
+
+        meta = pq.ParquetFile(out.name).metadata
+        if meta.num_rows > MAX_ROWS:
+            raise TooManyRowsError()
+        return Path(out.name).read_bytes(), meta.num_rows, meta.num_columns
+    finally:
+        con.close()
+        Path(out.name).unlink(missing_ok=True)
 
 
 def convert_to_parquet(
     file_bytes: bytes, filename: str, *, sheet_name: str | None = None
 ) -> tuple[bytes, int, int]:
-    """
-    Convert CSV/XLSX/JSON/TSV to Parquet using DuckDB + PyArrow.
-    Returns (parquet_bytes, row_count, column_count).
-    """
-    lower = filename.lower()
-
-    # Write to a temp file for DuckDB to read
-    suffix = Path(filename).suffix
-    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
-    tmp.write(file_bytes)
-    tmp.flush()
-    tmp.close()
-    con = get_connection(read=(tmp.name,))
-    tmp_path = _sql_path(tmp.name)  # forward slashes + quote-escaped for DuckDB
-
+    """Convert CSV/XLSX/JSON/TSV/Parquet bytes to Parquet.
+    Returns (parquet_bytes, row_count, column_count). For a file already on
+    disk, convert_path_to_parquet avoids holding it in memory."""
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=Path(filename).suffix)
     try:
-        if lower.endswith(".parquet") or lower.endswith(".pq"):
-            # Already parquet — enforce the row cap, else pass through
-            arrow_table = pq.read_table(tmp.name)
-            if arrow_table.num_rows > MAX_ROWS:
-                raise TooManyRowsError(arrow_table.num_rows)
-            names = [str(c) for c in arrow_table.column_names]
-            if sanitize_column_names(names) == names:
-                return file_bytes, arrow_table.num_rows, arrow_table.num_columns
-            # Otherwise its names get the same cleaning as any upload, below
-        elif lower.endswith(".xlsx") or lower.endswith(".xls"):
-            import pandas as pd
-
-            df = pd.read_excel(
-                io.BytesIO(file_bytes),
-                sheet_name=sheet_name or 0,
-            )
-            con.register("staging", df)
-        elif lower.endswith(".json") or lower.endswith(".jsonl"):
-            con.execute(
-                f"CREATE TABLE staging AS SELECT * FROM read_json_auto('{tmp_path}')"
-            )
-        elif lower.endswith(".tsv"):
-            _read_csv_lenient(con, tmp_path, delim="\\t")
-        else:
-            # Default: CSV
-            _read_csv_lenient(con, tmp_path)
-
-        if not (lower.endswith(".parquet") or lower.endswith(".pq")):
-            arrow_table = con.execute("SELECT * FROM staging").fetch_arrow_table()
+        tmp.write(file_bytes)
+        tmp.close()
+        return convert_path_to_parquet(tmp.name, filename, sheet_name=sheet_name)
     finally:
         Path(tmp.name).unlink(missing_ok=True)
-
-    # Sanitize column names (strip control chars, deduplicate)
-    original_names = [str(c) for c in arrow_table.column_names]
-    clean_names = sanitize_column_names(original_names)
-    if clean_names != original_names:
-        arrow_table = arrow_table.rename_columns(clean_names)
-
-    # The row cap refuses the file rather than keeping only part of it
-    if arrow_table.num_rows > MAX_ROWS:
-        raise TooManyRowsError(arrow_table.num_rows)
-
-    row_count = arrow_table.num_rows
-    col_count = arrow_table.num_columns
-
-    buf = io.BytesIO()
-    pq.write_table(arrow_table, buf, compression="zstd")
-    return buf.getvalue(), row_count, col_count
 
 
 def detect_sheets(file_bytes: bytes, filename: str) -> list[str] | None:

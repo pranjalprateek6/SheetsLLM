@@ -5,7 +5,9 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import tempfile
 import uuid
+from pathlib import Path
 from time import perf_counter
 
 from fastapi import APIRouter, Header, HTTPException, Query, Request, Response
@@ -15,6 +17,7 @@ from app import cache, db, storage
 from app.fetch_url import FetchError, fetch_bytes, normalise_url
 from app.engine import (
     UnreadableFileError,
+    convert_path_to_parquet,
     convert_to_parquet,
     detect_sheets,
     get_schema_from_local,
@@ -32,6 +35,9 @@ from app.usage import UsageLimitExceeded
 logger = logging.getLogger("sheetsllm.routes.upload")
 
 router = APIRouter()
+
+# Uploads up to this size are converted from memory; larger ones from disk
+IN_MEMORY_BYTES = 8 * 1024 * 1024
 
 # Sheets one upload may add as files: enough for a workbook of months,
 # few enough that converting them stays inside the upload's time
@@ -57,7 +63,10 @@ async def upload(
     request_id = getattr(request.state, "request_id", "unknown")
     user_id = getattr(request.state, "user_id", "anonymous")
     file_id = str(uuid.uuid4())
-    filename = (x_filename or "upload.csv").strip()
+    # The browser sends the name URL-encoded (a header carries ASCII only)
+    from urllib.parse import unquote
+
+    filename = unquote(x_filename or "upload.csv").strip().replace("/", "_").replace("\\", "_")[:200] or "upload.csv"
     start_time = perf_counter()
 
     # ── Monthly usage cap ────────────────────────────────────────────
@@ -92,21 +101,44 @@ async def upload(
             except ValueError:
                 pass
 
-        chunks: list[bytes] = []
+        # The body goes to disk as it arrives, never whole into memory: a
+        # large CSV is then converted from the file (engine.convert_path_to_parquet)
+        spool = tempfile.NamedTemporaryFile(delete=False, suffix=".upload")
         bytes_seen = 0
-        async for chunk in request.stream():
-            if not chunk:
-                continue
-            bytes_seen += len(chunk)
-            if bytes_seen > UPLOAD_MAX_BYTES:
-                return _json_response(
-                    413, "UPLOAD_TOO_LARGE", f"Max upload size is {MAX_UPLOAD_MB} MB"
+        try:
+            async for chunk in request.stream():
+                if not chunk:
+                    continue
+                bytes_seen += len(chunk)
+                if bytes_seen > UPLOAD_MAX_BYTES:
+                    spool.close()
+                    return _json_response(
+                        413, "UPLOAD_TOO_LARGE", f"Max upload size is {MAX_UPLOAD_MB} MB"
+                    )
+                spool.write(chunk)
+            spool.close()
+            if not bytes_seen:
+                return _json_response(400, "EMPTY_FILE", "No file data received")
+            lower = filename.lower()
+            if bytes_seen <= IN_MEMORY_BYTES or lower.endswith((".xlsx", ".xls", ".xlsm")):
+                # Small files, and workbooks (the sheet question and the
+                # macro check read them whole), go through as bytes
+                file_bytes = Path(spool.name).read_bytes()
+                return await _ingest(
+                    user_id=user_id, file_id=file_id, filename=filename, file_bytes=file_bytes,
+                    sheet_name=sheet_name, sheet_names=sheet_names, pending_id=pending_id, source=source,
+                    start_time=start_time,
                 )
-            chunks.append(chunk)
-
-        file_bytes = b"".join(chunks)
-        if not file_bytes:
-            return _json_response(400, "EMPTY_FILE", "No file data received")
+            with open(spool.name, "rb") as fh:
+                head = fh.read(64 * 1024)
+            return await _ingest(
+                user_id=user_id, file_id=file_id, filename=filename, file_bytes=head,
+                sheet_name=sheet_name, sheet_names=sheet_names, pending_id=pending_id, source=source,
+                start_time=start_time, file_path=spool.name, file_size=bytes_seen,
+            )
+        finally:
+            spool.close()
+            Path(spool.name).unlink(missing_ok=True)
 
     return await _ingest(
         user_id=user_id, file_id=file_id, filename=filename, file_bytes=file_bytes,
@@ -119,6 +151,7 @@ async def _ingest(
     *, user_id: str, file_id: str, filename: str, file_bytes: bytes,
     sheet_name: str | None, pending_id: str | None, source: str | None, start_time: float,
     source_url: str | None = None, sheet_names: list[str] | None = None,
+    file_path: str | None = None, file_size: int | None = None,
 ):
     """Everything after the bytes are in hand: checks, the sheet question,
     Parquet, storage, the record, the preview and the insights. Shared by a
@@ -158,7 +191,7 @@ async def _ingest(
 
     stored = await _store(
         user_id=user_id, file_id=file_id, filename=filename, file_bytes=file_bytes,
-        sheet_name=sheet_name, source_url=source_url,
+        sheet_name=sheet_name, source_url=source_url, file_path=file_path, file_size=file_size,
     )
     if isinstance(stored, Response):
         return stored
@@ -311,14 +344,20 @@ async def _ingest_sheets(
 async def _store(
     *, user_id: str, file_id: str, filename: str, file_bytes: bytes,
     sheet_name: str | None, source_url: str | None,
+    file_path: str | None = None, file_size: int | None = None,
 ) -> dict | Response:
     """One table to Parquet, into storage, with its record. A sheet of a
     workbook is named for the sheet and sized as what is kept of it."""
     # ── Convert to Parquet ───────────────────────────────────────────
     try:
-        parquet_bytes, row_count, col_count = await asyncio.to_thread(
-            convert_to_parquet, file_bytes, filename, sheet_name=sheet_name
-        )
+        if file_path:
+            parquet_bytes, row_count, col_count = await asyncio.to_thread(
+                convert_path_to_parquet, file_path, filename, sheet_name=sheet_name
+            )
+        else:
+            parquet_bytes, row_count, col_count = await asyncio.to_thread(
+                convert_to_parquet, file_bytes, filename, sheet_name=sheet_name
+            )
     except UnreadableFileError as exc:
         # str(exc) is written for humans; the underlying parser error is
         # chained onto it and already logged by the engine.
@@ -368,7 +407,7 @@ async def _store(
     name = sheet_file_name(filename, sheet_name) if sheet_name else filename
     # A sheet is the part of the workbook that was kept, so its size is
     # what is stored; a whole file keeps the size it arrived at
-    size_bytes = len(parquet_bytes) if sheet_name else len(file_bytes)
+    size_bytes = len(parquet_bytes) if sheet_name else (file_size if file_size is not None else len(file_bytes))
     try:
         db.create_file(
             file_id=file_id,

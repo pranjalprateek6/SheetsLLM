@@ -470,6 +470,39 @@ class TestUpload:
         r = client.post(f"/upload?pending_id={pending}&sheet_names=Sales&sheet_names=Costs")
         assert r.status_code == 400 and r.json()["code"] == "TOO_MANY_SHEETS"
 
+    def test_a_large_csv_is_converted_from_disk_with_its_name_decoded(self, client, upload_seams, monkeypatch):
+        from app import db
+
+        made: list[dict] = []
+        monkeypatch.setattr(db, "create_file", lambda **kw: made.append(kw) or kw)
+        monkeypatch.setattr(upload_module, "IN_MEMORY_BYTES", 10)
+        used: list[str] = []
+        real = upload_module.convert_path_to_parquet
+        monkeypatch.setattr(upload_module, "convert_path_to_parquet", lambda *a, **k: used.append("path") or real(*a, **k))
+        body = "\n".join(["id,amount"] + [f"{i},{i * 3}" for i in range(500)]).encode() + b"\n"
+        resp = client.post(
+            "/upload", content=body,
+            headers={"X-Filename": "orders%20%E2%82%B9.csv", "Content-Type": "application/octet-stream"},
+        )
+        assert resp.status_code == 200, resp.text
+        assert used == ["path"]
+        assert resp.json()["name"] == "orders ₹.csv"
+        assert resp.json()["preview"]["total_rows"] == 500
+        # The size is the file's, not the 64 KB head read for checks
+        assert made[0]["size_bytes"] == len(body)
+
+    def test_a_csv_over_the_row_limit_says_so(self, client, upload_seams, monkeypatch):
+        import app.engine as engine
+
+        monkeypatch.setattr(engine, "MAX_ROWS", 3)
+        monkeypatch.setattr(upload_module, "IN_MEMORY_BYTES", 10)
+        resp = client.post(
+            "/upload", content="\n".join(["a", "1", "2", "3", "4", "5"]).encode() + b"\n",
+            headers={"X-Filename": "big.csv", "Content-Type": "application/octet-stream"},
+        )
+        assert resp.status_code == 400
+        assert "more than 3 rows" in resp.json()["message"]
+
     def test_empty_upload_400(self, client, upload_seams):
         resp = client.post(
             "/upload", content=b"",

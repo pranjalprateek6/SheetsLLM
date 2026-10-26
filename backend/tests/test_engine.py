@@ -104,24 +104,12 @@ class _DeadCon(_FlakyCon):
         raise RuntimeError("Error when sniffing file: Delimiter Candidates ...")
 
 
-def test_lenient_retry_after_strict_sniffer_failure():
-    from app.engine import _read_csv_lenient
-
-    con = _FlakyCon()
-    _read_csv_lenient(con, "C:/tmp/x.csv")  # no raise
-    assert len(con.calls) == 2
-    assert "strict_mode=false" in con.calls[1]
-    assert "null_padding=true" in con.calls[1]
-
-
-def test_unreadable_after_both_attempts_raises_friendly():
-    from app.engine import _read_csv_lenient
-
-    con = _DeadCon()
-    with pytest.raises(UnreadableFileError) as exc:
-        _read_csv_lenient(con, "C:/tmp/x.csv")
-    assert "couldn't read this file" in str(exc.value)
-    assert "Delimiter Candidates" not in str(exc.value)
+def test_a_ragged_csv_keeps_every_row():
+    # A row with an extra field fails the strict reader; the lenient one
+    # keeps the file and its rows
+    ragged = "\n".join(["a,b", "1,2", "3,4,5", "6,7"]).encode() + b"\n"
+    _, rows, cols = convert_to_parquet(ragged, "ragged.csv")
+    assert rows == 3 and cols >= 1
 
 
 def test_unreadable_file_gets_friendly_error():
@@ -224,7 +212,7 @@ def test_a_file_over_the_row_limit_is_refused_not_cut(monkeypatch):
 
     monkeypatch.setattr(engine, "MAX_ROWS", 3)
     csv = b"a\n1\n2\n3\n4\n"
-    with pytest.raises(engine.TooManyRowsError, match="4 rows, over the 3 row limit"):
+    with pytest.raises(engine.TooManyRowsError, match="more than 3 rows, over the 3 row limit"):
         engine.convert_to_parquet(csv, "big.csv")
     # At the limit is fine
     _, rows, _ = engine.convert_to_parquet(b"a\n1\n2\n3\n", "ok.csv")

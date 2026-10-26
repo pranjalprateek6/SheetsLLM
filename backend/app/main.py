@@ -31,7 +31,7 @@ logger = logging.getLogger("sheetsllm")
 # kills requests that are still working and the user sees a generic
 # timeout instead of an answer.
 _ROUTE_TIMEOUTS = {
-    "/upload": 120,
+    "/upload": 600,  # a large file now comes straight from the browser, so this covers the transfer
     "/transform/op": 90,  # one-click fixes replay every step on big files
     "/download": 60,
     "/chat": 90,
@@ -98,12 +98,6 @@ app = FastAPI(
     openapi_url=None if IS_PRODUCTION else "/openapi.json",
 )
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 
 # ── Middleware ────────────────────────────────────────────────────────
@@ -231,3 +225,14 @@ async def unhandled_error(request: Request, exc: Exception):
 
 # ── Routes ────────────────────────────────────────────────────────────
 register_routes(app)
+
+# Added last, so it wraps every other middleware: an answer they give early
+# (a 401, a timeout) still carries the CORS headers, and the browser can read
+# it. Uploads come straight from the browser, so this matters: without it an
+# expired session's 401 reads as a network failure and is never refreshed.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)

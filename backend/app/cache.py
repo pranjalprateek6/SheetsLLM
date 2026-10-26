@@ -32,11 +32,23 @@ _MAX_CACHED_FILES = 50
 _file_lock = threading.Lock()
 
 
+# One lock per key, so requests that miss together download the file once
+# and share it, instead of each downloading its own copy
+_key_locks: dict[str, threading.Lock] = {}
+
+
 def get_local_parquet(r2_key: str) -> str:
     """
     Return a local file path for the given R2 key.
     Downloads on cache miss; returns cached path on hit.
     """
+    with _file_lock:
+        key_lock = _key_locks.setdefault(r2_key, threading.Lock())
+    with key_lock:
+        return _get_local_parquet(r2_key)
+
+
+def _get_local_parquet(r2_key: str) -> str:
     with _file_lock:
         entry = _file_cache.get(r2_key)
         if entry is not None:
