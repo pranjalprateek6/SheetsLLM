@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from typing import Any
 from uuid import UUID
 
@@ -42,28 +43,59 @@ def get_client() -> Client:
             _client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
         _retry_closed_connections(_client.postgrest.session)
         _retry_closed_connections(_client.storage.session)
+        # Auth admin calls (account deletion, the owner's email) share this one
+        _retry_closed_connections(_client.auth._http_client)
     return _client
 
 
-class _RetryClosedConnection(httpx.BaseTransport):
-    """Sends a request again, once, when the server had closed the pooled
-    connection it went out on.
+# Methods that do the same thing however many times they are sent
+_IDEMPOTENT = frozenset({"GET", "HEAD", "OPTIONS", "PUT", "DELETE"})
 
-    After a quiet spell Supabase drops idle keep-alive connections; the next
-    request on one fails with "Server disconnected" before any response, so
-    it never reached the server and is safe to repeat. Seen in production as
-    a recipe run that failed the first time and worked on retry.
+
+class _RetryClosedConnection(httpx.BaseTransport):
+    """Sends a request again when the server closed the pooled connection
+    it went out on.
+
+    After a quiet spell Supabase drops idle keep-alive connections, and under
+    load several requests can be on one when it goes. A request that failed
+    before any response never reached the server, so it is always repeated.
+    One whose response was cut off partway was answered, so only a request
+    that is safe to repeat (a read, a delete) is sent again. Seen in
+    production as a recipe run that failed the first time and worked on
+    retry, and locally as 500s when the end-to-end sweep ran in parallel.
     """
+
+    ATTEMPTS = 3
+    BACKOFF_SECONDS = 0.05
 
     def __init__(self, inner: httpx.BaseTransport):
         self._inner = inner
 
     def handle_request(self, request: httpx.Request) -> httpx.Response:
-        try:
-            return self._inner.handle_request(request)
-        except httpx.RemoteProtocolError as exc:
-            logger.info("Supabase closed a pooled connection (%s); retrying once", exc)
-            return self._inner.handle_request(request)
+        for attempt in range(1, self.ATTEMPTS + 1):
+            answered = False
+            try:
+                response = self._inner.handle_request(request)
+                answered = True
+                # Take the body off the wire here, so a connection dropped
+                # partway through it is caught by this loop, not the caller
+                try:
+                    body = b"".join(response.stream)
+                finally:
+                    response.stream.close()
+                return httpx.Response(
+                    response.status_code,
+                    headers=response.headers,
+                    stream=httpx.ByteStream(body),
+                    extensions=response.extensions,
+                    request=request,
+                )
+            except httpx.RemoteProtocolError as exc:
+                if attempt == self.ATTEMPTS or (answered and request.method not in _IDEMPOTENT):
+                    raise
+                logger.info("Supabase closed a pooled connection (%s); sending %s %s again", exc, request.method, request.url.path)
+                time.sleep(self.BACKOFF_SECONDS * attempt)
+        raise AssertionError("unreachable")
 
     def close(self) -> None:
         self._inner.close()
