@@ -82,3 +82,19 @@ describe("sendFile", () => {
     await expect(sendFile(big, "big.csv", new URLSearchParams())).rejects.toBeTruthy();
   });
 });
+
+describe("workbookTooLarge", () => {
+  it("turns away a workbook over the Excel cap and points to CSV", async () => {
+    const { workbookTooLarge, MAX_EXCEL_BYTES } = await import("./upload");
+    const message = workbookTooLarge({ name: "Orders.XLSX", size: MAX_EXCEL_BYTES + 1 });
+    expect(message).toMatch(/up to 10 MB/);
+    expect(message).toMatch(/Save the sheet as CSV/);
+    expect(message).not.toMatch(/—/);
+  });
+
+  it("lets a workbook at the cap, and a CSV of any size, through", async () => {
+    const { workbookTooLarge, MAX_EXCEL_BYTES } = await import("./upload");
+    expect(workbookTooLarge({ name: "orders.xlsx", size: MAX_EXCEL_BYTES })).toBeNull();
+    expect(workbookTooLarge({ name: "orders.csv", size: MAX_EXCEL_BYTES * 30 })).toBeNull();
+  });
+});

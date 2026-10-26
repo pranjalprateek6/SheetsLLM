@@ -28,6 +28,12 @@ MAX_ROWS: int = int(os.getenv("MAX_ROWS", "1000000"))
 MAX_PREVIEW_ROWS: int = int(os.getenv("MAX_PREVIEW_ROWS", "500"))
 MAX_UPLOAD_MB: int = int(os.getenv("MAX_UPLOAD_MB", "400"))
 UPLOAD_MAX_BYTES: int = MAX_UPLOAD_MB * 1024 * 1024
+# A workbook is opened whole to read it, so it costs far more memory than a
+# CSV of the same size: measured on a text-heavy sheet, about 25 MB per MB of
+# .xlsx over a 100 MB idle server (12 MB peaked at 473 MB, 25 MB at 746 MB).
+# 10 MB peaks near 410 MB, inside the 512 MB the server has.
+MAX_EXCEL_MB: int = int(os.getenv("MAX_EXCEL_MB", "10"))
+EXCEL_MAX_BYTES: int = MAX_EXCEL_MB * 1024 * 1024
 MAX_INSTRUCTION_LENGTH: int = int(os.getenv("MAX_INSTRUCTION_LENGTH", "2000"))
 MAX_COLUMNS: int = int(os.getenv("MAX_COLUMNS", "500"))
 

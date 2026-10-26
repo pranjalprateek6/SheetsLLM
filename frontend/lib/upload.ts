@@ -10,6 +10,17 @@ import { fetchWithAuth } from "@/lib/fetch-with-auth";
 
 export const MAX_UPLOAD_BYTES = 400 * 1024 * 1024;
 export const MAX_ROWS = 1_000_000;
+/** A workbook is opened whole on the server, so it has its own, smaller cap
+ *  (MAX_EXCEL_MB in backend/app/config.py, where the measurements are) */
+export const MAX_EXCEL_BYTES = 10 * 1024 * 1024;
+
+export const isWorkbook = (name: string) => /\.(xlsx|xls|xlsm)$/i.test(name);
+
+/** What to say about a workbook over the Excel cap, or null when it fits. */
+export function workbookTooLarge(file: { name: string; size: number }): string | null {
+  if (!isWorkbook(file.name) || file.size <= MAX_EXCEL_BYTES) return null;
+  return `${file.name} is ${megabytes(file.size)}. An Excel file can be up to ${MAX_EXCEL_BYTES / (1024 * 1024)} MB, because it has to be opened whole to read it. Save the sheet as CSV and upload that: a CSV can be up to ${megabytes(MAX_UPLOAD_BYTES)}.`;
+}
 /** The proxy's own ceiling, with room for the multipart wrapping */
 const PROXY_MAX_BYTES = 4 * 1024 * 1024;
 
