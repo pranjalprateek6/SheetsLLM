@@ -48,3 +48,13 @@ def test_a_failed_token_is_401_even_in_anonymous_mode(client):
     r = client.get("/recipes", headers={"Authorization": "Bearer expired.token.here"})
     assert r.status_code == 401
     assert r.json()["code"] == "UNAUTHORIZED"
+
+
+def test_an_early_401_still_carries_cors_headers(monkeypatch):
+    from app.config import ALLOWED_ORIGINS
+
+    monkeypatch.setattr(main_module, "ALLOW_ANONYMOUS", False)
+    origin = ALLOWED_ORIGINS[0]
+    r = TestClient(app).post("/upload", content=b"a\n1\n", headers={"Origin": origin, "Authorization": "Bearer bad"})
+    assert r.status_code == 401
+    assert r.headers.get("access-control-allow-origin") == origin

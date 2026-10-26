@@ -1,3 +1,14 @@
+// Uploads go from the browser straight to the backend (a Vercel function
+// takes at most 4.5 MB of body), so the page may connect to its origin.
+// BACKEND_URL is read when the site is built.
+const backendOrigin = (() => {
+  try {
+    return new URL(process.env.BACKEND_URL || '').origin;
+  } catch {
+    return '';
+  }
+})();
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
@@ -17,7 +28,7 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob:",
               "font-src 'self' data:",
-              "connect-src 'self' https://*.supabase.co",
+              `connect-src 'self' https://*.supabase.co${backendOrigin ? ` ${backendOrigin}` : ''}`,
               "frame-ancestors 'none'",
               "base-uri 'self'",
               "form-action 'self'",

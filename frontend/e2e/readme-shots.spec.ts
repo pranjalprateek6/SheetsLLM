@@ -57,7 +57,7 @@ test("workspace: a file, a one-click fix, Chef, and the chart", async ({ browser
     localStorage.setItem(k, v);
     localStorage.setItem("theme", "dark");
   }, [`sb-${host.split(".")[0]}-auth-token`, JSON.stringify(session)] as const);
-  await context.route("**/api/**", (route) => {
+  await context.route(/localhost:(3000\/api|8000)\//, (route) => {
     const headers = { ...route.request().headers() };
     delete headers.authorization;
     return route.continue({ headers });

@@ -44,8 +44,9 @@ async function signIn(context: BrowserContext) {
     user: { id: "anonymous", email: "sweep@example.com", aud: "authenticated", app_metadata: {}, user_metadata: {} },
   };
   await context.addInitScript(([k, v]) => localStorage.setItem(k, v), [key, JSON.stringify(session)] as const);
-  // The stand-in session is never sent: the dev backend serves token-less calls
-  await context.route("**/api/**", (route) => {
+  // The stand-in session is never sent, to the proxy or to the backend itself
+  // (uploads go straight there): the dev backend serves token-less calls
+  await context.route(/localhost:(3000\/api|8000)\//, (route) => {
     const headers = { ...route.request().headers() };
     delete headers.authorization;
     return route.continue({ headers });

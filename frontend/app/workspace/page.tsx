@@ -34,6 +34,11 @@ import { listLookups, uploadAndLink, type Lookup } from "@/lib/lookups";
 import { fetchRows, isViewActive, PAGE_SIZE, type GridView } from "@/lib/rows";
 import { takeToolResult } from "@/lib/loops";
 import { takeTrySteps } from "@/lib/try";
+import { checkRows, MAX_ROWS, MAX_UPLOAD_BYTES, megabytes, sendFile } from "@/lib/upload";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
+  AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 const LookupsPanel = dynamic(() => import("@/components/LookupsPanel"));
 const SchemaPanel = dynamic(() => import("@/components/SchemaPanel"));
 const ChartPanel = dynamic(() => import("@/components/ChartPanel"));
@@ -91,6 +96,8 @@ function WorkspaceContent() {
   const [availableSheets, setAvailableSheets] = useState<string[]>([]);
   const [sheetRows, setSheetRows] = useState<Record<string, number | null>>({});
   const [maxSheets, setMaxSheets] = useState(10);
+  // A CSV over the row limit: the offer to upload its first rows instead
+  const [trimOffer, setTrimOffer] = useState<{ file: File; head: Blob; headBytes: number; suggestions?: string[] } | null>(null);
   const router = useRouter();
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [pendingUploadId, setPendingUploadId] = useState<string | null>(null);
@@ -466,13 +473,33 @@ function WorkspaceContent() {
           return await onUpload(file, sheetName, suggestions);
         }
       } else {
-        const form = new FormData();
-        form.append("file", file);
-        r = await fetchWithAuth(url, { method: "POST", body: form });
+        // A big CSV may be over the row limit: find out before sending it,
+        // reading only as far as the limit, and offer its first rows
+        if (file.size > 20 * 1024 * 1024) {
+          const rows = await checkRows(file);
+          if (rows.over && rows.head) {
+            setTrimOffer({ file, head: rows.head, headBytes: rows.headBytes, suggestions });
+            return false;
+          }
+        }
+        if (file.size > MAX_UPLOAD_BYTES) {
+          setUploadError(`${file.name} is ${megabytes(file.size)}, over the ${megabytes(MAX_UPLOAD_BYTES)} limit per file. Split it, or keep only the columns you need, and upload again.`);
+          return false;
+        }
+        r = await sendFile(file, file.name, params);
       }
-      const data = await r.json();
+      const data = await r.json().catch(() => ({}));
 
       if (!r.ok) {
+        // Over the row limit after all (a narrow file packs many rows into
+        // few bytes): the same offer, when it is a CSV
+        if (!pendingId && /row limit/i.test(data.message ?? "")) {
+          const rows = await checkRows(file);
+          if (rows.over && rows.head) {
+            setTrimOffer({ file, head: rows.head, headBytes: rows.headBytes, suggestions });
+            return false;
+          }
+        }
         setUploadError(data.message || "Upload failed. Try again.");
         return false;
       }
@@ -522,9 +549,7 @@ function WorkspaceContent() {
           return await onUploadSheets(file, sheetNames);
         }
       } else {
-        const form = new FormData();
-        form.append("file", file);
-        r = await fetchWithAuth(`/api/upload?${params}`, { method: "POST", body: form });
+        r = await sendFile(file, file.name, params);
       }
       const data = await r.json().catch(() => ({}));
       if (!r.ok || !Array.isArray(data.files)) {
@@ -2032,6 +2057,35 @@ function WorkspaceContent() {
           confirmText={revertShown === 0 ? "Go back to the original" : "Go back"}
           cancelText="Cancel"
         />
+        <AlertDialog open={!!trimOffer} onOpenChange={(open) => !open && setTrimOffer(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>This file has more than {MAX_ROWS.toLocaleString()} rows</AlertDialogTitle>
+              <AlertDialogDescription>
+                SheetsLLM works on up to {MAX_ROWS.toLocaleString()} rows per file. {trimOffer?.file.name} is{" "}
+                {trimOffer ? megabytes(trimOffer.file.size) : ""}. You can upload its header and first{" "}
+                {MAX_ROWS.toLocaleString()} rows ({trimOffer ? megabytes(trimOffer.headBytes) : ""}); the rows after them are left out.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => {
+                  const offer = trimOffer;
+                  setTrimOffer(null);
+                  if (!offer) return;
+                  const dot = offer.file.name.lastIndexOf(".");
+                  const name = dot > 0
+                    ? `${offer.file.name.slice(0, dot)} (first ${MAX_ROWS.toLocaleString()} rows)${offer.file.name.slice(dot)}`
+                    : `${offer.file.name} (first ${MAX_ROWS.toLocaleString()} rows)`;
+                  void onUpload(new File([offer.head], name, { type: offer.file.type || "text/csv" }), undefined, offer.suggestions);
+                }}
+              >
+                Upload the first {MAX_ROWS.toLocaleString()} rows
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
         <SheetSelector isOpen={showSheetSelector} sheets={availableSheets} sheetRows={sheetRows} maxSheets={maxSheets} workbookName={pendingFile?.name} onSelect={handleSheetSelect} onCancel={() => { setShowSheetSelector(false); setPendingFile(null); setPendingUploadId(null); setLoading(false); }} />
         <ChartPanel columns={columns} rows={rows} open={chartOpen} onClose={() => setChartOpen(false)} />
         <CommandPalette
