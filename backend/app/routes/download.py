@@ -25,6 +25,7 @@ from app.engine import (
     QueryTimeoutError,
     execute_full_result_local,
     export_full_result_local,
+    query_turn,
 )
 from app.security import RateLimitExceeded, check_rate_limit
 from app.share import read_token
@@ -217,7 +218,8 @@ def download(
             )
         try:
             local_path = get_local_parquet(r2_key)
-            df = execute_full_result_local(local_path, steps).fetchdf()
+            with query_turn():
+                df = execute_full_result_local(local_path, steps).fetchdf()
             buf = io.BytesIO()
             df.to_excel(buf, index=False, engine="openpyxl")
             content = buf.getvalue()

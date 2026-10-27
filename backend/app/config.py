@@ -33,7 +33,18 @@ MAX_COLUMNS: int = int(os.getenv("MAX_COLUMNS", "500"))
 
 # ── DuckDB ───────────────────────────────────────────────────────────
 DUCKDB_THREADS: int = int(os.getenv("DUCKDB_THREADS", "2"))
-DUCKDB_MEMORY_LIMIT: str = os.getenv("DUCKDB_MEMORY_LIMIT", "512MB")
+# The limit bounds DuckDB's buffer pool only: a query also allocates outside
+# it, and the server idles at about 100 MB. At 512MB (the whole instance) a
+# 5M-row dedupe peaked at 630 MB and an export at 669 MB; at 200MB they spill
+# to disk and peak at 321 and 347 MB, a few seconds slower.
+DUCKDB_MEMORY_LIMIT: str = os.getenv("DUCKDB_MEMORY_LIMIT", "200MB")
+# How much a query may spill to disk before it fails
+DUCKDB_MAX_TEMP_SIZE: str = os.getenv("DUCKDB_MAX_TEMP_SIZE", "4GB")
+# Queries running at once. Each may use its memory limit and more, so two
+# heavy ones together would outgrow a 512 MB instance; the rest wait.
+DUCKDB_QUERIES_AT_ONCE: int = int(os.getenv("DUCKDB_QUERIES_AT_ONCE", "1"))
+# How long a query waits for its turn before saying the server is busy
+DUCKDB_QUEUE_WAIT_SECONDS: int = int(os.getenv("DUCKDB_QUEUE_WAIT_SECONDS", "60"))
 DUCKDB_QUERY_TIMEOUT: int = int(os.getenv("DUCKDB_QUERY_TIMEOUT", "30"))
 # Materialize a chain checkpoint every N steps so replays stay bounded
 # instead of re-running the whole chain from base (0 disables).
