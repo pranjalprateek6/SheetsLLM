@@ -21,6 +21,7 @@ import argparse
 import sys
 
 from app.config import SUPABASE_BUCKET
+from app.storage import part_owner
 from app.db import get_client
 
 
@@ -98,9 +99,11 @@ def main() -> int:
         row["r2_key"]
         for row in client.table("files").select("r2_key").execute().data
     }
-    orphans = sorted(all_keys - referenced)
-    # anon keys are about to lose their DB rows too
-    to_remove = sorted(set(anon_keys) | set(orphans))
+    # A large file is stored as parts beside its key: they belong to it
+    orphans = sorted(k for k in all_keys - referenced if part_owner(k) not in referenced)
+    # anon keys are about to lose their DB rows too, and their parts with them
+    anon_parts = {k for k in all_keys if part_owner(k) in set(anon_keys)}
+    to_remove = sorted(set(anon_keys) | anon_parts | set(orphans))
 
     print(f"storage objects total    : {len(all_keys)}")
     print(f"orphaned (no files row)  : {len(orphans)}")
