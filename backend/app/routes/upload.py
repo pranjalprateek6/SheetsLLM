@@ -54,7 +54,7 @@ def _excel_too_large(filename: str, size: int) -> Response | None:
     return _json_response(
         413, "EXCEL_TOO_LARGE",
         f"This workbook is {size / (1024 * 1024):.1f} MB. An Excel file can be up to {MAX_EXCEL_MB} MB, "
-        f"because it has to be opened whole to read it. Save the sheet as CSV and upload that: "
+        f"because a workbook takes far more memory and time to read than a CSV. Save the sheet as CSV and upload that: "
         f"a CSV can be up to {MAX_UPLOAD_MB} MB.",
         max_mb=MAX_EXCEL_MB,
     )

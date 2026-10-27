@@ -87,7 +87,7 @@ describe("workbookTooLarge", () => {
   it("turns away a workbook over the Excel cap and points to CSV", async () => {
     const { workbookTooLarge, MAX_EXCEL_BYTES } = await import("./upload");
     const message = workbookTooLarge({ name: "Orders.XLSX", size: MAX_EXCEL_BYTES + 1 });
-    expect(message).toMatch(/up to 10 MB/);
+    expect(message).toMatch(/up to 25 MB/);
     expect(message).toMatch(/Save the sheet as CSV/);
     expect(message).not.toMatch(/—/);
   });

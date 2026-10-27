@@ -58,7 +58,7 @@ export default function DropZone({
         ) : (
           <>
             <p className="text-[14px] font-medium">Click to upload or drag and drop</p>
-            <p className="mt-1 text-[13px] text-muted-foreground">CSV, Excel, JSON, TSV or Parquet. Up to 400 MB (Excel 10 MB) and 1,000,000 rows.</p>
+            <p className="mt-1 text-[13px] text-muted-foreground">CSV, Excel, JSON, TSV or Parquet. Up to 400 MB (Excel 25 MB) and 1,000,000 rows.</p>
           </>
         )}
       </div>
