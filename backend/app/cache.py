@@ -61,21 +61,38 @@ def _get_local_parquet(r2_key: str) -> str:
             # Expired or missing — clean up
             _evict_entry(r2_key)
 
-    # Download from R2
-    data = storage.download_parquet(r2_key)
+    # Download from storage, straight to disk
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".parquet")
-    tmp.write(data)
     tmp.close()
-    local_path = tmp.name
+    try:
+        size = storage.download_parquet_file(r2_key, tmp.name)
+    except BaseException:
+        Path(tmp.name).unlink(missing_ok=True)
+        raise
+    _keep(r2_key, tmp.name)
+    logger.info("File cache MISS: %s → %s (%d bytes)", r2_key, tmp.name, size)
+    return tmp.name
 
+
+def adopt_local_parquet(r2_key: str, path: str) -> str:
+    """Cache a file just written to storage under its key, so the first read
+    of it does not download what was uploaded a moment ago. The cache owns
+    `path` from here on."""
+    with _file_lock:
+        key_lock = _key_locks.setdefault(r2_key, threading.Lock())
+    with key_lock:
+        with _file_lock:
+            _evict_entry(r2_key)
+        _keep(r2_key, path)
+    return path
+
+
+def _keep(r2_key: str, path: str) -> None:
     with _file_lock:
         # Evict if at capacity
         if len(_file_cache) >= _MAX_CACHED_FILES:
             _evict_oldest()
-        _file_cache[r2_key] = (local_path, time.monotonic() + _FILE_TTL)
-
-    logger.info("File cache MISS: %s → %s (%d bytes)", r2_key, local_path, len(data))
-    return local_path
+        _file_cache[r2_key] = (path, time.monotonic() + _FILE_TTL)
 
 
 def invalidate_file(r2_key: str) -> None:

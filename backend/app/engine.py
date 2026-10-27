@@ -871,12 +871,24 @@ def _workbook_to_csv(src: str, sheet_name: str | None) -> tuple[str, list[str], 
     return out.name, names, text
 
 
-@one_at_a_time
 def convert_path_to_parquet(
     src_path: str | Path, filename: str, *, sheet_name: str | None = None
 ) -> tuple[bytes, int, int]:
+    """convert_path_to_parquet_file, returning the Parquet as bytes."""
+    out, rows, cols = convert_path_to_parquet_file(src_path, filename, sheet_name=sheet_name)
+    try:
+        return Path(out).read_bytes(), rows, cols
+    finally:
+        Path(out).unlink(missing_ok=True)
+
+
+@one_at_a_time
+def convert_path_to_parquet_file(
+    src_path: str | Path, filename: str, *, sheet_name: str | None = None
+) -> tuple[str, int, int]:
     """Convert a CSV/TSV/JSON/XLSX/Parquet file on disk to Parquet.
-    Returns (parquet_bytes, row_count, column_count).
+    Returns (parquet_path, row_count, column_count); the caller owns the
+    file at parquet_path and deletes it when done.
 
     DuckDB reads the file and writes the Parquet straight to disk, so a
     large upload is never held whole in memory (a 1M-row CSV used to peak
@@ -894,7 +906,10 @@ def convert_path_to_parquet(
             raise TooManyRowsError(meta.num_rows)
         names = [str(n) for n in pq.ParquetFile(src).schema_arrow.names]
         if sanitize_column_names(names) == names:
-            return Path(src).read_bytes(), meta.num_rows, meta.num_columns
+            out = tempfile.NamedTemporaryFile(delete=False, suffix=".parquet")
+            out.close()
+            shutil.copyfile(src, out.name)
+            return out.name, meta.num_rows, meta.num_columns
 
     labels: list[str] | None = None
     sheet_csv: str | None = None
@@ -903,6 +918,7 @@ def convert_path_to_parquet(
     out = tempfile.NamedTemporaryFile(delete=False, suffix=".parquet")
     out.close()
     con = get_connection(read=(src, *([sheet_csv] if sheet_csv else [])), write=(out.name,))
+    done = False
     try:
         if lower.endswith(".parquet") or lower.endswith(".pq"):
             sources = [f"SELECT * FROM read_parquet('{sql_src}')"]
@@ -951,10 +967,12 @@ def convert_path_to_parquet(
         meta = pq.ParquetFile(out.name).metadata
         if meta.num_rows > MAX_ROWS:
             raise TooManyRowsError()
-        return Path(out.name).read_bytes(), meta.num_rows, meta.num_columns
+        done = True
+        return out.name, meta.num_rows, meta.num_columns
     finally:
         con.close()
-        Path(out.name).unlink(missing_ok=True)
+        if not done:
+            Path(out.name).unlink(missing_ok=True)
         if sheet_csv:
             Path(sheet_csv).unlink(missing_ok=True)
 
@@ -965,11 +983,22 @@ def convert_to_parquet(
     """Convert CSV/XLSX/JSON/TSV/Parquet bytes to Parquet.
     Returns (parquet_bytes, row_count, column_count). For a file already on
     disk, convert_path_to_parquet avoids holding it in memory."""
+    out, rows, cols = convert_to_parquet_file(file_bytes, filename, sheet_name=sheet_name)
+    try:
+        return Path(out).read_bytes(), rows, cols
+    finally:
+        Path(out).unlink(missing_ok=True)
+
+
+def convert_to_parquet_file(
+    file_bytes: bytes, filename: str, *, sheet_name: str | None = None
+) -> tuple[str, int, int]:
+    """convert_path_to_parquet_file for bytes in memory."""
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=Path(filename).suffix)
     try:
         tmp.write(file_bytes)
         tmp.close()
-        return convert_path_to_parquet(tmp.name, filename, sheet_name=sheet_name)
+        return convert_path_to_parquet_file(tmp.name, filename, sheet_name=sheet_name)
     finally:
         Path(tmp.name).unlink(missing_ok=True)
 

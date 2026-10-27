@@ -17,8 +17,8 @@ from app import cache, db, storage
 from app.fetch_url import FetchError, fetch_bytes, normalise_url
 from app.engine import (
     UnreadableFileError,
-    convert_path_to_parquet,
-    convert_to_parquet,
+    convert_path_to_parquet_file,
+    convert_to_parquet_file,
     detect_sheets,
     get_schema_from_local,
     sheet_row_counts,
@@ -373,14 +373,16 @@ async def _store(
     """One table to Parquet, into storage, with its record. A sheet of a
     workbook is named for the sheet and sized as what is kept of it."""
     # ── Convert to Parquet ───────────────────────────────────────────
+    # The Parquet stays on disk: it goes up to storage from the file and
+    # the file becomes the local cached copy
     try:
         if file_path:
-            parquet_bytes, row_count, col_count = await asyncio.to_thread(
-                convert_path_to_parquet, file_path, filename, sheet_name=sheet_name
+            parquet_path, row_count, col_count = await asyncio.to_thread(
+                convert_path_to_parquet_file, file_path, filename, sheet_name=sheet_name
             )
         else:
-            parquet_bytes, row_count, col_count = await asyncio.to_thread(
-                convert_to_parquet, file_bytes, filename, sheet_name=sheet_name
+            parquet_path, row_count, col_count = await asyncio.to_thread(
+                convert_to_parquet_file, file_bytes, filename, sheet_name=sheet_name
             )
     except UnreadableFileError as exc:
         # str(exc) is written for humans; the underlying parser error is
@@ -398,6 +400,7 @@ async def _store(
         )
 
     if col_count > MAX_COLUMNS:
+        Path(parquet_path).unlink(missing_ok=True)
         return _json_response(
             400,
             "TOO_MANY_COLUMNS",
@@ -409,18 +412,17 @@ async def _store(
 
     # ── Upload to Storage ────────────────────────────────────────────
     r2_key = storage.r2_key_for_file(user_id, file_id)
+    parquet_size = Path(parquet_path).stat().st_size
     try:
-        await asyncio.to_thread(storage.upload_parquet, r2_key, parquet_bytes)
+        await asyncio.to_thread(storage.upload_parquet_file, r2_key, parquet_path)
     except Exception as exc:
+        Path(parquet_path).unlink(missing_ok=True)
         logger.error("Storage upload failed: %s", exc)
         return _json_response(500, "STORAGE_FAILED", "Failed to store file")
 
     # ── Cache locally + get schema ───────────────────────────────────
-    from app.cache import get_local_parquet
-
-    local_path = None
+    local_path = cache.adopt_local_parquet(r2_key, parquet_path)
     try:
-        local_path = await asyncio.to_thread(get_local_parquet, r2_key)
         schema = await asyncio.to_thread(get_schema_from_local, local_path)
     except Exception as exc:
         logger.error("Schema inference failed: %s", exc)
@@ -431,7 +433,7 @@ async def _store(
     name = sheet_file_name(filename, sheet_name) if sheet_name else filename
     # A sheet is the part of the workbook that was kept, so its size is
     # what is stored; a whole file keeps the size it arrived at
-    size_bytes = len(parquet_bytes) if sheet_name else (file_size if file_size is not None else len(file_bytes))
+    size_bytes = parquet_size if sheet_name else (file_size if file_size is not None else len(file_bytes))
     try:
         db.create_file(
             file_id=file_id,
@@ -447,6 +449,7 @@ async def _store(
         )
     except Exception as exc:
         logger.error("Supabase file record creation failed: %s", exc)
+        cache.invalidate_file(r2_key)
         try:
             storage.delete_object(r2_key)
         except Exception:
