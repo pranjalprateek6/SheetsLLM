@@ -801,6 +801,76 @@ def _quote(name: str) -> str:
     return '"' + name.replace('"', '""') + '"'
 
 
+# A workbook whose parts unzip to more than this is refused unread: a small
+# crafted file can otherwise inflate to fill the disk or the memory
+_WORKBOOK_MAX_UNZIPPED = 2 * 1024 * 1024 * 1024
+
+
+def _workbook_to_csv(src: str, sheet_name: str | None) -> tuple[str, list[str], set[int]]:
+    """Copy one sheet of a workbook to a CSV, a row at a time.
+
+    pandas.read_excel holds the whole sheet as cells and then as a frame:
+    about 25 MB of memory per MB of .xlsx (a 24.7 MB workbook peaked at
+    746 MB). Read-only openpyxl hands over one row at a time, so only the
+    shared strings stay in memory (the same workbook peaked at 223 MB).
+
+    Returns the CSV's path, the header row's names, and the columns holding
+    any text: those are read back as text, so "00123" keeps its zeros.
+    """
+    import csv
+    import datetime as dt
+    import zipfile
+
+    from openpyxl import load_workbook
+
+    if sum(i.file_size for i in zipfile.ZipFile(src).infolist()) > _WORKBOOK_MAX_UNZIPPED:
+        raise UnreadableFileError("This workbook unpacks to more than 2 GB, so it can't be opened safely.")
+
+    def cell(v):
+        if v is None:
+            return ""
+        if isinstance(v, dt.datetime):
+            return v.isoformat(sep=" ")
+        if isinstance(v, (dt.date, dt.time)):
+            return v.isoformat()
+        return v
+
+    wb = load_workbook(src, read_only=True, data_only=True)
+    out = tempfile.NamedTemporaryFile("w", suffix=".csv", delete=False, newline="", encoding="utf-8")
+    header: list | None = None
+    text: set[int] = set()
+    width = 0
+    blank = 0  # empty rows held back: written only if a row follows them
+    try:
+        ws = wb[sheet_name] if sheet_name else wb.worksheets[0]
+        # "\n" throughout: a line break inside a cell is "\n", and DuckDB
+        # refuses a file that mixes it with "\r\n" row ends
+        writer = csv.writer(out, lineterminator="\n")
+        for row in ws.iter_rows(values_only=True):
+            if header is None:
+                header = list(row)
+                continue
+            if all(v is None for v in row):
+                blank += 1
+                continue
+            for _ in range(blank):
+                writer.writerow([""])
+            blank = 0
+            width = max(width, len(row))
+            for i, v in enumerate(row):
+                if isinstance(v, str):
+                    text.add(i)
+            writer.writerow([cell(v) for v in row])
+    finally:
+        out.close()
+        wb.close()
+    header = header or []
+    width = max(width, len(header))
+    # Named as pandas named them, so a file reads the same as it used to
+    names = [f"Unnamed: {i}" if i >= len(header) or header[i] is None else str(header[i]) for i in range(width)]
+    return out.name, names, text
+
+
 @one_at_a_time
 def convert_path_to_parquet(
     src_path: str | Path, filename: str, *, sheet_name: str | None = None
@@ -826,13 +896,25 @@ def convert_path_to_parquet(
         if sanitize_column_names(names) == names:
             return Path(src).read_bytes(), meta.num_rows, meta.num_columns
 
+    labels: list[str] | None = None
+    sheet_csv: str | None = None
+    if lower.endswith((".xlsx", ".xlsm")):
+        sheet_csv, labels, text = _workbook_to_csv(src, sheet_name)
     out = tempfile.NamedTemporaryFile(delete=False, suffix=".parquet")
     out.close()
-    con = get_connection(read=(src,), write=(out.name,))
+    con = get_connection(read=(src, *([sheet_csv] if sheet_csv else [])), write=(out.name,))
     try:
         if lower.endswith(".parquet") or lower.endswith(".pq"):
             sources = [f"SELECT * FROM read_parquet('{sql_src}')"]
-        elif lower.endswith(".xlsx") or lower.endswith(".xls"):
+        elif sheet_csv is not None:
+            columns = [f"c{i}" for i in range(len(labels))]
+            as_text = ", ".join(f"'c{i}': 'VARCHAR'" for i in sorted(text) if i < len(columns))
+            types = f"types={{{as_text}}}, " if as_text else ""
+            sources = [
+                f"SELECT * FROM read_csv('{_sql_path(sheet_csv)}', header=false, names={columns!r}, "
+                f"{types}delim=',', quote='\"', escape='\"', new_line='\\n', null_padding=true, sample_size=-1)"
+            ] if columns else ["SELECT 1 WHERE false"]
+        elif lower.endswith(".xls"):
             import pandas as pd
 
             df = pd.read_excel(src, sheet_name=sheet_name or 0)
@@ -850,7 +932,7 @@ def convert_path_to_parquet(
         for i, source in enumerate(sources):
             try:
                 names = [str(r[0]) for r in con.execute(f"DESCRIBE {source}").fetchall()]
-                clean = sanitize_column_names(names)
+                clean = sanitize_column_names(labels if labels is not None and len(labels) == len(names) else names)
                 select = ", ".join(f"{_quote(n)} AS {_quote(c)}" for n, c in zip(names, clean))
                 con.execute(
                     f"COPY (SELECT {select} FROM ({source}) LIMIT {MAX_ROWS + 1}) "
@@ -862,7 +944,7 @@ def convert_path_to_parquet(
                 if i + 1 < len(sources):
                     logger.warning("csv strict parse failed, retrying leniently: %s", exc)
         else:
-            if lower.endswith((".csv", ".tsv", ".txt")) or not lower.endswith((".json", ".jsonl", ".xlsx", ".xls", ".parquet", ".pq")):
+            if lower.endswith((".csv", ".tsv", ".txt")) or not lower.endswith((".json", ".jsonl", ".xlsx", ".xlsm", ".xls", ".parquet", ".pq")):
                 raise UnreadableFileError(_UNREADABLE_CSV) from last_exc
             raise last_exc  # type: ignore[misc]
 
@@ -873,6 +955,8 @@ def convert_path_to_parquet(
     finally:
         con.close()
         Path(out.name).unlink(missing_ok=True)
+        if sheet_csv:
+            Path(sheet_csv).unlink(missing_ok=True)
 
 
 def convert_to_parquet(

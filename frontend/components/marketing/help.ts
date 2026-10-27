@@ -109,7 +109,7 @@ export const HELP_SECTIONS: HelpSection[] = [
     items: [
       `Free: ${limitText(DEFAULT_PLANS.free.uploads)} uploads and ${limitText(DEFAULT_PLANS.free.ai_requests)} AI requests a month, ${limitText(DEFAULT_PLANS.free.recipes)} saved recipe${DEFAULT_PLANS.free.recipes === 1 ? "" : "s"}, one on a schedule.`,
       `Pro: ${limitText(DEFAULT_PLANS.pro.uploads)} uploads and ${limitText(DEFAULT_PLANS.pro.ai_requests)} AI requests a month, ${limitText(DEFAULT_PLANS.pro.recipes).toLowerCase()} saved recipes.`,
-      "Files up to 1,000,000 rows and 500 columns, 400 MB. Excel export stops at 250,000 rows; CSV and Parquet have no cap.",
+      "Files up to 1,000,000 rows and 500 columns, 400 MB. An Excel file can be up to 25 MB, since a workbook takes far longer to read; save a bigger one as CSV. Excel export stops at 250,000 rows; CSV and Parquet have no cap.",
       "Counters reset on the first of each month. At a cap, uploads and AI requests pause; files, recipes and history stay.",
     ],
   },

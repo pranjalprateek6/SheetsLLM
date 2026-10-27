@@ -12,7 +12,7 @@ from time import perf_counter
 
 from fastapi import APIRouter, Header, HTTPException, Query, Request, Response
 
-from app.config import MAX_COLUMNS, MAX_UPLOAD_MB, UPLOAD_MAX_BYTES
+from app.config import EXCEL_MAX_BYTES, MAX_COLUMNS, MAX_EXCEL_MB, MAX_UPLOAD_MB, UPLOAD_MAX_BYTES
 from app import cache, db, storage
 from app.fetch_url import FetchError, fetch_bytes, normalise_url
 from app.engine import (
@@ -42,6 +42,22 @@ IN_MEMORY_BYTES = 8 * 1024 * 1024
 # Sheets one upload may add as files: enough for a workbook of months,
 # few enough that converting them stays inside the upload's time
 MAX_SHEETS = 10
+
+
+_EXCEL = (".xlsx", ".xls", ".xlsm")
+
+
+def _excel_too_large(filename: str, size: int) -> Response | None:
+    """A workbook over the Excel cap, said plainly with the way round it."""
+    if not filename.lower().endswith(_EXCEL) or size <= EXCEL_MAX_BYTES:
+        return None
+    return _json_response(
+        413, "EXCEL_TOO_LARGE",
+        f"This workbook is {size / (1024 * 1024):.1f} MB. An Excel file can be up to {MAX_EXCEL_MB} MB, "
+        f"because a workbook takes far more memory and time to read than a CSV. Save the sheet as CSV and upload that: "
+        f"a CSV can be up to {MAX_UPLOAD_MB} MB.",
+        max_mb=MAX_EXCEL_MB,
+    )
 
 
 def _json_response(status: int, code: str, message: str, **extra) -> Response:
@@ -98,6 +114,8 @@ async def upload(
                     return _json_response(
                         413, "UPLOAD_TOO_LARGE", f"Max upload size is {MAX_UPLOAD_MB} MB"
                     )
+                if (too_large := _excel_too_large(filename, int(content_length))) is not None:
+                    return too_large
             except ValueError:
                 pass
 
@@ -115,12 +133,14 @@ async def upload(
                     return _json_response(
                         413, "UPLOAD_TOO_LARGE", f"Max upload size is {MAX_UPLOAD_MB} MB"
                     )
+                if (too_large := _excel_too_large(filename, bytes_seen)) is not None:
+                    spool.close()
+                    return too_large
                 spool.write(chunk)
             spool.close()
             if not bytes_seen:
                 return _json_response(400, "EMPTY_FILE", "No file data received")
-            lower = filename.lower()
-            if bytes_seen <= IN_MEMORY_BYTES or lower.endswith((".xlsx", ".xls", ".xlsm")):
+            if bytes_seen <= IN_MEMORY_BYTES or filename.lower().endswith(_EXCEL):
                 # Small files, and workbooks (the sheet question and the
                 # macro check read them whole), go through as bytes
                 file_bytes = Path(spool.name).read_bytes()
@@ -156,6 +176,10 @@ async def _ingest(
     """Everything after the bytes are in hand: checks, the sheet question,
     Parquet, storage, the record, the preview and the insights. Shared by a
     dropped file and a fetched link."""
+    # A workbook from a link, or stashed for its sheets, meets the cap here
+    if (too_large := _excel_too_large(filename, len(file_bytes))) is not None:
+        return too_large
+
     # ── Security validation ────────────────────────────────────────────
     try:
         validate_file_magic(file_bytes, filename)

@@ -503,6 +503,40 @@ class TestUpload:
         assert resp.status_code == 400
         assert "more than 3 rows" in resp.json()["message"]
 
+    def test_a_workbook_over_the_excel_cap_says_to_save_it_as_csv(self, client, upload_seams, monkeypatch):
+        book = _multi_sheet_xlsx()
+        monkeypatch.setattr(upload_module, "EXCEL_MAX_BYTES", len(book) - 1)
+        resp = client.post(
+            "/upload", content=book,
+            headers={"X-Filename": "big.xlsx", "Content-Type": "application/octet-stream"},
+        )
+        assert resp.status_code == 413
+        body = resp.json()
+        assert body["code"] == "EXCEL_TOO_LARGE"
+        assert "Save the sheet as CSV" in body["message"]
+        assert "—" not in body["message"]
+
+    def test_a_csv_the_size_of_a_big_workbook_still_goes_through(self, client, upload_seams, monkeypatch):
+        monkeypatch.setattr(upload_module, "EXCEL_MAX_BYTES", 10)
+        resp = client.post(
+            "/upload", content=b"id,amount\n1,2\n3,4\n",
+            headers={"X-Filename": "orders.csv", "Content-Type": "application/octet-stream"},
+        )
+        assert resp.status_code == 200, resp.text
+
+    def test_a_workbook_from_a_link_meets_the_same_cap(self, monkeypatch):
+        import asyncio
+        from time import perf_counter
+
+        book = _multi_sheet_xlsx()
+        monkeypatch.setattr(upload_module, "EXCEL_MAX_BYTES", len(book) - 1)
+        resp = asyncio.run(upload_module._ingest(
+            user_id="u1", file_id="f1", filename="linked.xlsx", file_bytes=book, sheet_name=None,
+            pending_id=None, source="url", start_time=perf_counter(),
+        ))
+        assert resp.status_code == 413
+        assert b"EXCEL_TOO_LARGE" in resp.body
+
     def test_empty_upload_400(self, client, upload_seams):
         resp = client.post(
             "/upload", content=b"",

@@ -34,7 +34,7 @@ import { listLookups, uploadAndLink, type Lookup } from "@/lib/lookups";
 import { fetchRows, isViewActive, PAGE_SIZE, type GridView } from "@/lib/rows";
 import { takeToolResult } from "@/lib/loops";
 import { takeTrySteps } from "@/lib/try";
-import { checkRows, MAX_ROWS, MAX_UPLOAD_BYTES, megabytes, sendFile } from "@/lib/upload";
+import { checkRows, MAX_ROWS, MAX_UPLOAD_BYTES, megabytes, sendFile, workbookTooLarge } from "@/lib/upload";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription,
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -481,6 +481,11 @@ function WorkspaceContent() {
             setTrimOffer({ file, head: rows.head, headBytes: rows.headBytes, suggestions });
             return false;
           }
+        }
+        const workbookError = workbookTooLarge(file);
+        if (workbookError) {
+          setUploadError(workbookError);
+          return false;
         }
         if (file.size > MAX_UPLOAD_BYTES) {
           setUploadError(`${file.name} is ${megabytes(file.size)}, over the ${megabytes(MAX_UPLOAD_BYTES)} limit per file. Split it, or keep only the columns you need, and upload again.`);
