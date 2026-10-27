@@ -785,7 +785,9 @@ class TooManyRowsError(UnreadableFileError):
 
 def _csv_source(path: str, delim: str | None, *, lenient: bool) -> str:
     delim_arg = f", delim='{delim}'" if delim else ""
-    extra = ", strict_mode=false, null_padding=true" if lenient else ""
+    # The parallel reader cannot pad short rows when a cell holds a newline:
+    # DuckDB 1.x read such a file as one column, 2.0 refuses it
+    extra = ", strict_mode=false, null_padding=true, parallel=false" if lenient else ""
     return f"SELECT * FROM read_csv_auto('{path}'{delim_arg}{extra})"
 
 
@@ -912,7 +914,7 @@ def convert_path_to_parquet(
             types = f"types={{{as_text}}}, " if as_text else ""
             sources = [
                 f"SELECT * FROM read_csv('{_sql_path(sheet_csv)}', header=false, names={columns!r}, "
-                f"{types}delim=',', quote='\"', escape='\"', new_line='\\n', null_padding=true, sample_size=-1)"
+                f"{types}delim=',', quote='\"', escape='\"', new_line='\\n', null_padding=true, parallel=false, sample_size=-1)"
             ] if columns else ["SELECT 1 WHERE false"]
         elif lower.endswith(".xls"):
             import pandas as pd

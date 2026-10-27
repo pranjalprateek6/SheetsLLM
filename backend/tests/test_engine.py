@@ -4,10 +4,12 @@ real end-to-end round-trip (no Supabase / no network — pure local DuckDB)."""
 import tempfile
 from pathlib import Path
 
+import duckdb
 import pytest
 
 from app.engine import (
     UnreadableFileError,
+    _csv_source,
     _retarget_from_data,
     _sql_path,
     build_replay_sql,
@@ -110,6 +112,15 @@ def test_a_ragged_csv_keeps_every_row():
     ragged = "\n".join(["a,b", "1,2", "3,4,5", "6,7"]).encode() + b"\n"
     _, rows, cols = convert_to_parquet(ragged, "ragged.csv")
     assert rows == 3 and cols >= 1
+
+
+def test_the_lenient_reader_pads_short_rows_around_a_newline_in_a_cell(tmp_path):
+    # DuckDB 1.x read this as one column and 2.0 refuses it, unless the
+    # parallel reader is off
+    path = tmp_path / "notes.csv"
+    path.write_bytes(b'a,b,c\n1,"x\ny",3\n4,5\n6,7,8\n')
+    rows = duckdb.sql(_csv_source(_sql_path(path), None, lenient=True)).fetchall()
+    assert rows == [(1, "x\ny", 3), (4, "5", None), (6, "7", 8)]
 
 
 def test_unreadable_file_gets_friendly_error():
