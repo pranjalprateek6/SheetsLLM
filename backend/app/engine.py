@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 import concurrent.futures
+import contextlib
 import contextvars
+import functools
 import io
 import logging
 import re
+import shutil
 import tempfile
 import threading
+import weakref
 from pathlib import Path
 from typing import Any
 
@@ -17,8 +21,11 @@ import pyarrow.parquet as pq
 
 from app.config import (
     CHECKPOINT_EVERY_N_STEPS,
+    DUCKDB_MAX_TEMP_SIZE,
     DUCKDB_MEMORY_LIMIT,
+    DUCKDB_QUERIES_AT_ONCE,
     DUCKDB_QUERY_TIMEOUT,
+    DUCKDB_QUEUE_WAIT_SECONDS,
     DUCKDB_THREADS,
     MAX_PREVIEW_ROWS,
     MAX_ROWS,
@@ -83,7 +90,9 @@ _TITLE_CASE_SQL = (
 )
 
 # Where DuckDB may spill when a query outgrows max_memory: its own directory,
-# so allowing it opens nothing else
+# so allowing it opens nothing else. Each connection spills into a folder of
+# its own inside it: two databases spilling into one folder crash the process
+# (DuckDB 1.5.3, four 5M-row DISTINCTs at once, every time).
 _SPILL_DIR = Path(tempfile.gettempdir()) / "sheetsllm-duckdb-spill"
 
 
@@ -94,9 +103,13 @@ def _lock_to_files(con, read, write) -> None:
         p = Path(p)
         paths += [_sql_path(p), _sql_path(p.with_name(f"tmp_{p.name}"))]
     _SPILL_DIR.mkdir(parents=True, exist_ok=True)
-    spill = _sql_path(_SPILL_DIR)
+    own = tempfile.mkdtemp(prefix="con-", dir=_SPILL_DIR)
+    # Gone with the connection, whoever closes it
+    weakref.finalize(con, shutil.rmtree, own, True)
+    spill = _sql_path(own)
     listed = ", ".join(f"'{p}'" for p in paths)
     con.execute(f"SET temp_directory = '{spill}'")
+    con.execute(f"SET max_temp_directory_size = '{DUCKDB_MAX_TEMP_SIZE}'")
     con.execute(f"SET allowed_paths = [{listed}]")
     con.execute(f"SET allowed_directories = ['{spill}/']")
     con.execute("SET enable_external_access = false")
@@ -114,6 +127,49 @@ class QueryTimeoutError(Exception):
     """Raised when a DuckDB query exceeds the time limit."""
 
 
+# ── One query at a time ──────────────────────────────────────────────
+# Each query may use DUCKDB_MEMORY_LIMIT and more besides, so the queries
+# running at once are capped. Work that already holds a turn (insights
+# replaying its steps, say) never waits on itself: the turn travels with
+# the context into the threads it starts.
+
+_turns = threading.BoundedSemaphore(DUCKDB_QUERIES_AT_ONCE)
+_has_turn: contextvars.ContextVar[bool] = contextvars.ContextVar("duckdb_has_turn", default=False)
+
+
+def _take_turn() -> bool:
+    """Wait for a turn. False when this context already has one."""
+    if _has_turn.get():
+        return False
+    if not _turns.acquire(timeout=DUCKDB_QUEUE_WAIT_SECONDS):
+        raise QueryTimeoutError("The server is busy with another large file. Try again in a minute.")
+    return True
+
+
+@contextlib.contextmanager
+def query_turn():
+    """Hold a turn for the queries inside the block."""
+    taken = _take_turn()
+    token = _has_turn.set(True)
+    try:
+        yield
+    finally:
+        _has_turn.reset(token)
+        if taken:
+            _turns.release()
+
+
+def one_at_a_time(func):
+    """Run ``func`` holding a turn."""
+
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        with query_turn():
+            return func(*args, **kwargs)
+
+    return wrapper
+
+
 def _run_with_timeout(func, *args, timeout: int = DUCKDB_QUERY_TIMEOUT, interrupt=()):
     """Run a synchronous function, and stop its queries when time runs out.
 
@@ -124,8 +180,11 @@ def _run_with_timeout(func, *args, timeout: int = DUCKDB_QUERY_TIMEOUT, interrup
     the limit, and nothing waits on it.
     """
     opened: list[duckdb.DuckDBPyConnection] = list(interrupt)
+    # The time limit counts from the turn, not from joining the queue
+    taken = _take_turn()
     # The worker thread gets this request's context (its lookups among it)
     ctx = contextvars.copy_context()
+    ctx.run(_has_turn.set, True)
 
     def run():
         _opened.cons = opened
@@ -133,6 +192,10 @@ def _run_with_timeout(func, *args, timeout: int = DUCKDB_QUERY_TIMEOUT, interrup
             return func(*args)
         finally:
             _opened.cons = None
+            # Given back when the queries stop, which may be after the caller
+            # has stopped waiting for them
+            if taken:
+                _turns.release()
 
     pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
     try:
@@ -738,6 +801,7 @@ def _quote(name: str) -> str:
     return '"' + name.replace('"', '""') + '"'
 
 
+@one_at_a_time
 def convert_path_to_parquet(
     src_path: str | Path, filename: str, *, sheet_name: str | None = None
 ) -> tuple[bytes, int, int]:
