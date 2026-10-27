@@ -8,7 +8,7 @@ import time
 from pathlib import Path
 from typing import Any
 
-from app.engine import _retarget_from_data, _run_with_timeout, _sql_path, build_replay_sql, get_connection
+from app.engine import _retarget_from_data, _run_with_timeout, _sql_path, build_replay_sql, get_connection, one_at_a_time
 from app.ops import quote_ident, quote_literal  # column names come from the file
 
 logger = logging.getLogger("sheetsllm.insights")
@@ -20,6 +20,7 @@ logger = logging.getLogger("sheetsllm.insights")
 INSIGHTS_BUDGET_SECONDS = 8.0
 
 
+@one_at_a_time
 def generate_insights(
     local_path: str | Path, steps: list[dict] | None = None, *, budget: float = INSIGHTS_BUDGET_SECONDS
 ) -> dict[str, Any]:
