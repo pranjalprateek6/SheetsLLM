@@ -5,14 +5,21 @@ is refused with 413), and a 5M-row file is about 113 MB of Parquet. So a
 file over PART_BYTES is stored as numbered parts, `{key}.part0000`, ...,
 with a small manifest at `{key}` itself. Callers never see the parts: every
 function here takes and returns whole files by their key.
+
+A file goes up from disk and comes back to disk a part at a time, so a
+113 MB file never sits whole in memory (as bytes it did, two or three
+copies over at once).
 """
 
 from __future__ import annotations
 
+import io
 import json
 import logging
 import os
 import re
+import tempfile
+from pathlib import Path
 
 from app.config import SUPABASE_BUCKET
 from app.db import get_client
@@ -49,39 +56,108 @@ def part_owner(name: str) -> str | None:
     return m.group("owner") if m else None
 
 
-def _put(key: str, data: bytes) -> None:
+class _Window(io.RawIOBase):
+    """Bytes `start` to `start + length` of a file, read as a whole file of
+    their own. The upload sizes it by seeking to its end and reads it in
+    chunks, so one part goes up without being copied out first."""
+
+    def __init__(self, path: str | Path, start: int, length: int):
+        self._file = open(path, "rb")
+        self._start, self._length, self._pos = start, length, 0
+
+    def readable(self) -> bool:
+        return True
+
+    def seekable(self) -> bool:
+        return True
+
+    def tell(self) -> int:
+        return self._pos
+
+    def seek(self, offset: int, whence: int = io.SEEK_SET) -> int:
+        base = {io.SEEK_SET: 0, io.SEEK_CUR: self._pos, io.SEEK_END: self._length}[whence]
+        self._pos = max(0, min(self._length, base + offset))
+        return self._pos
+
+    def readinto(self, buffer) -> int:
+        want = min(len(buffer), self._length - self._pos)
+        if want <= 0:
+            return 0
+        self._file.seek(self._start + self._pos)
+        got = self._file.readinto(memoryview(buffer)[:want])
+        self._pos += got
+        return got
+
+    def close(self) -> None:
+        self._file.close()
+        super().close()
+
+
+def _put(key: str, data) -> None:
     _bucket().upload(path=key, file=data, file_options={"content-type": "application/octet-stream"})
 
 
-def upload_parquet(key: str, parquet_bytes: bytes) -> str:
-    """Upload Parquet bytes to Supabase Storage. Returns the key."""
-    size = len(parquet_bytes)
-    if size <= PART_BYTES:
-        _put(key, parquet_bytes)
+def _put_window(key: str, path: str | Path, start: int, length: int) -> None:
+    # A BufferedReader is sent as it is; anything else is taken for a path
+    with io.BufferedReader(_Window(path, start, length)) as part:
+        _put(key, part)
+
+
+def upload_parquet_file(key: str, path: str | Path) -> str:
+    """Upload a Parquet file on disk to Supabase Storage. Returns the key."""
+    size = os.path.getsize(path)
+    count = max(1, -(-size // PART_BYTES))
+    if count == 1:
+        _put_window(key, path, 0, size)
     else:
-        view = memoryview(parquet_bytes)
-        count = -(-size // PART_BYTES)
         # The parts first: a manifest is only ever written over parts that exist
         for i in range(count):
-            _put(part_key(key, i), bytes(view[i * PART_BYTES : (i + 1) * PART_BYTES]))
+            _put_window(part_key(key, i), path, i * PART_BYTES, min(PART_BYTES, size - i * PART_BYTES))
         _put(key, _MANIFEST + json.dumps({"parts": count, "size": size}).encode())
     logger.info("Uploaded %d bytes to storage key=%s", size, key)
     return key
 
 
+def upload_parquet(key: str, parquet_bytes: bytes) -> str:
+    """Upload Parquet bytes to Supabase Storage. Returns the key."""
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".parquet")
+    try:
+        with tmp:
+            tmp.write(parquet_bytes)
+        return upload_parquet_file(key, tmp.name)
+    finally:
+        Path(tmp.name).unlink(missing_ok=True)
+
+
+def download_parquet_file(key: str, dest: str | Path) -> int:
+    """Download a Parquet file from Supabase Storage to `dest`, a part at a
+    time. Returns its size."""
+    data = _bucket().download(key)
+    with open(dest, "wb") as out:
+        if data.startswith(_MANIFEST):
+            manifest = json.loads(data[len(_MANIFEST) :])
+            del data
+            for i in range(manifest["parts"]):
+                out.write(_bucket().download(part_key(key, i)))
+            size = out.tell()
+            if size != manifest["size"]:
+                raise RuntimeError(f"storage key={key} came back {size} bytes, expected {manifest['size']}")
+        else:
+            out.write(data)
+            size = out.tell()
+    logger.info("Downloaded %d bytes from storage key=%s", size, key)
+    return size
+
+
 def download_parquet(key: str) -> bytes:
     """Download a Parquet file from Supabase Storage."""
-    data = _bucket().download(key)
-    if data.startswith(_MANIFEST):
-        manifest = json.loads(data[len(_MANIFEST) :])
-        whole = bytearray()
-        for i in range(manifest["parts"]):
-            whole += _bucket().download(part_key(key, i))
-        if len(whole) != manifest["size"]:
-            raise RuntimeError(f"storage key={key} came back {len(whole)} bytes, expected {manifest['size']}")
-        data = bytes(whole)
-    logger.info("Downloaded %d bytes from storage key=%s", len(data), key)
-    return data
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".parquet")
+    tmp.close()
+    try:
+        download_parquet_file(key, tmp.name)
+        return Path(tmp.name).read_bytes()
+    finally:
+        Path(tmp.name).unlink(missing_ok=True)
 
 
 def _parts_of(keys: list[str]) -> dict[str, list[str]]:

@@ -17,6 +17,8 @@ class _Bucket:
         self.objects: dict[str, bytes] = {}
 
     def upload(self, path, file, file_options=None):
+        if not isinstance(file, bytes):
+            file = file.read()
         if len(file) > self.cap:
             raise RuntimeError("413 The object exceeded the maximum allowed size")
         if path in self.objects:
@@ -89,3 +91,43 @@ def test_a_part_knows_its_file():
     assert storage.part_owner("u/f/original.parquet.part0003") == "u/f/original.parquet"
     assert storage.part_owner("u/f/original.parquet") is None
     assert storage.part_owner("u/f/original.parquet.part12") is None
+
+
+def test_a_file_goes_up_and_comes_back_from_disk_in_parts(bucket, tmp_path):
+    src = tmp_path / "big.parquet"
+    data = b"PAR1" + os.urandom(250)
+    src.write_bytes(data)
+    storage.upload_parquet_file("u/f/original.parquet", src)
+    assert sorted(bucket.objects) == ["u/f/original.parquet"] + [f"u/f/original.parquet.part000{i}" for i in range(3)]
+    dest = tmp_path / "back.parquet"
+    assert storage.download_parquet_file("u/f/original.parquet", dest) == len(data)
+    assert dest.read_bytes() == data
+
+
+def test_a_short_part_download_is_refused(bucket, tmp_path):
+    src = tmp_path / "big.parquet"
+    src.write_bytes(b"PAR1" + os.urandom(250))
+    storage.upload_parquet_file("u/f/original.parquet", src)
+    bucket.objects["u/f/original.parquet.part0001"] = b"short"
+    with pytest.raises(RuntimeError, match="expected 254"):
+        storage.download_parquet_file("u/f/original.parquet", tmp_path / "back.parquet")
+
+
+def test_a_part_is_sent_as_just_its_bytes(tmp_path):
+    """The upload is multipart over httpx: it must size the part, not the
+    whole file, and send exactly the part's bytes (again on a retry)."""
+    import io
+
+    import httpx
+
+    src = tmp_path / "f.bin"
+    data = os.urandom(1000)
+    src.write_bytes(data)
+    with io.BufferedReader(storage._Window(src, 300, 400)) as part:
+        request = httpx.Request("POST", "https://x.test/o", files={"file": ("p", part, "application/octet-stream")})
+        first = b"".join(request.stream)
+        again = b"".join(request.stream)
+    assert int(request.headers["content-length"]) == len(first)
+    assert data[300:700] in first and first.count(data[300:700]) == 1
+    assert len(first) - 400 < 300  # the rest is the multipart framing
+    assert again == first

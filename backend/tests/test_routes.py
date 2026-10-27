@@ -10,6 +10,7 @@ no startup sweep / eviction loop / Supabase calls happen here.
 from __future__ import annotations
 
 import io
+from pathlib import Path
 import types
 
 import duckdb
@@ -312,8 +313,8 @@ def upload_seams(monkeypatch, tmp_path):
     from app import db, storage
 
     stored: dict[str, bytes] = {}
-    monkeypatch.setattr(storage, "upload_parquet",
-                        lambda key, data: stored.__setitem__(key, data))
+    monkeypatch.setattr(storage, "upload_parquet_file",
+                        lambda key, path: stored.__setitem__(key, Path(path).read_bytes()))
     monkeypatch.setattr(storage, "delete_object", lambda key: None)
 
     def _local(r2_key: str) -> str:
@@ -449,14 +450,14 @@ class TestUpload:
         assert client.post(f"/upload?pending_id={pending}&sheet_names=Sales").status_code == 410
 
     def test_a_sheet_that_will_not_read_is_reported_and_the_rest_kept(self, client, upload_seams, monkeypatch):
-        real = upload_module.convert_to_parquet
+        real = upload_module.convert_to_parquet_file
 
         def _convert(data, filename, *, sheet_name=None):
             if sheet_name == "Costs":
                 raise upload_module.UnreadableFileError("That sheet has no table in it.")
             return real(data, filename, sheet_name=sheet_name)
 
-        monkeypatch.setattr(upload_module, "convert_to_parquet", _convert)
+        monkeypatch.setattr(upload_module, "convert_to_parquet_file", _convert)
         pending = self._ask(client, _multi_sheet_xlsx())["file_id"]
         body = client.post(f"/upload?pending_id={pending}&sheet_names=Sales&sheet_names=Costs").json()
         assert [f["sheet"] for f in body["files"]] == ["Sales"]
@@ -477,8 +478,8 @@ class TestUpload:
         monkeypatch.setattr(db, "create_file", lambda **kw: made.append(kw) or kw)
         monkeypatch.setattr(upload_module, "IN_MEMORY_BYTES", 10)
         used: list[str] = []
-        real = upload_module.convert_path_to_parquet
-        monkeypatch.setattr(upload_module, "convert_path_to_parquet", lambda *a, **k: used.append("path") or real(*a, **k))
+        real = upload_module.convert_path_to_parquet_file
+        monkeypatch.setattr(upload_module, "convert_path_to_parquet_file", lambda *a, **k: used.append("path") or real(*a, **k))
         body = "\n".join(["id,amount"] + [f"{i},{i * 3}" for i in range(500)]).encode() + b"\n"
         resp = client.post(
             "/upload", content=body,
@@ -591,3 +592,17 @@ class TestFeedback:
             assert client.post("/feedback", json={"message": "hi"}).status_code == 200
         resp = client.post("/feedback", json={"message": "hi again"})
         assert resp.status_code == 429
+
+
+def test_an_upload_is_cached_from_its_own_file_not_downloaded_back(client, upload_seams, monkeypatch):
+    from app import storage
+
+    def _no_download(*a, **k):
+        raise AssertionError("downloaded what was just uploaded")
+
+    monkeypatch.setattr(storage, "download_parquet_file", _no_download)
+    monkeypatch.setattr(cache, "get_local_parquet", _no_download)
+    resp = client.post("/upload", content=b"id,amount\n1,2\n3,4\n",
+                       headers={"X-Filename": "small.csv", "Content-Type": "application/octet-stream"})
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["preview"]["total_rows"] == 2
